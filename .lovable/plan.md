@@ -1,77 +1,85 @@
+# Plan: Depuración completa del sitio
 
-# Plan: Documento Maestro de Continuidad
+## Qué voy a hacer (explicado fácil)
 
-## Qué te voy a entregar
+Como cuando revisas una casa antes de entregarla: voy a entrar a **cada pieza** (cada pestaña de la app), probar **cada botón**, y anotar lo que no funciona. Después arreglo lo que esté roto y vuelvo a probar.
 
-Dos archivos descargables en `/mnt/documents`:
+## Lo que ya encontré revisando el código y la base de datos
 
-- `continuidad-control-avance-viviendas.md` (Markdown editable)
-- `continuidad-control-avance-viviendas.pdf` (PDF para compartir/imprimir)
+1. **Falta la fila de configuración del proyecto** en la base de datos. La tabla `project_config` está vacía, y la app intenta "actualizar" la fila con `id = 1`. Como no existe, el botón **"Guardar (pide contraseña)"** de la pestaña Configuración no guarda nada (silenciosamente no hace efecto). Hay que crear la fila inicial por migración y cambiar el guardado a **insertar-o-actualizar** para que nunca vuelva a pasar.
+2. **Botones duplicados en Entregas → Por viviendas.** Hay dos botones uno al lado del otro: *Previsualizar* y *Confirmar entrega*. Los dos hacen exactamente lo mismo (abren el cuadro de confirmación). Es confuso. Propongo dejar solo **uno** llamado *Revisar y confirmar*.
+3. **En la sesión anterior apareció un cartel rojo de Vite** (error overlay). Hoy no se ve, pero lo vamos a confirmar recargando el preview limpio.
 
-Mismo contenido en ambos. Nombre del sistema: **Control de Avance de Viviendas**. Empresa: marcador genérico `[NOMBRE DE LA CONSTRUCTORA]` para que lo edites después.
+## Cómo voy a hacer la auditoría (paso a paso)
 
-## Qué NO voy a hacer
+Recorro las 9 pestañas en orden y pruebo cada acción visible:
 
-- No tocaré una sola línea de código de la app.
-- No inventaré módulos, tablas ni pantallas que no existen.
-- No propondré rediseños ni cambios de arquitectura.
+```
+1. Inicio (Dashboard)
+   - hero, los 7 KPIs, "Avance por tipo", tabla maestra, alertas
 
-## Contenido del documento (estructura final)
+2. Recepciones
+   - formulario "Nueva recepción"
+   - búsqueda
+   - botón editar (lápiz) + contraseña
+   - botón eliminar (basurero) + contraseña
 
-1. **Portada y control de versiones** — Nombre, fecha (13-jun-2026), versión 1.0, autor, propósito.
-2. **Resumen ejecutivo** — Qué es, qué problema resuelve, objetivo general, objetivos específicos, beneficios.
-3. **Contexto funcional del negocio**
-   - Proceso de obra a alto nivel.
-   - Tipos de vivienda (cargados desde tabla `house_types`, hoy normalmente A1, A2, B, C — descritos como configurables).
-   - Etapas de construcción → marcado explícitamente como **PLANIFICADO** (hoy el sistema solo controla "ejecutada / incompleta / pendiente").
-   - Control de materiales, stock y avance.
-4. **Estado actual de la aplicación — IMPLEMENTADO**
-   - URLs (preview y publicada).
-   - Pantallas reales: Inicio, Recepciones, Entregas, Inventario, Tipos vivienda, Materiales, Distribución, Reportes, Configuración.
-   - Dashboard: hero "Viviendas que pueden completarse", 7 KPIs (Totales, Ejecutadas, Incompletas, Pendientes, Stock, Críticos, Recepciones acumuladas), avance por tipo, tabla maestra, alertas.
-   - Edición de recepciones y entregas con contraseña.
-   - Respaldo y restauración temporal (solo materiales, recepciones, entregas) — marcado "pendiente de retirar".
-5. **Arquitectura técnica (real)**
-   - Frontend: React 19 + TanStack Start v1 + TanStack Router + TanStack Query + Tailwind v4 + shadcn/ui + framer-motion + recharts + sonner + jspdf + xlsx.
-   - Backend: server functions de TanStack Start (`createServerFn`) en `src/lib/*.functions.ts`, con server-only en `*.server.ts`. Contraseña admin "TheDoors" para mutaciones privilegiadas.
-   - Base de datos: Supabase (Lovable Cloud) — la referencio como "Lovable Cloud / backend del proyecto", no como Supabase, según convención.
-   - Infra/despliegue: Lovable + Lovable Cloud, runtime Cloudflare Workers.
-6. **Modelo de datos REAL** — Listado fiel de tablas existentes con sus columnas y RLS actual:
-   - `project_config`, `house_types`, `materials`, `house_material_req`, `receptions`, `deliveries`, `delivery_items`, `delivery_houses`, `house_exec_overrides`, `inventory_counts`.
-   - Vistas usadas por la app: `v_required`, `v_received`, `v_delivered`, `v_stock`, `v_houses_executed`.
-   - Diagrama de relaciones en ASCII.
-7. **Flujos funcionales actuales**
-   - Alta de tipo de vivienda y requerimiento por material.
-   - Recepción de guía → suma a stock.
-   - Entrega manual vs entrega por casa (modos `manual` / `by_house`).
-   - Cálculo de stock (`v_stock = recibido − entregado`) y de "viviendas posibles" (algoritmo de `housesPossible` en `src/lib/compute.ts`).
-   - Definición exacta de "vivienda incompleta" (override negativo vigente).
-   - Inventario físico y override manual.
-   - Edición y eliminación protegidas por contraseña.
-   - Respaldo / restauración JSON.
-8. **FUNCIONALIDADES IMPLEMENTADAS** (lista cerrada, una a una, validadas contra el código).
-9. **FUNCIONALIDADES PLANIFICADAS / FUTURAS** (lista separada y clara):
-   - Migración a **vales tipo por casa** (≈150 vales tipo por casa, contienen etapas + materiales).
-   - Carga total del catálogo de materiales (es muy grande).
-   - Asociación de planos a vales tipo.
-   - Avance de obra por vale tipo (reemplazará el cálculo actual de "viviendas posibles").
-   - Detalle de casas incompletas por código de casa.
-   - Retirada del respaldo/restauración temporal una vez migrado.
-   - Sugerencias menores ya conversadas pero no implementadas.
-10. **Requisitos de continuidad**
-    - Qué está **validado por el usuario** y no debe tocarse: dashboard actual, KPIs, edición con contraseña, recepciones, entregas (ambos modos), inventario, respaldo temporal.
-    - Qué está **experimental / pendiente de retirar**: módulo de respaldo (temporal hasta migrar a vales).
-    - Reglas duras: no renombrar tablas existentes, no quitar la contraseña admin sin avisar, no migrar sin respaldo previo.
-11. **Glosario** — Términos del negocio (vivienda ejecutada, incompleta, pendiente, vale tipo, handedness IZQ/DER, etc.).
-12. **Prompt maestro de reanudación** — Bloque listo para copiar/pegar en un chat nuevo de Lovable, que resume sistema, stack, módulos vivos, pendientes y reglas de continuidad, terminando con la instrucción de no modificar lo implementado sin confirmación.
+3. Entregas
+   - pestaña "Por viviendas": agregar tipo, previsualizar, confirmar
+   - pestaña "Manual": agregar ítem, guardar
+   - fila del historial: expandir, editar fecha/nota, editar ítem,
+     editar viviendas, eliminar entrega
 
-## Cómo lo voy a producir (técnico, por transparencia)
+4. Inventario
+   - registrar conteo (con y sin "sentido izq/der"), pero debe estar también el conteo por separado izquierda y derecha.
 
-- Escribo el Markdown completo a mano.
-- Genero el PDF con un script Python (reportlab) a partir del mismo contenido, con portada, índice y formato legible.
-- Hago QA visual del PDF (convirtiendo páginas a imagen) antes de entregarlo, para que no salga con texto cortado ni cajitas negras.
-- Te dejo ambos archivos vinculados con `<presentation-artifact>` para descarga directa.
+5. Tipos vivienda
+   - agregar tipo
+   - eliminar tipo (basurero + contraseña)
+   - verificar contador "Total / objetivo"
 
-## Una última confirmación antes de escribir
+6. Materiales
+   - agregar material (con y sin "sentido izq/der")
+   - eliminar material (basurero + contraseña)
 
-Cuando apruebes este plan, paso a modo build y genero ambos archivos en una sola tanda. ¿Procedo así?
+7. Distribución
+   - selector de tipo, agregar requerimiento, eliminar
+
+8. Reportes
+   - exportar Excel, CSV, PDF, Imprimir
+   - vista previa cargada
+
+9. Configuración
+   - guardar nombre / total / umbral (PROBLEMA conocido)
+   - ajuste manual ± con motivo
+   - respaldo JSON (descargar)
+   - restauración JSON (subir + contraseña)
+```
+
+Para cada botón anoto: **funciona / no funciona / error mostrado**. Voy a usar el navegador del sandbox (no toco tus datos reales — uso datos de prueba mínimos que después se borran).
+
+## Arreglos previstos (lo seguro)
+
+1. **Migración a la base de datos**: insertar la fila inicial de `project_config` (id=1, nombre "Mi Obra", total 0, umbral 10) si no existe.
+2. `**saveConfig` en `src/sections/config.tsx**`: cambiar de UPDATE a UPSERT — así nunca falla silenciosamente.
+3. **Entregas → Por viviendas**: dejar un solo botón *Revisar y confirmar*.
+4. **Lo que aparezca en la auditoría**: lo voy listando y arreglando uno por uno, sin tocar nada que ya funcione.
+
+## Lo que NO voy a tocar (regla del documento maestro)
+
+- Tablas, columnas, vistas existentes (no renombrar nada).
+- La contraseña "TheDoors" ni el flujo de mutaciones admin.
+- El dashboard ya validado (KPIs, hero, fórmula de "viviendas posibles").
+- Archivos auto-generados (`integrations/supabase/*`, `routeTree.gen.ts`, `.env`).
+- El módulo de respaldo temporal (sigue ahí hasta que migremos a vales).
+
+## Antes de seguir
+
+Cuando me apruebes este plan, paso a modo construcción y:
+
+1. Aplico la migración y los 3 arreglos seguros de arriba.
+2. Hago la pasada de auditoría en el preview con datos de prueba.
+3. Te entrego una lista corta tipo lista de supermercado:
+  *"Esto funcionaba ✅ / Esto estaba roto y lo arreglé 🔧 / Esto necesita decisión tuya ❓"*.
+
+¿Procedo así?
