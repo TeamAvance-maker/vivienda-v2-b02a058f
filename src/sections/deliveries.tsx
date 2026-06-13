@@ -239,12 +239,9 @@ export function DeliveriesSection() {
               </div>
             )}
 
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" disabled={byhRows.length === 0} onClick={() => setPreviewOpen(true)}>
-                Previsualizar
-              </Button>
+            <div className="flex justify-end">
               <Button disabled={byhRows.length === 0} onClick={() => setPreviewOpen(true)}>
-                Confirmar entrega
+                Revisar y confirmar
               </Button>
             </div>
           </TabsContent>
