@@ -1,0 +1,76 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+
+// Validador de payload genérico para mutaciones administrativas.
+const tableEnum = z.enum([
+  "project_config",
+  "house_types",
+  "materials",
+  "house_material_req",
+  "receptions",
+  "deliveries",
+  "delivery_items",
+  "delivery_houses",
+  "house_exec_overrides",
+  "inventory_counts",
+]);
+
+const mutationSchema = z.object({
+  passphrase: z.string().min(1),
+  table: tableEnum,
+  action: z.enum(["update", "delete", "insert"]),
+  match: z.record(z.string(), z.any()).optional(),
+  values: z.record(z.string(), z.any()).optional(),
+});
+
+export const verifyPassphraseFn = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z.object({ passphrase: z.string() }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { checkPassphrase } = await import("./admin.server");
+    checkPassphrase(data.passphrase);
+    return { ok: true };
+  });
+
+export const adminMutateFn = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => mutationSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { checkPassphrase } = await import("./admin.server");
+    checkPassphrase(data.passphrase);
+
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+
+    if (data.action === "delete") {
+      if (!data.match || Object.keys(data.match).length === 0) {
+        throw new Error("Falta filtro para eliminar.");
+      }
+      let q: any = supabaseAdmin.from(data.table).delete();
+      for (const [k, v] of Object.entries(data.match)) q = q.eq(k, v);
+      const { error } = await q;
+      if (error) throw new Error(error.message);
+      return { ok: true };
+    }
+
+    if (data.action === "update") {
+      if (!data.match || Object.keys(data.match).length === 0) {
+        throw new Error("Falta filtro para actualizar.");
+      }
+      if (!data.values) throw new Error("Faltan valores.");
+      let q: any = supabaseAdmin.from(data.table).update(data.values as any);
+      for (const [k, v] of Object.entries(data.match)) q = q.eq(k, v);
+      const { error } = await q;
+      if (error) throw new Error(error.message);
+      return { ok: true };
+    }
+
+    // insert privilegiado
+    if (!data.values) throw new Error("Faltan valores.");
+    const { error } = await supabaseAdmin
+      .from(data.table)
+      .insert(data.values as any);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
