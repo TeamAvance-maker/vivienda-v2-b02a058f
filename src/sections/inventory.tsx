@@ -282,7 +282,7 @@ export function InventorySection() {
             note: editing.note ?? "",
           }}
         />
-      )}
+      );})()}
     </div>
   );
 }
