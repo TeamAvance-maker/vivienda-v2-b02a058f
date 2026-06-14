@@ -219,11 +219,17 @@ export function ValeTipoSection() {
               <SelectValue placeholder={valeTypeId ? "Selecciona etapa" : "Primero el vale tipo"} />
             </SelectTrigger>
             <SelectContent>
-              {stagesForType.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  Etapa {s.stage_number} · {s.name}
-                </SelectItem>
-              ))}
+              {stagesForType.map((s) => {
+                const prefix = `Etapa ${s.stage_number}`;
+                const label = s.name && s.name.trim() && s.name.trim() !== prefix
+                  ? `${prefix} · ${s.name}`
+                  : prefix;
+                return (
+                  <SelectItem key={s.id} value={s.id}>
+                    {label}
+                  </SelectItem>
+                );
+              })}
               {stagesForType.length === 0 && valeTypeId && (
                 <div className="px-2 py-1.5 text-xs text-muted-foreground">
                   Sin etapas
