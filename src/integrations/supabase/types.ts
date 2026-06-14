@@ -115,7 +115,7 @@ export type Database = {
             foreignKeyName: "delivery_items_material_code_fkey"
             columns: ["material_code"]
             isOneToOne: false
-            referencedRelation: "materials"
+            referencedRelation: "materials_v2"
             referencedColumns: ["code"]
           },
         ]
@@ -447,7 +447,7 @@ export type Database = {
             foreignKeyName: "receptions_material_code_fkey"
             columns: ["material_code"]
             isOneToOne: false
-            referencedRelation: "materials"
+            referencedRelation: "materials_v2"
             referencedColumns: ["code"]
           },
         ]
@@ -683,7 +683,7 @@ export type Database = {
             foreignKeyName: "delivery_items_material_code_fkey"
             columns: ["material_code"]
             isOneToOne: false
-            referencedRelation: "materials"
+            referencedRelation: "materials_v2"
             referencedColumns: ["code"]
           },
         ]
@@ -706,7 +706,7 @@ export type Database = {
             foreignKeyName: "receptions_material_code_fkey"
             columns: ["material_code"]
             isOneToOne: false
-            referencedRelation: "materials"
+            referencedRelation: "materials_v2"
             referencedColumns: ["code"]
           },
         ]
