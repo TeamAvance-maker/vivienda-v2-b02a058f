@@ -332,6 +332,64 @@ export function InventorySection() {
           }}
         />
       );})()}
+
+      {/* Historial de ajustes (inmutable) */}
+      <div className="surface-card overflow-x-auto">
+        <div className="border-b border-border/60 px-4 py-3">
+          <h3 className="font-display text-base font-semibold">Historial de ajustes</h3>
+          <p className="text-xs text-muted-foreground">
+            Cada ajuste queda registrado y no se puede modificar ni eliminar.
+          </p>
+        </div>
+        <table className="min-w-full text-sm">
+          <thead className="bg-secondary/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-4 py-2.5">Fecha</th>
+              <th className="px-4 py-2.5">Material</th>
+              <th className="px-4 py-2.5">Sentido</th>
+              <th className="px-4 py-2.5 text-right">Antes</th>
+              <th className="px-4 py-2.5 text-right">Contado</th>
+              <th className="px-4 py-2.5 text-right">Δ aplicado</th>
+              <th className="px-4 py-2.5">Nota</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(adjustments.data ?? []).map((a) => (
+              <tr key={a.id} className="border-t border-border/50">
+                <td className="px-4 py-2.5">{fmtDate(a.date)}</td>
+                <td className="px-4 py-2.5">
+                  <span className="font-mono text-xs">{a.material_code}</span>
+                  {matMap.get(a.material_code) && (
+                    <span className="ml-2 text-muted-foreground">
+                      {matMap.get(a.material_code)}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-2.5">{HAND_LABEL[a.handedness]}</td>
+                <td className="px-4 py-2.5 text-right num-display">{fmtNumber(a.prev_system_qty)}</td>
+                <td className="px-4 py-2.5 text-right num-display">{fmtNumber(a.counted_qty)}</td>
+                <td
+                  className={cn(
+                    "px-4 py-2.5 text-right num-display",
+                    a.delta < 0 ? "text-destructive" : "text-[oklch(0.4_0.08_115)]",
+                  )}
+                >
+                  {a.delta > 0 ? "+" : ""}
+                  {fmtNumber(a.delta)}
+                </td>
+                <td className="px-4 py-2.5 text-muted-foreground">{a.note || "—"}</td>
+              </tr>
+            ))}
+            {(adjustments.data ?? []).length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                  Aún no se han aplicado ajustes.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
