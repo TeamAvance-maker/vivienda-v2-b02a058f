@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,21 +12,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SectionHeader } from "@/components/app-shell";
+import { EditDialog } from "@/components/edit-dialog";
+import { requestAdminMutation } from "@/components/passphrase-dialog";
 import { supabase } from "@/integrations/supabase/client";
-import {
-  useInventory,
-  useInvalidateAll,
-  useMaterials,
-  useVStock,
-} from "@/lib/queries";
-import type { Handedness } from "@/lib/types";
+import { useInventory, useInvalidateAll, useVStock } from "@/lib/queries";
+import { useMaterialsV2 } from "@/lib/sites-queries";
+import type { Handedness, InventoryCount } from "@/lib/types";
 import { HAND_LABEL } from "@/lib/types";
 import { fmtDate, fmtNumber, get, makeMap } from "@/lib/compute";
 import { cn } from "@/lib/utils";
 
 export function InventorySection() {
   const list = useInventory();
-  const materials = useMaterials();
+  const materials = useMaterialsV2();
   const stock = useVStock();
   const invalidate = useInvalidateAll();
   const today = new Date().toISOString().slice(0, 10);
@@ -36,9 +35,25 @@ export function InventorySection() {
     counted_qty: 0,
     note: "",
   });
+  const [filter, setFilter] = useState("");
+  const [editing, setEditing] = useState<InventoryCount | null>(null);
 
   const mat = materials.data?.find((m) => m.code === form.material_code);
   const handOpts: Handedness[] = mat?.tracks_handedness ? ["left", "right"] : ["none"];
+
+  // Búsqueda en el selector
+  const [matFilter, setMatFilter] = useState("");
+  const matOptions = useMemo(() => {
+    const f = matFilter.trim().toLowerCase();
+    const all = materials.data ?? [];
+    return f
+      ? all.filter(
+          (m) =>
+            m.description.toLowerCase().includes(f) ||
+            m.code.toLowerCase().includes(f),
+        )
+      : all;
+  }, [materials.data, matFilter]);
 
   async function add() {
     if (!form.material_code) return toast.error("Selecciona material");
@@ -55,6 +70,25 @@ export function InventorySection() {
   }
 
   const sm = makeMap(stock.data);
+  const matMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const x of materials.data ?? []) m.set(x.code, x.description);
+    return m;
+  }, [materials.data]);
+
+  const rows = useMemo(() => {
+    const all = list.data ?? [];
+    const f = filter.trim().toLowerCase();
+    if (!f) return all;
+    return all.filter((r) => {
+      const desc = (matMap.get(r.material_code) ?? "").toLowerCase();
+      return (
+        r.material_code.toLowerCase().includes(f) ||
+        desc.includes(f) ||
+        (r.note ?? "").toLowerCase().includes(f)
+      );
+    });
+  }, [list.data, filter, matMap]);
 
   return (
     <div className="space-y-6">
@@ -81,9 +115,21 @@ export function InventorySection() {
             >
               <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
               <SelectContent>
-                {(materials.data ?? []).map((m) => (
+                <div className="p-2">
+                  <Input
+                    autoFocus
+                    placeholder="Buscar material…"
+                    value={matFilter}
+                    onChange={(e) => setMatFilter(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  />
+                </div>
+                {matOptions.map((m) => (
                   <SelectItem key={m.code} value={m.code}>{m.code} · {m.description}</SelectItem>
                 ))}
+                {matOptions.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">Sin resultados</div>
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -121,7 +167,15 @@ export function InventorySection() {
         </div>
       </div>
 
-      <div className="surface-card overflow-hidden">
+      <div className="surface-card p-3">
+        <Input
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Buscar por material, código o nota…"
+        />
+      </div>
+
+      <div className="surface-card overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead className="bg-secondary/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
             <tr>
@@ -132,16 +186,21 @@ export function InventorySection() {
               <th className="px-4 py-2.5 text-right">Contado</th>
               <th className="px-4 py-2.5 text-right">Diferencia</th>
               <th className="px-4 py-2.5">Nota</th>
+              <th className="px-4 py-2.5 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {(list.data ?? []).map((r) => {
+            {rows.map((r) => {
               const sys = get(sm, r.material_code, r.handedness);
               const diff = r.counted_qty - sys;
+              const desc = matMap.get(r.material_code);
               return (
                 <tr key={r.id} className="border-t border-border/50">
                   <td className="px-4 py-2.5">{fmtDate(r.date)}</td>
-                  <td className="px-4 py-2.5">{r.material_code}</td>
+                  <td className="px-4 py-2.5">
+                    <span className="font-mono text-xs">{r.material_code}</span>
+                    {desc && <span className="ml-2 text-muted-foreground">{desc}</span>}
+                  </td>
                   <td className="px-4 py-2.5">{HAND_LABEL[r.handedness]}</td>
                   <td className="px-4 py-2.5 text-right num-display">{fmtNumber(sys)}</td>
                   <td className="px-4 py-2.5 text-right num-display">{fmtNumber(r.counted_qty)}</td>
@@ -155,19 +214,71 @@ export function InventorySection() {
                     {fmtNumber(diff)}
                   </td>
                   <td className="px-4 py-2.5 text-muted-foreground">{r.note || "—"}</td>
+                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    <Button variant="ghost" size="icon" onClick={() => setEditing(r)} title="Editar">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      title="Eliminar"
+                      onClick={() =>
+                        requestAdminMutation({
+                          table: "inventory_counts",
+                          action: "delete",
+                          match: { id: r.id },
+                          description: `Eliminar conteo del ${fmtDate(r.date)} · ${r.material_code} · ${fmtNumber(r.counted_qty)}.`,
+                        })
+                      }
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </td>
                 </tr>
               );
             })}
-            {(list.data ?? []).length === 0 && (
+            {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
-                  Sin conteos registrados.
+                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                  {(list.data ?? []).length === 0 ? "Sin conteos registrados." : "Sin resultados para ese filtro."}
                 </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {editing && (
+        <EditDialog
+          open={!!editing}
+          onOpenChange={(o) => !o && setEditing(null)}
+          title="Editar conteo"
+          description={`${editing.material_code} · ${fmtDate(editing.date)}`}
+          table="inventory_counts"
+          match={{ id: editing.id }}
+          fields={[
+            { name: "date", label: "Fecha", type: "date" },
+            { name: "counted_qty", label: "Cantidad contada", type: "number" },
+            {
+              name: "handedness",
+              label: "Sentido",
+              type: "select",
+              options: [
+                { value: "none", label: HAND_LABEL.none },
+                { value: "left", label: HAND_LABEL.left },
+                { value: "right", label: HAND_LABEL.right },
+              ],
+            },
+            { name: "note", label: "Nota", type: "text" },
+          ]}
+          initial={{
+            date: editing.date,
+            counted_qty: editing.counted_qty,
+            handedness: editing.handedness,
+            note: editing.note ?? "",
+          }}
+        />
+      )}
     </div>
   );
 }
