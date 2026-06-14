@@ -780,7 +780,7 @@ function DeliveryDialog({
             <AlertDialogHeader>
               <AlertDialogTitle>¿Confirmar entrega?</AlertDialogTitle>
               <AlertDialogDescription>
-                Vas a registrar {totalLines} materiales para Manzana {site.manzana} · {site.sitio} ·
+                Vas a registrar {totalLines} materiales para Manzana {site.manzana} · Sitio {site.sitio} ·
                 Etapa {stage.stage_number}. Esta acción queda en el historial.
               </AlertDialogDescription>
             </AlertDialogHeader>
