@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { CheckCircle2, Pencil, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,12 @@ import { SectionHeader } from "@/components/app-shell";
 import { EditDialog } from "@/components/edit-dialog";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { useInventory, useInvalidateAll, useVStock } from "@/lib/queries";
+import {
+  useAdjustments,
+  useInventory,
+  useInvalidateAll,
+  useVStock,
+} from "@/lib/queries";
 import { useMaterialsV2 } from "@/lib/sites-queries";
 import type { Handedness, InventoryCount } from "@/lib/types";
 import { HAND_LABEL } from "@/lib/types";
@@ -24,6 +29,7 @@ import { cn } from "@/lib/utils";
 
 export function InventorySection() {
   const list = useInventory();
+  const adjustments = useAdjustments();
   const materials = useMaterialsV2();
   const stock = useVStock();
   const invalidate = useInvalidateAll();
@@ -215,24 +221,67 @@ export function InventorySection() {
                   </td>
                   <td className="px-4 py-2.5 text-muted-foreground">{r.note || "—"}</td>
                   <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                    <Button variant="ghost" size="icon" onClick={() => setEditing(r)} title="Editar">
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="Eliminar"
-                      onClick={() =>
-                        requestAdminMutation({
-                          table: "inventory_counts",
-                          action: "delete",
-                          match: { id: r.id },
-                          description: `Eliminar conteo del ${fmtDate(r.date)} · ${r.material_code} · ${fmtNumber(r.counted_qty)}.`,
-                        })
-                      }
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    {r.adjustment_applied ? (
+                      <span className="chip" title="Este conteo ya generó un ajuste de stock">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Ajustado
+                      </span>
+                    ) : (
+                      <>
+                        {diff !== 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mr-1"
+                            title="Aplicar ajuste al stock teórico"
+                            onClick={() =>
+                              requestAdminMutation({
+                                table: "inventory_adjustments",
+                                action: "insert",
+                                values: {
+                                  count_id: r.id,
+                                  date: r.date,
+                                  material_code: r.material_code,
+                                  handedness: r.handedness,
+                                  prev_system_qty: sys,
+                                  counted_qty: r.counted_qty,
+                                  delta: diff,
+                                  note: r.note || null,
+                                },
+                                description: `Aplicar ajuste de stock para ${r.material_code} (${HAND_LABEL[r.handedness]}): el sistema dice ${fmtNumber(sys)} y contaste ${fmtNumber(r.counted_qty)}. Se registrará un ajuste de ${diff > 0 ? "+" : ""}${fmtNumber(diff)}. No se puede deshacer.`,
+                                onSuccess: () => {
+                                  // Marcar el conteo como ajustado
+                                  (supabase.from("inventory_counts" as never) as any)
+                                    .update({ adjustment_applied: true })
+                                    .eq("id", r.id)
+                                    .then(() => invalidate());
+                                },
+                              })
+                            }
+                          >
+                            <ShieldCheck className="mr-1 h-4 w-4" />
+                            Aplicar ajuste
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" onClick={() => setEditing(r)} title="Editar">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Eliminar"
+                          onClick={() =>
+                            requestAdminMutation({
+                              table: "inventory_counts",
+                              action: "delete",
+                              match: { id: r.id },
+                              description: `Eliminar conteo del ${fmtDate(r.date)} · ${r.material_code} · ${fmtNumber(r.counted_qty)}.`,
+                            })
+                          }
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </>
+                    )}
                   </td>
                 </tr>
               );
@@ -283,6 +332,64 @@ export function InventorySection() {
           }}
         />
       );})()}
+
+      {/* Historial de ajustes (inmutable) */}
+      <div className="surface-card overflow-x-auto">
+        <div className="border-b border-border/60 px-4 py-3">
+          <h3 className="font-display text-base font-semibold">Historial de ajustes</h3>
+          <p className="text-xs text-muted-foreground">
+            Cada ajuste queda registrado y no se puede modificar ni eliminar.
+          </p>
+        </div>
+        <table className="min-w-full text-sm">
+          <thead className="bg-secondary/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-4 py-2.5">Fecha</th>
+              <th className="px-4 py-2.5">Material</th>
+              <th className="px-4 py-2.5">Sentido</th>
+              <th className="px-4 py-2.5 text-right">Antes</th>
+              <th className="px-4 py-2.5 text-right">Contado</th>
+              <th className="px-4 py-2.5 text-right">Δ aplicado</th>
+              <th className="px-4 py-2.5">Nota</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(adjustments.data ?? []).map((a) => (
+              <tr key={a.id} className="border-t border-border/50">
+                <td className="px-4 py-2.5">{fmtDate(a.date)}</td>
+                <td className="px-4 py-2.5">
+                  <span className="font-mono text-xs">{a.material_code}</span>
+                  {matMap.get(a.material_code) && (
+                    <span className="ml-2 text-muted-foreground">
+                      {matMap.get(a.material_code)}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-2.5">{HAND_LABEL[a.handedness]}</td>
+                <td className="px-4 py-2.5 text-right num-display">{fmtNumber(a.prev_system_qty)}</td>
+                <td className="px-4 py-2.5 text-right num-display">{fmtNumber(a.counted_qty)}</td>
+                <td
+                  className={cn(
+                    "px-4 py-2.5 text-right num-display",
+                    a.delta < 0 ? "text-destructive" : "text-[oklch(0.4_0.08_115)]",
+                  )}
+                >
+                  {a.delta > 0 ? "+" : ""}
+                  {fmtNumber(a.delta)}
+                </td>
+                <td className="px-4 py-2.5 text-muted-foreground">{a.note || "—"}</td>
+              </tr>
+            ))}
+            {(adjustments.data ?? []).length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
+                  Aún no se han aplicado ajustes.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

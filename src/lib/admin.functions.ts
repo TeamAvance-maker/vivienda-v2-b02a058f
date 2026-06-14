@@ -13,6 +13,7 @@ const tableEnum = z.enum([
   "delivery_houses",
   "house_exec_overrides",
   "inventory_counts",
+  "inventory_adjustments",
   "materials_v2",
   "vale_types_v2",
   "vale_stages",
@@ -46,9 +47,35 @@ export const adminMutateFn = createServerFn({ method: "POST" })
     const { checkPassphrase } = await import("./admin.server");
     checkPassphrase(data.passphrase);
 
+    // Reglas inmutables:
+    // - inventory_adjustments es historial: solo permite INSERT.
+    if (data.table === "inventory_adjustments" && data.action !== "insert") {
+      throw new Error("Los ajustes de inventario no se pueden modificar ni eliminar.");
+    }
+
     const { supabaseAdmin } = await import(
       "@/integrations/supabase/client.server"
     );
+
+    // Bloquear edición/eliminación de conteos que ya generaron ajuste.
+    if (
+      data.table === "inventory_counts" &&
+      (data.action === "update" || data.action === "delete") &&
+      data.match?.id
+    ) {
+      const { data: existing, error: chkErr } = await supabaseAdmin
+        .from("inventory_counts")
+        .select("adjustment_applied")
+        .eq("id", data.match.id)
+        .maybeSingle();
+      if (chkErr) throw new Error(chkErr.message);
+      if ((existing as any)?.adjustment_applied) {
+        throw new Error(
+          "Este conteo ya generó un ajuste y no puede modificarse ni eliminarse. Crea un nuevo conteo si necesitas corregir.",
+        );
+      }
+    }
+
 
     if (data.action === "delete") {
       if (!data.match || Object.keys(data.match).length === 0) {

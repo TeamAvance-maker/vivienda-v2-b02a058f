@@ -232,8 +232,66 @@ export type Database = {
         }
         Relationships: []
       }
+      inventory_adjustments: {
+        Row: {
+          applied_at: string
+          count_id: string | null
+          counted_qty: number
+          created_at: string
+          date: string
+          delta: number
+          handedness: Database["public"]["Enums"]["handedness"]
+          id: string
+          material_code: string
+          note: string | null
+          prev_system_qty: number
+        }
+        Insert: {
+          applied_at?: string
+          count_id?: string | null
+          counted_qty: number
+          created_at?: string
+          date?: string
+          delta: number
+          handedness?: Database["public"]["Enums"]["handedness"]
+          id?: string
+          material_code: string
+          note?: string | null
+          prev_system_qty: number
+        }
+        Update: {
+          applied_at?: string
+          count_id?: string | null
+          counted_qty?: number
+          created_at?: string
+          date?: string
+          delta?: number
+          handedness?: Database["public"]["Enums"]["handedness"]
+          id?: string
+          material_code?: string
+          note?: string | null
+          prev_system_qty?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_adjustments_count_id_fkey"
+            columns: ["count_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_counts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_adjustments_material_code_fkey"
+            columns: ["material_code"]
+            isOneToOne: false
+            referencedRelation: "materials_v2"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       inventory_counts: {
         Row: {
+          adjustment_applied: boolean
           counted_qty: number
           created_at: string
           date: string
@@ -243,6 +301,7 @@ export type Database = {
           note: string
         }
         Insert: {
+          adjustment_applied?: boolean
           counted_qty: number
           created_at?: string
           date?: string
@@ -252,6 +311,7 @@ export type Database = {
           note?: string
         }
         Update: {
+          adjustment_applied?: boolean
           counted_qty?: number
           created_at?: string
           date?: string

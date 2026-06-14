@@ -9,6 +9,7 @@ import type {
   HouseMaterialReq,
   HouseType,
   HousesExecutedRow,
+  InventoryAdjustment,
   InventoryCount,
   Material,
   ProjectConfig,
@@ -26,6 +27,7 @@ export const qk = {
   deliveryHouses: ["delivery_houses"] as const,
   overrides: ["house_exec_overrides"] as const,
   inventory: ["inventory_counts"] as const,
+  adjustments: ["inventory_adjustments"] as const,
   vRequired: ["v_required"] as const,
   vReceived: ["v_received"] as const,
   vDelivered: ["v_delivered"] as const,
@@ -108,6 +110,13 @@ export const useInventory = () =>
   useQuery({
     queryKey: qk.inventory,
     queryFn: () => fetchAll<InventoryCount>("inventory_counts", { column: "date", ascending: false }),
+  });
+
+export const useAdjustments = () =>
+  useQuery({
+    queryKey: qk.adjustments,
+    queryFn: () =>
+      fetchAll<InventoryAdjustment>("inventory_adjustments", { column: "applied_at", ascending: false }),
   });
 
 export const useVRequired = () =>
