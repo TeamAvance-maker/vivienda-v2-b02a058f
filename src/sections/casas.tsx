@@ -266,6 +266,23 @@ function TiposTab() {
 
 const HOUSE_TYPES_OPTIONS: HouseTypeV2[] = ["A1", "A2", "B", "C"];
 
+// "Sitio 1", "sitio 1", " 1 " → "1". Así no se duplican por el formato.
+function normalizeSitio(raw: string): string {
+  return raw.trim().replace(/^[Ss]itio\s+/, "").trim();
+}
+
+// Cómo se muestra en pantalla: "Sitio N".
+function formatSitio(value: string): string {
+  return `Sitio ${value}`;
+}
+
+function explainSiteError(msg: string): string {
+  if (/duplicate key|unique/i.test(msg)) {
+    return "Ese sitio ya existe en esa manzana.";
+  }
+  return msg;
+}
+
 function ManzanasTab() {
   const sitesQ = useSites();
   const invalidate = useInvalidateSitesV2();
@@ -314,14 +331,15 @@ function ManzanasTab() {
   async function addOne() {
     const m = Number(form.manzana);
     if (!m || m < 1) return toast.error("Manzana inválida");
-    if (!form.sitio.trim()) return toast.error("Sitio requerido");
+    const sitio = normalizeSitio(form.sitio);
+    if (!sitio) return toast.error("Sitio requerido");
     const { error } = await supabase.from("sites" as never).insert({
       manzana: m,
-      sitio: form.sitio.trim(),
+      sitio,
       house_type: form.house_type,
     } as any);
-    if (error) return toast.error(error.message);
-    toast.success("Sitio agregado");
+    if (error) return toast.error(explainSiteError(error.message));
+    toast.success(`${formatSitio(sitio)} agregado en M${m}`);
     setForm({ manzana: form.manzana, sitio: "", house_type: form.house_type });
     invalidate();
     invalidateAll();
@@ -338,7 +356,7 @@ function ManzanasTab() {
       rows.push({ manzana: m, sitio: String(i), house_type: bulkType });
     }
     const { error } = await supabase.from("sites" as never).insert(rows as any);
-    if (error) return toast.error(error.message);
+    if (error) return toast.error(explainSiteError(error.message));
     toast.success(`${rows.length} sitios agregados`);
     setBulkOpen(false);
     invalidate();
@@ -356,13 +374,14 @@ function ManzanasTab() {
     if (!editing) return;
     const m = Number(editManzana);
     if (!m || m < 1) return toast.error("Manzana inválida");
-    if (!editSitio.trim()) return toast.error("Sitio requerido");
+    const sitio = normalizeSitio(editSitio);
+    if (!sitio) return toast.error("Sitio requerido");
     requestAdminMutation({
       table: "sites",
       action: "update",
       match: { id: editing.id },
-      values: { manzana: m, sitio: editSitio.trim(), house_type: editType },
-      description: `Modificar sitio M${editing.manzana}·${editing.sitio} (${editing.house_type}).`,
+      values: { manzana: m, sitio, house_type: editType },
+      description: `Modificar sitio M${editing.manzana}·${formatSitio(editing.sitio)} (${editing.house_type}).`,
       onSuccess: () => {
         setEditing(null);
         invalidate();
@@ -475,7 +494,7 @@ function ManzanasTab() {
             {filtered.map((s) => (
               <tr key={s.id} className="border-t border-border/60">
                 <td className="px-4 py-2.5 font-medium">M{s.manzana}</td>
-                <td className="px-4 py-2.5">{s.sitio}</td>
+                <td className="px-4 py-2.5">{formatSitio(s.sitio)}</td>
                 <td className="px-4 py-2.5">
                   <span className="rounded bg-secondary px-2 py-0.5 text-xs font-semibold">
                     {s.house_type}
@@ -493,7 +512,7 @@ function ManzanasTab() {
                         table: "sites",
                         action: "delete",
                         match: { id: s.id },
-                        description: `Eliminar sitio M${s.manzana}·${s.sitio}. Esto también eliminará sus entregas registradas.`,
+                        description: `Eliminar sitio M${s.manzana}·${formatSitio(s.sitio)}. Esto también eliminará sus entregas registradas.`,
                         onSuccess: () => {
                           invalidate();
                           invalidateAll();

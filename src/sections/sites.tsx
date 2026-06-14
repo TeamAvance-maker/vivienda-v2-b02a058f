@@ -332,7 +332,7 @@ export function SitesSection() {
               {sites.map((s) => (
                 <tr key={s.id}>
                   <th className="sticky left-0 z-10 whitespace-nowrap border-b border-border bg-background px-3 py-1.5 text-left text-[11px] font-medium">
-                    M{s.manzana} · {s.sitio}{" "}
+                    M{s.manzana} · Sitio {s.sitio}{" "}
                     <span className="ml-1 inline-block rounded bg-secondary px-1.5 text-[9px] font-semibold text-muted-foreground">
                       {s.house_type}
                     </span>
@@ -464,7 +464,7 @@ function SiteValeDialog({
         <DialogHeader>
           <DialogTitle>{vale.name}</DialogTitle>
           <DialogDescription>
-            Manzana {site.manzana} · {site.sitio} · Tipo casa{" "}
+            Manzana {site.manzana} · Sitio {site.sitio} · Tipo casa{" "}
             <Badge variant="secondary">{site.house_type}</Badge>
           </DialogDescription>
         </DialogHeader>
@@ -704,7 +704,7 @@ function DeliveryDialog({
             {mode === "auto" ? "Auto-completar lo que falta" : "Entregar manual"}
           </DialogTitle>
           <DialogDescription>
-            Manzana {site.manzana} · {site.sitio} · Etapa {stage.stage_number}.{" "}
+            Manzana {site.manzana} · Sitio {site.sitio} · Etapa {stage.stage_number}.{" "}
             {mode === "auto"
               ? "Las cantidades vienen prellenadas con lo que falta. Puedes ajustarlas si entregas de más por pérdida o extravío."
               : "Escribe cuánto entregas hoy de cada material."}
@@ -780,7 +780,7 @@ function DeliveryDialog({
             <AlertDialogHeader>
               <AlertDialogTitle>¿Confirmar entrega?</AlertDialogTitle>
               <AlertDialogDescription>
-                Vas a registrar {totalLines} materiales para Manzana {site.manzana} · {site.sitio} ·
+                Vas a registrar {totalLines} materiales para Manzana {site.manzana} · Sitio {site.sitio} ·
                 Etapa {stage.stage_number}. Esta acción queda en el historial.
               </AlertDialogDescription>
             </AlertDialogHeader>
