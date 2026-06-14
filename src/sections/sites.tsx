@@ -1,0 +1,806 @@
+import { useMemo, useState } from "react";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { SectionHeader } from "@/components/app-shell";
+import { cn } from "@/lib/utils";
+import {
+  useInvalidateSitesV2,
+  useMaterialsV2,
+  useSiteDeliveries,
+  useSiteDeliveryItems,
+  useSites,
+  useValeReqs,
+  useValeStages,
+  useValeTypes,
+} from "@/lib/sites-queries";
+import type {
+  CellStatus,
+  HouseTypeV2,
+  MaterialV2,
+  Site,
+  ValeStage,
+  ValeTypeV2,
+} from "@/lib/sites-types";
+
+// ============================================================
+// Helpers de cálculo
+// ============================================================
+
+interface Maps {
+  // stageId -> houseType -> [{material_id, qty}]
+  reqsByStageHouse: Map<string, Map<string, { material_id: string; qty: number }[]>>;
+  // siteId -> stageId -> material_id -> qty entregado acumulado
+  deliveredBySiteStageMat: Map<string, Map<string, Map<string, number>>>;
+  // valeTypeId -> stageId[]
+  stagesByVale: Map<string, ValeStage[]>;
+  // materialId -> Material
+  matById: Map<string, MaterialV2>;
+}
+
+function buildMaps(input: {
+  stages: ValeStage[];
+  reqs: { vale_stage_id: string; house_type: string; material_id: string; qty: number }[];
+  deliveries: { id: string; site_id: string; vale_stage_id: string }[];
+  items: { delivery_id: string; material_id: string; qty: number }[];
+  materials: MaterialV2[];
+}): Maps {
+  const reqsByStageHouse = new Map<
+    string,
+    Map<string, { material_id: string; qty: number }[]>
+  >();
+  for (const r of input.reqs) {
+    if (!reqsByStageHouse.has(r.vale_stage_id))
+      reqsByStageHouse.set(r.vale_stage_id, new Map());
+    const m = reqsByStageHouse.get(r.vale_stage_id)!;
+    if (!m.has(r.house_type)) m.set(r.house_type, []);
+    m.get(r.house_type)!.push({ material_id: r.material_id, qty: Number(r.qty) });
+  }
+
+  const deliveryToSiteStage = new Map<string, { site_id: string; vale_stage_id: string }>();
+  for (const d of input.deliveries) deliveryToSiteStage.set(d.id, d);
+
+  const deliveredBySiteStageMat = new Map<string, Map<string, Map<string, number>>>();
+  for (const it of input.items) {
+    const ss = deliveryToSiteStage.get(it.delivery_id);
+    if (!ss) continue;
+    if (!deliveredBySiteStageMat.has(ss.site_id))
+      deliveredBySiteStageMat.set(ss.site_id, new Map());
+    const byStage = deliveredBySiteStageMat.get(ss.site_id)!;
+    if (!byStage.has(ss.vale_stage_id)) byStage.set(ss.vale_stage_id, new Map());
+    const byMat = byStage.get(ss.vale_stage_id)!;
+    byMat.set(it.material_id, (byMat.get(it.material_id) ?? 0) + Number(it.qty));
+  }
+
+  const stagesByVale = new Map<string, ValeStage[]>();
+  for (const s of input.stages) {
+    if (!stagesByVale.has(s.vale_type_id)) stagesByVale.set(s.vale_type_id, []);
+    stagesByVale.get(s.vale_type_id)!.push(s);
+  }
+  for (const arr of stagesByVale.values())
+    arr.sort((a, b) => a.stage_number - b.stage_number);
+
+  const matById = new Map(input.materials.map((m) => [m.id, m]));
+  return { reqsByStageHouse, deliveredBySiteStageMat, stagesByVale, matById };
+}
+
+function cellStatus(site: Site, valeType: ValeTypeV2, maps: Maps): CellStatus {
+  const stages = maps.stagesByVale.get(valeType.id) ?? [];
+  if (stages.length === 0) return "na";
+  let hasAny = false;
+  let allComplete = true;
+  let appliesToHouse = false;
+  for (const st of stages) {
+    const reqs = maps.reqsByStageHouse.get(st.id)?.get(site.house_type) ?? [];
+    if (reqs.length === 0) continue;
+    appliesToHouse = true;
+    const delivered = maps.deliveredBySiteStageMat.get(site.id)?.get(st.id) ?? new Map();
+    for (const r of reqs) {
+      const got = delivered.get(r.material_id) ?? 0;
+      if (got > 0) hasAny = true;
+      if (got < r.qty) allComplete = false;
+    }
+  }
+  if (!appliesToHouse) return "na";
+  if (allComplete) return "complete";
+  if (hasAny) return "partial";
+  return "empty";
+}
+
+const STATUS_COLOR: Record<CellStatus, string> = {
+  complete: "bg-emerald-500 hover:bg-emerald-400",
+  partial: "bg-amber-400 hover:bg-amber-300",
+  empty: "bg-muted hover:bg-muted/70",
+  na: "bg-secondary/40 hover:bg-secondary/60 opacity-40",
+};
+
+// ============================================================
+// Sección principal
+// ============================================================
+
+export function SitesSection() {
+  const sitesQ = useSites();
+  const vtQ = useValeTypes();
+  const stagesQ = useValeStages();
+  const reqsQ = useValeReqs();
+  const matsQ = useMaterialsV2();
+  const delivQ = useSiteDeliveries();
+  const itemsQ = useSiteDeliveryItems();
+
+  const [filterManzana, setFilterManzana] = useState<string>("all");
+  const [filterHouse, setFilterHouse] = useState<string>("all");
+  const [filterSection, setFilterSection] = useState<string>("all");
+  const [openCell, setOpenCell] = useState<{ site: Site; vale: ValeTypeV2 } | null>(null);
+
+  const loading =
+    sitesQ.isLoading ||
+    vtQ.isLoading ||
+    stagesQ.isLoading ||
+    reqsQ.isLoading ||
+    matsQ.isLoading ||
+    delivQ.isLoading ||
+    itemsQ.isLoading;
+
+  const maps = useMemo<Maps | null>(() => {
+    if (
+      !stagesQ.data ||
+      !reqsQ.data ||
+      !delivQ.data ||
+      !itemsQ.data ||
+      !matsQ.data
+    )
+      return null;
+    return buildMaps({
+      stages: stagesQ.data,
+      reqs: reqsQ.data,
+      deliveries: delivQ.data,
+      items: itemsQ.data,
+      materials: matsQ.data,
+    });
+  }, [stagesQ.data, reqsQ.data, delivQ.data, itemsQ.data, matsQ.data]);
+
+  const sites = useMemo(() => {
+    const list = sitesQ.data ?? [];
+    return list
+      .filter((s) => (filterManzana === "all" ? true : String(s.manzana) === filterManzana))
+      .filter((s) => (filterHouse === "all" ? true : s.house_type === filterHouse))
+      .sort((a, b) => a.manzana - b.manzana || a.sitio.localeCompare(b.sitio, "es", { numeric: true }));
+  }, [sitesQ.data, filterManzana, filterHouse]);
+
+  const vales = useMemo(() => {
+    const list = vtQ.data ?? [];
+    return list
+      .filter((v) => (filterSection === "all" ? true : v.section === filterSection))
+      .sort((a, b) => a.sort_order - b.sort_order);
+  }, [vtQ.data, filterSection]);
+
+  const manzanas = useMemo(
+    () => Array.from(new Set((sitesQ.data ?? []).map((s) => s.manzana))).sort((a, b) => a - b),
+    [sitesQ.data],
+  );
+  const sections = useMemo(
+    () => Array.from(new Set((vtQ.data ?? []).map((v) => v.section))).sort(),
+    [vtQ.data],
+  );
+
+  // KPIs de avance
+  const kpis = useMemo(() => {
+    if (!maps || !sitesQ.data || !vtQ.data)
+      return { total: 0, completas: 0, parciales: 0, vacias: 0 };
+    let total = 0,
+      completas = 0,
+      parciales = 0,
+      vacias = 0;
+    for (const s of sitesQ.data) {
+      for (const v of vtQ.data) {
+        const st = cellStatus(s, v, maps);
+        if (st === "na") continue;
+        total++;
+        if (st === "complete") completas++;
+        else if (st === "partial") parciales++;
+        else vacias++;
+      }
+    }
+    return { total, completas, parciales, vacias };
+  }, [maps, sitesQ.data, vtQ.data]);
+
+  return (
+    <div className="space-y-6">
+      <SectionHeader
+        title="Sitios y Vales"
+        description="Matriz de avance: cada celda es un vale tipo para un sitio. Verde = completo · amarillo = parcial · gris = sin tocar · transparente = no aplica."
+      />
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <KpiCard label="Combinaciones aplicables" value={kpis.total} />
+        <KpiCard
+          label="Completas"
+          value={kpis.completas}
+          tone="emerald"
+          pct={kpis.total ? (kpis.completas / kpis.total) * 100 : 0}
+        />
+        <KpiCard
+          label="Parciales"
+          value={kpis.parciales}
+          tone="amber"
+          pct={kpis.total ? (kpis.parciales / kpis.total) * 100 : 0}
+        />
+        <KpiCard
+          label="Sin tocar"
+          value={kpis.vacias}
+          tone="muted"
+          pct={kpis.total ? (kpis.vacias / kpis.total) * 100 : 0}
+        />
+      </div>
+
+      {/* Filtros */}
+      <div className="surface-card flex flex-wrap items-end gap-3 p-4">
+        <FilterSelect
+          label="Manzana"
+          value={filterManzana}
+          onChange={setFilterManzana}
+          options={[
+            { value: "all", label: "Todas" },
+            ...manzanas.map((m) => ({ value: String(m), label: `Manzana ${m}` })),
+          ]}
+        />
+        <FilterSelect
+          label="Tipo casa"
+          value={filterHouse}
+          onChange={setFilterHouse}
+          options={[
+            { value: "all", label: "Todos" },
+            { value: "A1", label: "A1" },
+            { value: "A2", label: "A2" },
+            { value: "B", label: "B" },
+            { value: "C", label: "C" },
+          ]}
+        />
+        <FilterSelect
+          label="Sección"
+          value={filterSection}
+          onChange={setFilterSection}
+          options={[
+            { value: "all", label: "Todas" },
+            ...sections.map((s) => ({ value: s, label: s })),
+          ]}
+        />
+        <div className="ml-auto text-xs text-muted-foreground">
+          {sites.length} sitios × {vales.length} vale tipos
+        </div>
+      </div>
+
+      {/* Matriz */}
+      <div className="surface-card overflow-auto">
+        {loading || !maps ? (
+          <div className="flex items-center justify-center gap-2 p-12 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" /> Cargando matriz…
+          </div>
+        ) : (
+          <table className="min-w-full border-separate border-spacing-0 text-xs">
+            <thead className="sticky top-0 z-10 bg-background">
+              <tr>
+                <th className="sticky left-0 z-20 min-w-[140px] border-b border-border bg-background px-3 py-2 text-left text-[11px] font-semibold">
+                  Sitio
+                </th>
+                {vales.map((v) => (
+                  <th
+                    key={v.id}
+                    className="border-b border-border bg-background px-1 py-2 text-center"
+                    title={v.name}
+                  >
+                    <div className="flex h-28 items-end justify-center">
+                      <span className="block max-w-[80px] -rotate-45 origin-bottom-left whitespace-nowrap text-[10px] font-medium text-muted-foreground">
+                        {v.name.replace(/^VALE TIPO /i, "")}
+                      </span>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sites.map((s) => (
+                <tr key={s.id}>
+                  <th className="sticky left-0 z-10 whitespace-nowrap border-b border-border bg-background px-3 py-1.5 text-left text-[11px] font-medium">
+                    M{s.manzana} · {s.sitio}{" "}
+                    <span className="ml-1 inline-block rounded bg-secondary px-1.5 text-[9px] font-semibold text-muted-foreground">
+                      {s.house_type}
+                    </span>
+                  </th>
+                  {vales.map((v) => {
+                    const st = cellStatus(s, v, maps);
+                    return (
+                      <td
+                        key={v.id}
+                        className="border-b border-border/40 p-0.5 text-center"
+                      >
+                        <button
+                          type="button"
+                          disabled={st === "na"}
+                          onClick={() => setOpenCell({ site: s, vale: v })}
+                          className={cn(
+                            "h-6 w-6 rounded transition-all",
+                            STATUS_COLOR[st],
+                            st !== "na" && "cursor-pointer hover:scale-110",
+                          )}
+                          title={`${v.name} → ${st}`}
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {openCell && maps && (
+        <SiteValeDialog
+          site={openCell.site}
+          vale={openCell.vale}
+          maps={maps}
+          onClose={() => setOpenCell(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Sub-componentes
+// ============================================================
+
+function KpiCard({
+  label,
+  value,
+  tone = "default",
+  pct,
+}: {
+  label: string;
+  value: number;
+  tone?: "default" | "emerald" | "amber" | "muted";
+  pct?: number;
+}) {
+  const color = {
+    default: "text-foreground",
+    emerald: "text-emerald-500",
+    amber: "text-amber-500",
+    muted: "text-muted-foreground",
+  }[tone];
+  return (
+    <div className="surface-card p-4">
+      <div className="text-[11px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={cn("mt-1 font-display text-2xl font-semibold", color)}>{value}</div>
+      {pct !== undefined && (
+        <div className="text-[11px] text-muted-foreground">{pct.toFixed(1)}%</div>
+      )}
+    </div>
+  );
+}
+
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+}) {
+  return (
+    <div className="min-w-[140px]">
+      <Label className="text-[11px]">{label}</Label>
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+// ============================================================
+// Diálogo detalle de un sitio × vale
+// ============================================================
+
+function SiteValeDialog({
+  site,
+  vale,
+  maps,
+  onClose,
+}: {
+  site: Site;
+  vale: ValeTypeV2;
+  maps: Maps;
+  onClose: () => void;
+}) {
+  const stages = maps.stagesByVale.get(vale.id) ?? [];
+  const [activeStage, setActiveStage] = useState<ValeStage | null>(stages[0] ?? null);
+  const [mode, setMode] = useState<"manual" | "auto" | null>(null);
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{vale.name}</DialogTitle>
+          <DialogDescription>
+            Manzana {site.manzana} · {site.sitio} · Tipo casa{" "}
+            <Badge variant="secondary">{site.house_type}</Badge>
+          </DialogDescription>
+        </DialogHeader>
+
+        {stages.length === 0 ? (
+          <div className="py-8 text-center text-sm text-muted-foreground">
+            Este vale tipo no tiene etapas cargadas.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Lista de etapas */}
+            <div className="flex flex-wrap gap-2">
+              {stages.map((st) => {
+                const reqs = maps.reqsByStageHouse.get(st.id)?.get(site.house_type) ?? [];
+                const delivered =
+                  maps.deliveredBySiteStageMat.get(site.id)?.get(st.id) ?? new Map();
+                const applies = reqs.length > 0;
+                const allOk =
+                  applies &&
+                  reqs.every((r) => (delivered.get(r.material_id) ?? 0) >= r.qty);
+                const partial =
+                  applies &&
+                  !allOk &&
+                  reqs.some((r) => (delivered.get(r.material_id) ?? 0) > 0);
+                const tone = !applies
+                  ? "bg-secondary/40 text-muted-foreground"
+                  : allOk
+                    ? "bg-emerald-500/20 text-emerald-600"
+                    : partial
+                      ? "bg-amber-400/20 text-amber-700"
+                      : "bg-muted";
+                return (
+                  <button
+                    key={st.id}
+                    type="button"
+                    disabled={!applies}
+                    onClick={() => setActiveStage(st)}
+                    className={cn(
+                      "rounded-full px-3 py-1 text-xs font-medium transition-all",
+                      tone,
+                      activeStage?.id === st.id && "ring-2 ring-primary",
+                      applies && "cursor-pointer",
+                    )}
+                  >
+                    Etapa {st.stage_number}
+                    {!applies && " (n/a)"}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Detalle etapa activa */}
+            {activeStage && (
+              <StageDetail
+                site={site}
+                stage={activeStage}
+                maps={maps}
+                onAction={(m) => setMode(m)}
+              />
+            )}
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cerrar
+          </Button>
+        </DialogFooter>
+
+        {mode && activeStage && (
+          <DeliveryDialog
+            site={site}
+            stage={activeStage}
+            mode={mode}
+            maps={maps}
+            onDone={() => setMode(null)}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function StageDetail({
+  site,
+  stage,
+  maps,
+  onAction,
+}: {
+  site: Site;
+  stage: ValeStage;
+  maps: Maps;
+  onAction: (m: "manual" | "auto") => void;
+}) {
+  const reqs = maps.reqsByStageHouse.get(stage.id)?.get(site.house_type) ?? [];
+  const delivered = maps.deliveredBySiteStageMat.get(site.id)?.get(stage.id) ?? new Map();
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="font-display text-sm font-semibold">
+          Etapa {stage.stage_number} — materiales requeridos
+        </h3>
+        <div className="flex gap-2">
+          <Button size="sm" variant="outline" onClick={() => onAction("manual")}>
+            Entregar manual
+          </Button>
+          <Button size="sm" onClick={() => onAction("auto")}>
+            Auto-completar lo que falta
+          </Button>
+        </div>
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-border/60">
+        <table className="min-w-full text-xs">
+          <thead className="bg-secondary/40 text-left text-[10px] uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2">Material</th>
+              <th className="px-2 py-2 text-right">Requerido</th>
+              <th className="px-2 py-2 text-right">Entregado</th>
+              <th className="px-2 py-2 text-right">Falta</th>
+              <th className="px-2 py-2">Unidad</th>
+            </tr>
+          </thead>
+          <tbody>
+            {reqs.map((r) => {
+              const mat = maps.matById.get(r.material_id);
+              const got = delivered.get(r.material_id) ?? 0;
+              const falta = Math.max(0, r.qty - got);
+              const ok = got >= r.qty;
+              return (
+                <tr key={r.material_id} className="border-t border-border/60">
+                  <td className="px-3 py-1.5">{mat?.description ?? r.material_id}</td>
+                  <td className="px-2 py-1.5 text-right tabular-nums">{r.qty}</td>
+                  <td
+                    className={cn(
+                      "px-2 py-1.5 text-right tabular-nums",
+                      ok && "font-semibold text-emerald-600",
+                    )}
+                  >
+                    {got}
+                  </td>
+                  <td className="px-2 py-1.5 text-right tabular-nums text-amber-600">
+                    {falta || ""}
+                  </td>
+                  <td className="px-2 py-1.5 text-muted-foreground">{mat?.unit}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Diálogo de entrega (manual o auto-completar)
+// ============================================================
+
+function DeliveryDialog({
+  site,
+  stage,
+  mode,
+  maps,
+  onDone,
+}: {
+  site: Site;
+  stage: ValeStage;
+  mode: "manual" | "auto";
+  maps: Maps;
+  onDone: () => void;
+}) {
+  const invalidate = useInvalidateSitesV2();
+  const reqs = maps.reqsByStageHouse.get(stage.id)?.get(site.house_type) ?? [];
+  const delivered = maps.deliveredBySiteStageMat.get(site.id)?.get(stage.id) ?? new Map();
+
+  const [rows, setRows] = useState(() =>
+    reqs.map((r) => {
+      const got = delivered.get(r.material_id) ?? 0;
+      const falta = Math.max(0, r.qty - got);
+      return { material_id: r.material_id, qty: mode === "auto" ? falta : 0, required: r.qty, already: got };
+    }),
+  );
+  const [note, setNote] = useState("");
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const totalLines = rows.filter((r) => r.qty > 0).length;
+  const willOverdeliver = rows.some((r) => r.already + r.qty > r.required);
+
+  async function save() {
+    setSaving(true);
+    const { data: deliv, error: e1 } = await supabase
+      .from("site_deliveries" as never)
+      .insert({
+        site_id: site.id,
+        vale_stage_id: stage.id,
+        mode,
+        note,
+      } as never)
+      .select("id")
+      .single();
+    if (e1 || !deliv) {
+      toast.error(e1?.message ?? "Error al guardar entrega");
+      setSaving(false);
+      return;
+    }
+    const items = rows
+      .filter((r) => r.qty > 0)
+      .map((r) => ({
+        delivery_id: (deliv as { id: string }).id,
+        material_id: r.material_id,
+        qty: r.qty,
+      }));
+    if (items.length > 0) {
+      const { error: e2 } = await supabase
+        .from("site_delivery_items" as never)
+        .insert(items as never);
+      if (e2) {
+        toast.error(e2.message);
+        setSaving(false);
+        return;
+      }
+    }
+    toast.success(`Entrega registrada (${items.length} materiales)`);
+    invalidate();
+    setSaving(false);
+    onDone();
+  }
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onDone()}>
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>
+            {mode === "auto" ? "Auto-completar lo que falta" : "Entregar manual"}
+          </DialogTitle>
+          <DialogDescription>
+            Manzana {site.manzana} · {site.sitio} · Etapa {stage.stage_number}.{" "}
+            {mode === "auto"
+              ? "Las cantidades vienen prellenadas con lo que falta. Puedes ajustarlas si entregas de más por pérdida o extravío."
+              : "Escribe cuánto entregas hoy de cada material."}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="overflow-hidden rounded-lg border border-border/60">
+            <table className="min-w-full text-xs">
+              <thead className="bg-secondary/40 text-left text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-2">Material</th>
+                  <th className="px-2 py-2 text-right">Req.</th>
+                  <th className="px-2 py-2 text-right">Ya entregado</th>
+                  <th className="px-2 py-2 text-right">Entregar ahora</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const mat = maps.matById.get(r.material_id);
+                  const over = r.already + r.qty > r.required;
+                  return (
+                    <tr key={r.material_id} className="border-t border-border/60">
+                      <td className="px-2 py-1.5">{mat?.description}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{r.required}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{r.already}</td>
+                      <td className="px-2 py-1.5 text-right">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={r.qty}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            setRows((rs) =>
+                              rs.map((x, j) => (j === i ? { ...x, qty: isNaN(v) ? 0 : v } : x)),
+                            );
+                          }}
+                          className={cn("h-7 w-20 text-right", over && "border-amber-500")}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div>
+            <Label>Nota (opcional)</Label>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Comentario..." />
+          </div>
+
+          {willOverdeliver && (
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700">
+              ⚠️ Estás entregando más de lo que pide el vale en algún material. Asegúrate de
+              registrar el motivo en la nota.
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onDone} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button onClick={() => setConfirmOpen(true)} disabled={saving || totalLines === 0}>
+            {saving ? "Guardando…" : `Confirmar (${totalLines} materiales)`}
+          </Button>
+        </DialogFooter>
+
+        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Confirmar entrega?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Vas a registrar {totalLines} materiales para Manzana {site.manzana} · {site.sitio} ·
+                Etapa {stage.stage_number}. Esta acción queda en el historial.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  setConfirmOpen(false);
+                  save();
+                }}
+              >
+                Sí, registrar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Suprime warning de tipo no usado
+export type _ = HouseTypeV2;
