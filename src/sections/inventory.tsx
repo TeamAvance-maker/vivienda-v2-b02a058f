@@ -248,7 +248,10 @@ export function InventorySection() {
         </table>
       </div>
 
-      {editing && (
+      {editing && (() => {
+        const em = materials.data?.find((x) => x.code === editing.material_code);
+        const tracks = !!em?.tracks_handedness;
+        return (
         <EditDialog
           open={!!editing}
           onOpenChange={(o) => !o && setEditing(null)}
@@ -259,16 +262,17 @@ export function InventorySection() {
           fields={[
             { name: "date", label: "Fecha", type: "date" },
             { name: "counted_qty", label: "Cantidad contada", type: "number" },
-            {
-              name: "handedness",
-              label: "Sentido",
-              type: "select",
-              options: [
-                { value: "none", label: HAND_LABEL.none },
-                { value: "left", label: HAND_LABEL.left },
-                { value: "right", label: HAND_LABEL.right },
-              ],
-            },
+            ...(tracks
+              ? ([{
+                  name: "handedness",
+                  label: "Sentido",
+                  type: "select",
+                  options: [
+                    { value: "left", label: HAND_LABEL.left },
+                    { value: "right", label: HAND_LABEL.right },
+                  ],
+                }] as const)
+              : []),
             { name: "note", label: "Nota", type: "text" },
           ]}
           initial={{
