@@ -263,17 +263,17 @@ export function InventorySection() {
             { name: "date", label: "Fecha", type: "date" },
             { name: "counted_qty", label: "Cantidad contada", type: "number" },
             ...(tracks
-              ? ([{
+              ? [{
                   name: "handedness",
                   label: "Sentido",
-                  type: "select",
+                  type: "select" as const,
                   options: [
                     { value: "left", label: HAND_LABEL.left },
                     { value: "right", label: HAND_LABEL.right },
                   ],
-                }] as const)
+                }]
               : []),
-            { name: "note", label: "Nota", type: "text" },
+            { name: "note", label: "Nota", type: "text" as const },
           ]}
           initial={{
             date: editing.date,
