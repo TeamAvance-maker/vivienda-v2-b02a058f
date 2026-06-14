@@ -512,7 +512,7 @@ function ManzanasTab() {
                         table: "sites",
                         action: "delete",
                         match: { id: s.id },
-                        description: `Eliminar sitio M${s.manzana}·${s.sitio}. Esto también eliminará sus entregas registradas.`,
+                        description: `Eliminar sitio M${s.manzana}·${formatSitio(s.sitio)}. Esto también eliminará sus entregas registradas.`,
                         onSuccess: () => {
                           invalidate();
                           invalidateAll();
