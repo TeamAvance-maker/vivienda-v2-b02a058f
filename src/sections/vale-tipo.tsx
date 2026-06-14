@@ -265,16 +265,60 @@ export function ValeTipoSection() {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
               <div className="md:col-span-2">
                 <Label>Material</Label>
-                <Select value={newMatId} onValueChange={setNewMatId}>
-                  <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
-                  <SelectContent className="max-h-80">
-                    {sortedMaterials.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.code} · {m.description}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={matOpen} onOpenChange={setMatOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className={cn(
+                        "w-full justify-between font-normal",
+                        !newMatId && "text-muted-foreground",
+                      )}
+                    >
+                      {newMatId
+                        ? (() => {
+                            const m = materialsById.get(newMatId);
+                            return m ? `${m.code} · ${m.description}` : "Selecciona";
+                          })()
+                        : "Selecciona o busca…"}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <Command
+                      filter={(value, search) => {
+                        if (!search) return 1;
+                        return value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
+                      }}
+                    >
+                      <CommandInput placeholder="Buscar por código o descripción…" />
+                      <CommandList className="max-h-72">
+                        <CommandEmpty>Sin resultados.</CommandEmpty>
+                        <CommandGroup>
+                          {sortedMaterials.map((m) => (
+                            <CommandItem
+                              key={m.id}
+                              value={`${m.code} ${m.description}`}
+                              onSelect={() => {
+                                setNewMatId(m.id);
+                                setMatOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  newMatId === m.id ? "opacity-100" : "opacity-0",
+                                )}
+                              />
+                              <span className="font-mono text-xs mr-2">{m.code}</span>
+                              <span className="truncate">{m.description}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div>
                 <Label>Cantidad</Label>
