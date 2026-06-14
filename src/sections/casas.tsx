@@ -374,13 +374,14 @@ function ManzanasTab() {
     if (!editing) return;
     const m = Number(editManzana);
     if (!m || m < 1) return toast.error("Manzana inválida");
-    if (!editSitio.trim()) return toast.error("Sitio requerido");
+    const sitio = normalizeSitio(editSitio);
+    if (!sitio) return toast.error("Sitio requerido");
     requestAdminMutation({
       table: "sites",
       action: "update",
       match: { id: editing.id },
-      values: { manzana: m, sitio: editSitio.trim(), house_type: editType },
-      description: `Modificar sitio M${editing.manzana}·${editing.sitio} (${editing.house_type}).`,
+      values: { manzana: m, sitio, house_type: editType },
+      description: `Modificar sitio M${editing.manzana}·${formatSitio(editing.sitio)} (${editing.house_type}).`,
       onSuccess: () => {
         setEditing(null);
         invalidate();
