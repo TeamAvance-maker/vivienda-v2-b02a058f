@@ -1,4 +1,6 @@
-import { Trash2 } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
+import { Pencil, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -7,8 +9,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SectionHeader } from "@/components/app-shell";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
+import { adminMutateFn } from "@/lib/admin.functions";
 import { useInvalidateSitesV2, useMaterialsV2 } from "@/lib/sites-queries";
+import type { MaterialV2 } from "@/lib/sites-types";
 
 function nextCode(existing: { code: string }[]): string {
   let maxN = 0;
@@ -22,6 +35,7 @@ function nextCode(existing: { code: string }[]): string {
 export function MaterialsSection() {
   const materials = useMaterialsV2();
   const invalidate = useInvalidateSitesV2();
+  const adminMutate = useServerFn(adminMutateFn);
   const [form, setForm] = useState({
     description: "",
     unit: "un",
@@ -29,6 +43,13 @@ export function MaterialsSection() {
   });
   const [saving, setSaving] = useState(false);
   const [filter, setFilter] = useState("");
+
+  // Edit dialog
+  const [editing, setEditing] = useState<MaterialV2 | null>(null);
+  const [editDesc, setEditDesc] = useState("");
+  const [editUnit, setEditUnit] = useState("");
+  const [editHand, setEditHand] = useState(false);
+  const [editPass, setEditPass] = useState("");
 
   const list = useMemo(() => {
     const all = materials.data ?? [];
@@ -70,6 +91,42 @@ export function MaterialsSection() {
     setForm({ description: "", unit: "un", tracks_handedness: false });
     invalidate();
   }
+
+  function openEdit(m: MaterialV2) {
+    setEditing(m);
+    setEditDesc(m.description);
+    setEditUnit(m.unit);
+    setEditHand(!!m.tracks_handedness);
+    setEditPass("");
+  }
+
+  const editMut = useMutation({
+    mutationFn: async () => {
+      if (!editing) return;
+      if (!editPass) throw new Error("Contraseña requerida");
+      if (!editDesc.trim()) throw new Error("La descripción es requerida");
+      await adminMutate({
+        data: {
+          passphrase: editPass,
+          table: "materials_v2",
+          action: "update",
+          match: { id: editing.id },
+          values: {
+            description: editDesc.trim(),
+            unit: editUnit.trim() || "un",
+            tracks_handedness: editHand,
+          },
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Material actualizado");
+      setEditing(null);
+      setEditPass("");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Error"),
+  });
 
   return (
     <div className="space-y-6">
@@ -153,6 +210,14 @@ export function MaterialsSection() {
                   <Button
                     variant="ghost"
                     size="icon"
+                    onClick={() => openEdit(m)}
+                    title="Editar"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() =>
                       requestAdminMutation({
                         table: "materials_v2",
@@ -161,6 +226,7 @@ export function MaterialsSection() {
                         description: `Eliminar material "${m.code} · ${m.description}". Esta acción no se puede deshacer.`,
                       })
                     }
+                    title="Eliminar"
                   >
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
@@ -177,6 +243,65 @@ export function MaterialsSection() {
           </tbody>
         </table>
       </div>
+
+      {/* Edit dialog */}
+      <AlertDialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Editar material {editing?.code}
+            </AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Descripción</Label>
+              <Input
+                value={editDesc}
+                onChange={(e) => setEditDesc(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Unidad</Label>
+                <Input
+                  value={editUnit}
+                  onChange={(e) => setEditUnit(e.target.value)}
+                />
+              </div>
+              <div className="flex items-end">
+                <label className="flex h-10 w-full items-center gap-2 rounded-md border border-input bg-background px-3 text-sm">
+                  <Checkbox
+                    checked={editHand}
+                    onCheckedChange={(v) => setEditHand(!!v)}
+                  />
+                  Sentido izq/der
+                </label>
+              </div>
+            </div>
+            <div>
+              <Label>Contraseña</Label>
+              <Input
+                type="password"
+                value={editPass}
+                onChange={(e) => setEditPass(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={editMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!editPass || editMut.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                editMut.mutate();
+              }}
+            >
+              {editMut.isPending ? "Guardando…" : "Guardar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
