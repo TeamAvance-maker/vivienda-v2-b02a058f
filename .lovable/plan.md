@@ -1,63 +1,47 @@
-# Plan: unir la configuración de casas en un solo lugar
+# Ajuste de inventario con confirmación e historial
 
-## La idea, en simple
+## Cómo va a funcionar (en cristiano)
 
-Hoy la información de las casas vive en 3 lugares distintos del menú de arriba:
-- **Tipos vivienda** (A1, A2, B, C y cuántas hay de cada uno)
-- **Sitios y Vales** (las manzanas y sitios, con su tipo)
-- **Vale Tipo** (los vales/etapas con materiales)
+1. Cuentas físicamente y registras un **conteo** (como hoy).
+2. Si hay diferencia, junto al renglón aparece un botón **"Aplicar ajuste"**.
+3. Al presionarlo te pide la **contraseña de obra**.
+4. Confirmado, se crea un **ajuste** que iguala el stock teórico al contado.
+5. Ese ajuste **queda marcado como aplicado y ya no se puede modificar ni borrar**. Si más tarde te das cuenta de un error, haces un **nuevo conteo** y aplicas otro ajuste.
 
-Vamos a juntar esos tres en **una sola sección** del menú llamada **"Casas"**, con 3 pestañas internas. Además, la cantidad de cada tipo (ej: "A1 = 20") ya no se escribirá a mano: la app la contará sola mirando los sitios registrados.
+## Cambios en la base de datos
 
-## Cómo se verá
+Nueva tabla `inventory_adjustments` (es el "historial inmutable"):
 
-```text
-Menú de arriba:
-  Sitios y Vales  ·  Inicio  ·  Recepciones  ·  Entregas  ·  Inventario
-  [Casas]  ·  Materiales  ·  Reportes  ·  Configuración
+- `id`, `count_id` (referencia al conteo que lo originó), `date`, `material_code`, `handedness`, `delta` (positivo o negativo), `prev_system_qty`, `counted_qty`, `note`, `applied_at`, `applied_by_label`.
+- Sin políticas de UPDATE ni DELETE → ni desde la app ni con contraseña se puede tocar.
 
-Al entrar en "Casas":
-  ┌─ Pestañas ────────────────────────────────┐
-  │  [Tipos]  [Manzanas/Sitios]  [Vales tipo] │
-  └───────────────────────────────────────────┘
-```
+Cambios en `inventory_counts`:
 
-- **Tipos**: lista los tipos (A1, A2…) con la cantidad **calculada automáticamente** desde los sitios. Aquí solo se crea/edita/elimina el tipo (código y nombre). La columna "Cantidad" será de solo lectura con la cuenta real.
-- **Manzanas/Sitios**: lo que hoy está en "Sitios y Vales", parte de gestionar sitios.
-- **Vales tipo**: lo que hoy está en "Vale Tipo".
+- Nueva columna `adjustment_applied` (boolean, default false).
+- Cuando se crea un ajuste, esta columna pasa a `true` y el conteo deja de ser editable/borrable.
 
-> Nota: la pestaña "Sitios y Vales" actual hace **dos cosas** (gestionar sitios + ver el cuadro de entregas por sitio). Solo movemos la parte de **gestionar manzanas/sitios** a "Casas". El **cuadro de seguimiento de entregas** se queda donde está (es operación diaria, no configuración).
+Cambios en la vista `v_stock`:
 
-## Cambios concretos
+- Pasa a sumar también los `delta` de `inventory_adjustments`, así el stock teórico refleja los ajustes.
+- Fórmula nueva: `recibido − entregado + ajustes`.
 
-1. **Menú** (`src/components/app-shell.tsx`)
-   - Quitar las pestañas: `tipos`, `vale_tipo`.
-   - Renombrar `sitios` → sigue siendo "Sitios y Vales" (el cuadro de seguimiento).
-   - Agregar nueva pestaña `casas` con ícono y label "Casas".
+## Cambios en la pantalla de Inventario
 
-2. **Nueva sección** `src/sections/casas.tsx`
-   - Componente con 3 pestañas (shadcn `Tabs`): Tipos / Manzanas / Vales tipo.
-   - Cada pestaña reutiliza el contenido de las secciones actuales (`house-types.tsx`, parte de `sites.tsx` para crear manzanas/sitios, y `vale-tipo.tsx`).
+- En la tabla de conteos:
+  - Si `diferencia ≠ 0` y aún no se ha aplicado → botón **"Aplicar ajuste"** (con candado de contraseña).
+  - Si ya se aplicó → chip **"Ajustado"** y los botones de editar/eliminar se ocultan.
+- Nueva sección debajo: **"Historial de ajustes"** (solo lectura), mostrando fecha, material, sentido, stock antes, contado, delta y nota. Sin acciones de editar/eliminar.
 
-3. **Cantidad automática por tipo**
-   - En la pestaña "Tipos", la columna **Cantidad** mostrará el conteo de sitios de ese tipo (consulta a la tabla `sites`).
-   - Se elimina el input manual de cantidad al crear/editar un tipo.
-   - El indicador "Total configurado / objetivo" sigue funcionando, pero ahora el total viene de los sitios reales.
+## Cambios en código (frontend)
 
-4. **Sitios** (`src/sections/sites.tsx`)
-   - Se mantiene aquí el **cuadro de seguimiento de entregas por sitio** (la parte diaria).
-   - La parte de **crear/editar manzanas y sitios** se expone también dentro de "Casas → Manzanas" (mismo componente, reutilizado).
+- `src/lib/types.ts` y `src/lib/queries.ts`: tipo y hook `useAdjustments`.
+- `src/lib/admin.functions.ts` / `admin.server.ts`: permitir `insert` en `inventory_adjustments` pero **bloquear** `update`/`delete` sobre esa tabla. Bloquear edición/borrado de conteos con `adjustment_applied = true`.
+- `src/sections/inventory.tsx`:
+  - Botón "Aplicar ajuste" por fila con diferencia.
+  - Ocultar editar/borrar cuando `adjustment_applied`.
+  - Tabla de historial de ajustes.
 
-5. **Enrutado del menú** (`src/routes/index.tsx`)
-   - Mapear `casas` → `<CasasSection />`.
-   - Quitar los mapeos viejos de `tipos` y `vale_tipo` (o redirigirlos a `casas` por compatibilidad).
+## Notas
 
-## Lo que NO cambia
-
-- La base de datos: no se tocan tablas ni columnas.
-- La lógica de vales, entregas, inventario, reportes.
-- La contraseña sigue pidiéndose para modificar/eliminar.
-
-## Pregunta abierta (la respondo yo si no me dices)
-
-Si un tipo (ej: "C") **no tiene sitios cargados todavía**, su cantidad mostrará 0. Eso está bien para el conteo real, pero perdemos el concepto de "cantidad objetivo por tipo". Si necesitas planificar antes de cargar sitios, podemos sumar un campo opcional **"objetivo"** que solo sirva como referencia visual. Si no me dices nada, lo dejo simple: solo conteo real.
+- El ajuste **no toca recepciones ni entregas** (esos historiales siguen intactos). Solo agrega un movimiento de corrección de inventario.
+- Si en el futuro quieres "deshacer" un ajuste, la única forma será otro conteo + otro ajuste. Eso es lo que pediste.
