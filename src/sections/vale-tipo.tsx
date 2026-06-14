@@ -129,7 +129,14 @@ export function ValeTipoSection() {
       setAddPass("");
       invalidate();
     },
-    onError: (e: any) => toast.error(e?.message ?? "Error"),
+    onError: (e: any) => {
+      const msg = String(e?.message ?? "Error");
+      if (msg.includes("duplicate key") || msg.includes("vale_reqs_vale_stage_id_house_type_material_id_key")) {
+        toast.error("Ese material ya está en la lista. Edita la cantidad en lugar de agregarlo de nuevo.");
+      } else {
+        toast.error(msg);
+      }
+    },
   });
 
   const editMut = useMutation({
