@@ -250,9 +250,8 @@ export function InventorySection() {
                                 description: `Aplicar ajuste de stock para ${r.material_code} (${HAND_LABEL[r.handedness]}): el sistema dice ${fmtNumber(sys)} y contaste ${fmtNumber(r.counted_qty)}. Se registrará un ajuste de ${diff > 0 ? "+" : ""}${fmtNumber(diff)}. No se puede deshacer.`,
                                 onSuccess: () => {
                                   // Marcar el conteo como ajustado
-                                  supabase
-                                    .from("inventory_counts" as never)
-                                    .update({ adjustment_applied: true } as any)
+                                  (supabase.from("inventory_counts" as never) as any)
+                                    .update({ adjustment_applied: true })
                                     .eq("id", r.id)
                                     .then(() => invalidate());
                                 },
