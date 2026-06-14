@@ -1,12 +1,11 @@
 import { motion } from "framer-motion";
 import {
-  BarChart3,
   Boxes,
   ClipboardCheck,
   FileSpreadsheet,
   Grid3x3,
   Home,
-  Layers,
+  HousePlus,
   PackagePlus,
   Settings2,
   Truck,
@@ -20,9 +19,8 @@ export type TabKey =
   | "dashboard"
   | "recepciones"
   | "entregas"
-  | "tipos"
+  | "casas"
   | "materiales"
-  | "vale_tipo"
   | "inventario"
   | "reportes"
   | "config";
@@ -33,9 +31,8 @@ export const TABS: { key: TabKey; label: string; short: string; icon: typeof Hom
   { key: "recepciones", label: "Recepciones", short: "Recep.", icon: PackagePlus },
   { key: "entregas", label: "Entregas", short: "Entrega", icon: Truck },
   { key: "inventario", label: "Inventario", short: "Conteo", icon: ClipboardCheck },
-  { key: "tipos", label: "Tipos vivienda", short: "Tipos", icon: Layers },
+  { key: "casas", label: "Casas", short: "Casas", icon: HousePlus },
   { key: "materiales", label: "Materiales", short: "Materia.", icon: Boxes },
-  { key: "vale_tipo", label: "Vale Tipo", short: "Vale", icon: BarChart3 },
   { key: "reportes", label: "Reportes", short: "Report.", icon: FileSpreadsheet },
   { key: "config", label: "Configuración", short: "Config.", icon: Settings2 },
 ];
