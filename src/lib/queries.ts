@@ -27,6 +27,7 @@ export const qk = {
   deliveryHouses: ["delivery_houses"] as const,
   overrides: ["house_exec_overrides"] as const,
   inventory: ["inventory_counts"] as const,
+  adjustments: ["inventory_adjustments"] as const,
   vRequired: ["v_required"] as const,
   vReceived: ["v_received"] as const,
   vDelivered: ["v_delivered"] as const,
