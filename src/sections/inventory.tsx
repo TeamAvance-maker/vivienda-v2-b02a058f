@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { CheckCircle2, Pencil, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,12 @@ import { SectionHeader } from "@/components/app-shell";
 import { EditDialog } from "@/components/edit-dialog";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
 import { supabase } from "@/integrations/supabase/client";
-import { useInventory, useInvalidateAll, useVStock } from "@/lib/queries";
+import {
+  useAdjustments,
+  useInventory,
+  useInvalidateAll,
+  useVStock,
+} from "@/lib/queries";
 import { useMaterialsV2 } from "@/lib/sites-queries";
 import type { Handedness, InventoryCount } from "@/lib/types";
 import { HAND_LABEL } from "@/lib/types";
