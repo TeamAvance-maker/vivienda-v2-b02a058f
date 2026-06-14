@@ -304,6 +304,7 @@ export type Database = {
           description: string
           id: string
           sort_order: number
+          tracks_handedness: boolean
           unit: string
           updated_at: string
         }
@@ -313,6 +314,7 @@ export type Database = {
           description: string
           id?: string
           sort_order?: number
+          tracks_handedness?: boolean
           unit?: string
           updated_at?: string
         }
@@ -322,6 +324,7 @@ export type Database = {
           description?: string
           id?: string
           sort_order?: number
+          tracks_handedness?: boolean
           unit?: string
           updated_at?: string
         }
