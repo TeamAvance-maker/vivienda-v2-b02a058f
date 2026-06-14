@@ -84,7 +84,7 @@ export function ValeTipoSection() {
   );
 
   const materialsById = useMemo(() => {
-    const m = new Map<string, (typeof materials.data)[number]>();
+    const m = new Map<string, ReturnType<typeof useMaterialsV2>["data"] extends (infer U)[] | undefined ? U : never>();
     for (const x of materials.data ?? []) m.set(x.id, x);
     return m;
   }, [materials.data]);
