@@ -47,6 +47,12 @@ export const adminMutateFn = createServerFn({ method: "POST" })
     const { checkPassphrase } = await import("./admin.server");
     checkPassphrase(data.passphrase);
 
+    // Reglas inmutables:
+    // - inventory_adjustments es historial: solo permite INSERT.
+    if (data.table === "inventory_adjustments" && data.action !== "insert") {
+      throw new Error("Los ajustes de inventario no se pueden modificar ni eliminar.");
+    }
+
     const { supabaseAdmin } = await import(
       "@/integrations/supabase/client.server"
     );
