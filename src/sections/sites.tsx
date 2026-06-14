@@ -704,7 +704,7 @@ function DeliveryDialog({
             {mode === "auto" ? "Auto-completar lo que falta" : "Entregar manual"}
           </DialogTitle>
           <DialogDescription>
-            Manzana {site.manzana} · {site.sitio} · Etapa {stage.stage_number}.{" "}
+            Manzana {site.manzana} · Sitio {site.sitio} · Etapa {stage.stage_number}.{" "}
             {mode === "auto"
               ? "Las cantidades vienen prellenadas con lo que falta. Puedes ajustarlas si entregas de más por pérdida o extravío."
               : "Escribe cuánto entregas hoy de cada material."}
