@@ -1,85 +1,81 @@
-# Plan: Depuración completa del sitio
+## Lo que entendí (en simple)
 
-## Qué voy a hacer (explicado fácil)
+Una casa es como una **torta de muchos pisos**. Cada piso es un **vale tipo** (Electricidad, Techumbre, Puertas…). Algunos pisos se hacen en **capas (etapas)**. Hay **102 casas** repartidas en 5 manzanas, y cada casa tiene un **tipo** (A1, A2, B, C). Para que una casa esté "lista", hay que entregar todos sus vale tipo.
 
-Como cuando revisas una casa antes de entregarla: voy a entrar a **cada pieza** (cada pestaña de la app), probar **cada botón**, y anotar lo que no funciona. Después arreglo lo que esté roto y vuelvo a probar.
+Tus respuestas claras:
+- **Etapas**: sugeridas, no obligadas (el sistema avisa si te saltas una).
+- **Auto-completar**: mostrar lo que falta, dejar **modificar cantidades** (por pérdidas/mermas), y confirmar siempre con aviso. **Nunca duplica** lo ya entregado.
+- **Convivencia**: **reemplazar todo de una** (lo viejo se va).
+- **Vista**: matriz general + detalle por sitio (después, plano dinámico).
 
-## Lo que ya encontré revisando el código y la base de datos
+---
 
-1. **Falta la fila de configuración del proyecto** en la base de datos. La tabla `project_config` está vacía, y la app intenta "actualizar" la fila con `id = 1`. Como no existe, el botón **"Guardar (pide contraseña)"** de la pestaña Configuración no guarda nada (silenciosamente no hace efecto). Hay que crear la fila inicial por migración y cambiar el guardado a **insertar-o-actualizar** para que nunca vuelva a pasar.
-2. **Botones duplicados en Entregas → Por viviendas.** Hay dos botones uno al lado del otro: *Previsualizar* y *Confirmar entrega*. Los dos hacen exactamente lo mismo (abren el cuadro de confirmación). Es confuso. Propongo dejar solo **uno** llamado *Revisar y confirmar*.
-3. **En la sesión anterior apareció un cartel rojo de Vite** (error overlay). Hoy no se ve, pero lo vamos a confirmar recargando el preview limpio.
+## El plan, paso a paso
 
-## Cómo voy a hacer la auditoría (paso a paso)
+### Paso 1 — Planilla de materiales duplicados (ANTES de tocar nada)
 
-Recorro las 9 pestañas en orden y pruebo cada acción visible:
+Tomo el ODS que subiste, agrupo los 353 materiales por nombre parecido (mayúsculas, espacios, tildes) y te genero un **Excel** con columnas:
 
 ```
-1. Inicio (Dashboard)
-   - hero, los 7 KPIs, "Avance por tipo", tabla maestra, alertas
-
-2. Recepciones
-   - formulario "Nueva recepción"
-   - búsqueda
-   - botón editar (lápiz) + contraseña
-   - botón eliminar (basurero) + contraseña
-
-3. Entregas
-   - pestaña "Por viviendas": agregar tipo, previsualizar, confirmar
-   - pestaña "Manual": agregar ítem, guardar
-   - fila del historial: expandir, editar fecha/nota, editar ítem,
-     editar viviendas, eliminar entrega
-
-4. Inventario
-   - registrar conteo (con y sin "sentido izq/der"), pero debe estar también el conteo por separado izquierda y derecha.
-
-5. Tipos vivienda
-   - agregar tipo
-   - eliminar tipo (basurero + contraseña)
-   - verificar contador "Total / objetivo"
-
-6. Materiales
-   - agregar material (con y sin "sentido izq/der")
-   - eliminar material (basurero + contraseña)
-
-7. Distribución
-   - selector de tipo, agregar requerimiento, eliminar
-
-8. Reportes
-   - exportar Excel, CSV, PDF, Imprimir
-   - vista previa cargada
-
-9. Configuración
-   - guardar nombre / total / umbral (PROBLEMA conocido)
-   - ajuste manual ± con motivo
-   - respaldo JSON (descargar)
-   - restauración JSON (subir + contraseña)
+Grupo | Material tal cual aparece | Veces que aparece | Vale tipos donde aparece | ¿Cuál es el correcto? (vacío para que tú marques)
 ```
 
-Para cada botón anoto: **funciona / no funciona / error mostrado**. Voy a usar el navegador del sandbox (no toco tus datos reales — uso datos de prueba mínimos que después se borran).
+Lo descargas, lo revisas, marcas el nombre bueno, y me lo devuelves. Recién ahí cargo materiales a la base. **Esto es entregable, no cambia la app todavía.**
 
-## Arreglos previstos (lo seguro)
+### Paso 2 — Estructura nueva en la base de datos
 
-1. **Migración a la base de datos**: insertar la fila inicial de `project_config` (id=1, nombre "Mi Obra", total 0, umbral 10) si no existe.
-2. `**saveConfig` en `src/sections/config.tsx**`: cambiar de UPDATE a UPSERT — así nunca falla silenciosamente.
-3. **Entregas → Por viviendas**: dejar un solo botón *Revisar y confirmar*.
-4. **Lo que aparezca en la auditoría**: lo voy listando y arreglando uno por uno, sin tocar nada que ya funcione.
+Creo tablas nuevas (no toco las viejas todavía):
 
-## Lo que NO voy a tocar (regla del documento maestro)
+```text
+sites              → las 102 casas (manzana, sitio, tipo_casa)
+vale_types         → los ~49 vale tipo (código, nombre, sección)
+vale_stages        → las etapas de cada vale (vale_id, n° etapa, nombre)
+vale_materials     → qué materiales y cuántos lleva cada etapa de cada vale,
+                     por tipo de casa (A1, A2, B, C)
+site_deliveries    → entregas: a qué sitio, qué vale, qué etapa, qué materiales,
+                     fecha, modo (manual / auto-completar), nota
+```
 
-- Tablas, columnas, vistas existentes (no renombrar nada).
-- La contraseña "TheDoors" ni el flujo de mutaciones admin.
-- El dashboard ya validado (KPIs, hero, fórmula de "viviendas posibles").
-- Archivos auto-generados (`integrations/supabase/*`, `routeTree.gen.ts`, `.env`).
-- El módulo de respaldo temporal (sigue ahí hasta que migremos a vales).
+Cargo los 102 sitios (la lista que me pasaste) y los vale tipos del ODS (ya con los nombres correctos que tú validaste en el paso 1).
 
-## Antes de seguir
+### Paso 3 — Pantallas nuevas (reemplazan las viejas)
 
-Cuando me apruebes este plan, paso a modo construcción y:
+1. **Inicio (nuevo)**: KPIs de avance: % obra, sitios completos, vales más atrasados, alertas de stock.
+2. **Sitios y Vales** (matriz): 102 filas × vale tipos en columnas, con semáforo:
+   - 🟢 verde = vale completo
+   - 🟡 amarillo = parcial
+   - ⚪ gris = sin tocar
+3. **Detalle de sitio** (clic en una celda): muestra el vale con sus etapas, los materiales pedidos vs entregados, y los botones:
+   - **Entregar manual** (escribes cantidades)
+   - **Auto-completar lo que falta** → muestra previsualización editable + aviso "vas a entregar X. ¿Confirmas?"
+4. **Recepciones** (igual que ahora, descuenta del mismo stock).
+5. **Inventario / Conteo físico** (igual).
+6. **Materiales / Vale tipos** (administración, con contraseña).
+7. **Reportes**: Excel/PDF con avance por sitio, por manzana, por vale tipo.
+8. **Configuración** (igual).
 
-1. Aplico la migración y los 3 arreglos seguros de arriba.
-2. Hago la pasada de auditoría en el preview con datos de prueba.
-3. Te entrego una lista corta tipo lista de supermercado:
-  *"Esto funcionaba ✅ / Esto estaba roto y lo arreglé 🔧 / Esto necesita decisión tuya ❓"*.
+El **plano dinámico** queda para una fase siguiente, lo conversamos cuando esto funcione.
 
-¿Procedo así?
+### Paso 4 — Migración segura
+
+Hago **respaldo completo** (descarga JSON) antes de tocar nada. Si algo sale mal, restauramos. Las recepciones e inventarios viejos se conservan (son datos reales).
+
+---
+
+## Por qué este orden
+
+La **planilla de duplicados primero** es la regla de oro: si cargo materiales sucios, después arreglar es 10 veces más caro. Mejor 1 hora tuya marcando "este sí, este no" que reconstruir vales mal cargados.
+
+## Lo que necesito de ti antes de construir
+
+1. ✅ Aprobar este plan.
+2. Después te entrego la **planilla de duplicados** (Paso 1).
+3. Tú marcas los nombres correctos y me la devuelves.
+4. Ahí sí construyo todo lo demás.
+
+## Detalles técnicos (para el archivo)
+
+- Nuevas tablas en `public` con RLS y GRANT a `authenticated` + `service_role`.
+- Mantengo el flujo de contraseña "TheDoors" para admin.
+- Las tablas viejas (`house_types`, `house_material_req`, `deliveries`, `delivery_houses`, etc.) se quedan inertes hasta que confirmes todo OK; entonces las archivamos.
+- Lógica de "auto-completar sin duplicar": `faltante = requerido_total − sumatoria(entregado_previo)`. Imposible duplicar por diseño.
