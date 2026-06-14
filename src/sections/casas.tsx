@@ -331,14 +331,15 @@ function ManzanasTab() {
   async function addOne() {
     const m = Number(form.manzana);
     if (!m || m < 1) return toast.error("Manzana inválida");
-    if (!form.sitio.trim()) return toast.error("Sitio requerido");
+    const sitio = normalizeSitio(form.sitio);
+    if (!sitio) return toast.error("Sitio requerido");
     const { error } = await supabase.from("sites" as never).insert({
       manzana: m,
-      sitio: form.sitio.trim(),
+      sitio,
       house_type: form.house_type,
     } as any);
-    if (error) return toast.error(error.message);
-    toast.success("Sitio agregado");
+    if (error) return toast.error(explainSiteError(error.message));
+    toast.success(`${formatSitio(sitio)} agregado en M${m}`);
     setForm({ manzana: form.manzana, sitio: "", house_type: form.house_type });
     invalidate();
     invalidateAll();
