@@ -9,6 +9,7 @@ import type {
   HouseMaterialReq,
   HouseType,
   HousesExecutedRow,
+  InventoryAdjustment,
   InventoryCount,
   Material,
   ProjectConfig,
