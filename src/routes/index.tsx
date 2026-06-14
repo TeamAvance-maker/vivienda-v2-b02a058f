@@ -3,11 +3,10 @@ import { useState } from "react";
 import { Toaster } from "sonner";
 import { AppShell, type TabKey } from "@/components/app-shell";
 import { PassphraseProvider } from "@/components/passphrase-dialog";
+import { CasasSection } from "@/sections/casas";
 import { ConfigSection } from "@/sections/config";
 import { DashboardSection } from "@/sections/dashboard";
 import { DeliveriesSection } from "@/sections/deliveries";
-import { ValeTipoSection } from "@/sections/vale-tipo";
-import { HouseTypesSection } from "@/sections/house-types";
 import { InventorySection } from "@/sections/inventory";
 import { MaterialsSection } from "@/sections/materials";
 import { ReceptionsSection } from "@/sections/receptions";
@@ -41,9 +40,8 @@ function Index() {
         {tab === "recepciones" && <ReceptionsSection />}
         {tab === "entregas" && <DeliveriesSection />}
         {tab === "inventario" && <InventorySection />}
-        {tab === "tipos" && <HouseTypesSection />}
+        {tab === "casas" && <CasasSection />}
         {tab === "materiales" && <MaterialsSection />}
-        {tab === "vale_tipo" && <ValeTipoSection />}
         {tab === "reportes" && <ReportsSection />}
         {tab === "config" && <ConfigSection />}
       </AppShell>
