@@ -81,6 +81,21 @@ export interface InventoryCount {
   counted_qty: number;
   note: string;
   created_at: string;
+  adjustment_applied: boolean;
+}
+
+export interface InventoryAdjustment {
+  id: string;
+  count_id: string | null;
+  date: string;
+  material_code: string;
+  handedness: Handedness;
+  prev_system_qty: number;
+  counted_qty: number;
+  delta: number;
+  note: string | null;
+  applied_at: string;
+  created_at: string;
 }
 
 export interface AggregateRow {
