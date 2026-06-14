@@ -32,7 +32,7 @@ import {
   useValeStages,
   useValeTypes,
 } from "@/lib/sites-queries";
-import type { HouseTypeV2, ValeReq } from "@/lib/sites-types";
+import type { HouseTypeV2, MaterialV2, ValeReq } from "@/lib/sites-types";
 
 const HOUSE_TYPES: HouseTypeV2[] = ["A1", "A2", "B", "C"];
 
@@ -84,7 +84,7 @@ export function ValeTipoSection() {
   );
 
   const materialsById = useMemo(() => {
-    const m = new Map<string, ReturnType<typeof useMaterialsV2>["data"] extends (infer U)[] | undefined ? U : never>();
+    const m = new Map<string, MaterialV2>();
     for (const x of materials.data ?? []) m.set(x.id, x);
     return m;
   }, [materials.data]);
