@@ -112,6 +112,13 @@ export const useInventory = () =>
     queryFn: () => fetchAll<InventoryCount>("inventory_counts", { column: "date", ascending: false }),
   });
 
+export const useAdjustments = () =>
+  useQuery({
+    queryKey: qk.adjustments,
+    queryFn: () =>
+      fetchAll<InventoryAdjustment>("inventory_adjustments", { column: "applied_at", ascending: false }),
+  });
+
 export const useVRequired = () =>
   useQuery({ queryKey: qk.vRequired, queryFn: () => fetchAll<AggregateRow>("v_required") });
 export const useVReceived = () =>
