@@ -13,6 +13,7 @@ const tableEnum = z.enum([
   "delivery_houses",
   "house_exec_overrides",
   "inventory_counts",
+  "inventory_adjustments",
   "materials_v2",
   "vale_types_v2",
   "vale_stages",
