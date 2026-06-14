@@ -21,9 +21,22 @@ export const sqk = {
 };
 
 async function fetchAll<T>(table: string): Promise<T[]> {
-  const { data, error } = await supabase.from(table as never).select("*");
-  if (error) throw new Error(error.message);
-  return (data ?? []) as T[];
+  const PAGE = 1000;
+  const out: T[] = [];
+  let from = 0;
+  // Paginamos para evitar el límite por defecto de 1000 filas de PostgREST.
+  for (;;) {
+    const { data, error } = await supabase
+      .from(table as never)
+      .select("*")
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+    from += PAGE;
+  }
+  return out;
 }
 
 export const useSites = () =>
