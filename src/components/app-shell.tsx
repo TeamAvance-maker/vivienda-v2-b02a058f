@@ -4,6 +4,7 @@ import {
   Boxes,
   ClipboardCheck,
   FileSpreadsheet,
+  Grid3x3,
   Home,
   Layers,
   PackagePlus,
@@ -15,6 +16,7 @@ import { Logo } from "./logo";
 import { cn } from "@/lib/utils";
 
 export type TabKey =
+  | "sitios"
   | "dashboard"
   | "recepciones"
   | "entregas"
@@ -26,6 +28,7 @@ export type TabKey =
   | "config";
 
 export const TABS: { key: TabKey; label: string; short: string; icon: typeof Home }[] = [
+  { key: "sitios", label: "Sitios y Vales", short: "Sitios", icon: Grid3x3 },
   { key: "dashboard", label: "Inicio", short: "Inicio", icon: Home },
   { key: "recepciones", label: "Recepciones", short: "Recep.", icon: PackagePlus },
   { key: "entregas", label: "Entregas", short: "Entrega", icon: Truck },
@@ -36,6 +39,7 @@ export const TABS: { key: TabKey; label: string; short: string; icon: typeof Hom
   { key: "reportes", label: "Reportes", short: "Report.", icon: FileSpreadsheet },
   { key: "config", label: "Configuración", short: "Config.", icon: Settings2 },
 ];
+
 
 export function AppShell({
   active,
