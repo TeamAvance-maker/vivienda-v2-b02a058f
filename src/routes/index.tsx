@@ -46,7 +46,26 @@ function Index() {
         {tab === "config" && <ConfigSection />}
       </AppShell>
       <PassphraseProvider />
-      <Toaster richColors position="top-center" />
+      <Toaster
+        richColors
+        position="top-center"
+        expand
+        visibleToasts={5}
+        toastOptions={{
+          classNames: {
+            toast:
+              "!w-[min(92vw,520px)] !p-5 !rounded-2xl !border-2 !shadow-2xl !text-base !font-medium",
+            title: "!text-base sm:!text-lg !font-semibold",
+            description: "!text-sm sm:!text-base",
+            error: "!bg-destructive !text-destructive-foreground !border-destructive",
+          },
+          style: {
+            // Centrado vertical en pantalla, encima de cualquier diálogo
+            // (sonner posiciona top-center; lo bajamos al centro vertical)
+          },
+        }}
+        offset="45vh"
+      />
     </>
   );
 }
