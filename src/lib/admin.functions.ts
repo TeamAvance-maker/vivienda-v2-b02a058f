@@ -13,6 +13,13 @@ const tableEnum = z.enum([
   "delivery_houses",
   "house_exec_overrides",
   "inventory_counts",
+  "materials_v2",
+  "vale_types_v2",
+  "vale_stages",
+  "vale_reqs",
+  "sites",
+  "site_deliveries",
+  "site_delivery_items",
 ]);
 
 const mutationSchema = z.object({

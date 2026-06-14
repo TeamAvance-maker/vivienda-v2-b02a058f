@@ -6,7 +6,7 @@ import { PassphraseProvider } from "@/components/passphrase-dialog";
 import { ConfigSection } from "@/sections/config";
 import { DashboardSection } from "@/sections/dashboard";
 import { DeliveriesSection } from "@/sections/deliveries";
-import { DistributionSection } from "@/sections/distribution";
+import { ValeTipoSection } from "@/sections/vale-tipo";
 import { HouseTypesSection } from "@/sections/house-types";
 import { InventorySection } from "@/sections/inventory";
 import { MaterialsSection } from "@/sections/materials";
@@ -43,7 +43,7 @@ function Index() {
         {tab === "inventario" && <InventorySection />}
         {tab === "tipos" && <HouseTypesSection />}
         {tab === "materiales" && <MaterialsSection />}
-        {tab === "distribucion" && <DistributionSection />}
+        {tab === "vale_tipo" && <ValeTipoSection />}
         {tab === "reportes" && <ReportsSection />}
         {tab === "config" && <ConfigSection />}
       </AppShell>
