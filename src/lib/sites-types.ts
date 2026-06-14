@@ -29,6 +29,7 @@ export interface MaterialV2 {
   description: string;
   unit: string;
   sort_order: number;
+  tracks_handedness: boolean;
 }
 
 export interface ValeReq {
