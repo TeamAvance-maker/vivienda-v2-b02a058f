@@ -67,7 +67,7 @@ export const useHouseTypes = () =>
 export const useMaterials = () =>
   useQuery({
     queryKey: qk.materials,
-    queryFn: () => fetchAll<Material>("materials", { column: "sort_order" }),
+    queryFn: () => fetchAll<Material>("materials_v2", { column: "sort_order" }),
   });
 
 export const useReqs = () =>
