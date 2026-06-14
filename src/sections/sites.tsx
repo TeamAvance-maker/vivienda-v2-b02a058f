@@ -464,7 +464,7 @@ function SiteValeDialog({
         <DialogHeader>
           <DialogTitle>{vale.name}</DialogTitle>
           <DialogDescription>
-            Manzana {site.manzana} · {site.sitio} · Tipo casa{" "}
+            Manzana {site.manzana} · Sitio {site.sitio} · Tipo casa{" "}
             <Badge variant="secondary">{site.house_type}</Badge>
           </DialogDescription>
         </DialogHeader>
