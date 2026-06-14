@@ -297,6 +297,36 @@ export type Database = {
         }
         Relationships: []
       }
+      materials_v2: {
+        Row: {
+          code: string
+          created_at: string
+          description: string
+          id: string
+          sort_order: number
+          unit: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description: string
+          id?: string
+          sort_order?: number
+          unit?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string
+          id?: string
+          sort_order?: number
+          unit?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       project_config: {
         Row: {
           critical_stock_threshold: number
@@ -358,6 +388,224 @@ export type Database = {
             referencedColumns: ["code"]
           },
         ]
+      }
+      site_deliveries: {
+        Row: {
+          created_at: string
+          date: string
+          id: string
+          mode: string
+          note: string
+          site_id: string
+          vale_stage_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          id?: string
+          mode?: string
+          note?: string
+          site_id: string
+          vale_stage_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          id?: string
+          mode?: string
+          note?: string
+          site_id?: string
+          vale_stage_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_deliveries_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_deliveries_vale_stage_id_fkey"
+            columns: ["vale_stage_id"]
+            isOneToOne: false
+            referencedRelation: "vale_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_delivery_items: {
+        Row: {
+          created_at: string
+          delivery_id: string
+          id: string
+          material_id: string
+          qty: number
+        }
+        Insert: {
+          created_at?: string
+          delivery_id: string
+          id?: string
+          material_id: string
+          qty: number
+        }
+        Update: {
+          created_at?: string
+          delivery_id?: string
+          id?: string
+          material_id?: string
+          qty?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_delivery_items_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "site_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_delivery_items_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials_v2"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sites: {
+        Row: {
+          created_at: string
+          house_type: Database["public"]["Enums"]["house_type_v2"]
+          id: string
+          manzana: number
+          sitio: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          house_type: Database["public"]["Enums"]["house_type_v2"]
+          id?: string
+          manzana: number
+          sitio: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          house_type?: Database["public"]["Enums"]["house_type_v2"]
+          id?: string
+          manzana?: number
+          sitio?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      vale_reqs: {
+        Row: {
+          created_at: string
+          house_type: Database["public"]["Enums"]["house_type_v2"]
+          id: string
+          material_id: string
+          qty: number
+          vale_stage_id: string
+        }
+        Insert: {
+          created_at?: string
+          house_type: Database["public"]["Enums"]["house_type_v2"]
+          id?: string
+          material_id: string
+          qty: number
+          vale_stage_id: string
+        }
+        Update: {
+          created_at?: string
+          house_type?: Database["public"]["Enums"]["house_type_v2"]
+          id?: string
+          material_id?: string
+          qty?: number
+          vale_stage_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vale_reqs_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "materials_v2"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vale_reqs_vale_stage_id_fkey"
+            columns: ["vale_stage_id"]
+            isOneToOne: false
+            referencedRelation: "vale_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vale_stages: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          stage_number: number
+          vale_type_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          stage_number?: number
+          vale_type_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          stage_number?: number
+          vale_type_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vale_stages_vale_type_id_fkey"
+            columns: ["vale_type_id"]
+            isOneToOne: false
+            referencedRelation: "vale_types_v2"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vale_types_v2: {
+        Row: {
+          code: string
+          created_at: string
+          id: string
+          name: string
+          section: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          id?: string
+          name: string
+          section?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          id?: string
+          name?: string
+          section?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
       }
     }
     Views: {
@@ -431,6 +679,7 @@ export type Database = {
     Enums: {
       delivery_mode: "manual" | "by_house"
       handedness: "left" | "right" | "none"
+      house_type_v2: "A1" | "A2" | "B" | "C"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -560,6 +809,7 @@ export const Constants = {
     Enums: {
       delivery_mode: ["manual", "by_house"],
       handedness: ["left", "right", "none"],
+      house_type_v2: ["A1", "A2", "B", "C"],
     },
   },
 } as const
