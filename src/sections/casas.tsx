@@ -356,7 +356,7 @@ function ManzanasTab() {
       rows.push({ manzana: m, sitio: String(i), house_type: bulkType });
     }
     const { error } = await supabase.from("sites" as never).insert(rows as any);
-    if (error) return toast.error(error.message);
+    if (error) return toast.error(explainSiteError(error.message));
     toast.success(`${rows.length} sitios agregados`);
     setBulkOpen(false);
     invalidate();
