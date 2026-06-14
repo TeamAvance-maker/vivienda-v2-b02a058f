@@ -332,7 +332,7 @@ export function SitesSection() {
               {sites.map((s) => (
                 <tr key={s.id}>
                   <th className="sticky left-0 z-10 whitespace-nowrap border-b border-border bg-background px-3 py-1.5 text-left text-[11px] font-medium">
-                    M{s.manzana} · {s.sitio}{" "}
+                    M{s.manzana} · Sitio {s.sitio}{" "}
                     <span className="ml-1 inline-block rounded bg-secondary px-1.5 text-[9px] font-semibold text-muted-foreground">
                       {s.house_type}
                     </span>
