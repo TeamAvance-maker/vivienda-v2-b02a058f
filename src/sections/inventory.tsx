@@ -221,24 +221,68 @@ export function InventorySection() {
                   </td>
                   <td className="px-4 py-2.5 text-muted-foreground">{r.note || "—"}</td>
                   <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                    <Button variant="ghost" size="icon" onClick={() => setEditing(r)} title="Editar">
-                      <Pencil className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      title="Eliminar"
-                      onClick={() =>
-                        requestAdminMutation({
-                          table: "inventory_counts",
-                          action: "delete",
-                          match: { id: r.id },
-                          description: `Eliminar conteo del ${fmtDate(r.date)} · ${r.material_code} · ${fmtNumber(r.counted_qty)}.`,
-                        })
-                      }
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                    {r.adjustment_applied ? (
+                      <span className="chip" title="Este conteo ya generó un ajuste de stock">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Ajustado
+                      </span>
+                    ) : (
+                      <>
+                        {diff !== 0 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mr-1"
+                            title="Aplicar ajuste al stock teórico"
+                            onClick={() =>
+                              requestAdminMutation({
+                                table: "inventory_adjustments",
+                                action: "insert",
+                                values: {
+                                  count_id: r.id,
+                                  date: r.date,
+                                  material_code: r.material_code,
+                                  handedness: r.handedness,
+                                  prev_system_qty: sys,
+                                  counted_qty: r.counted_qty,
+                                  delta: diff,
+                                  note: r.note || null,
+                                },
+                                description: `Aplicar ajuste de stock para ${r.material_code} (${HAND_LABEL[r.handedness]}): el sistema dice ${fmtNumber(sys)} y contaste ${fmtNumber(r.counted_qty)}. Se registrará un ajuste de ${diff > 0 ? "+" : ""}${fmtNumber(diff)}. No se puede deshacer.`,
+                                onSuccess: () => {
+                                  // Marcar el conteo como ajustado
+                                  supabase
+                                    .from("inventory_counts" as never)
+                                    .update({ adjustment_applied: true } as any)
+                                    .eq("id", r.id)
+                                    .then(() => invalidate());
+                                },
+                              })
+                            }
+                          >
+                            <ShieldCheck className="mr-1 h-4 w-4" />
+                            Aplicar ajuste
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" onClick={() => setEditing(r)} title="Editar">
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Eliminar"
+                          onClick={() =>
+                            requestAdminMutation({
+                              table: "inventory_counts",
+                              action: "delete",
+                              match: { id: r.id },
+                              description: `Eliminar conteo del ${fmtDate(r.date)} · ${r.material_code} · ${fmtNumber(r.counted_qty)}.`,
+                            })
+                          }
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </>
+                    )}
                   </td>
                 </tr>
               );
