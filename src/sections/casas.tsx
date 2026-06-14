@@ -266,6 +266,23 @@ function TiposTab() {
 
 const HOUSE_TYPES_OPTIONS: HouseTypeV2[] = ["A1", "A2", "B", "C"];
 
+// "Sitio 1", "sitio 1", " 1 " → "1". Así no se duplican por el formato.
+function normalizeSitio(raw: string): string {
+  return raw.trim().replace(/^[Ss]itio\s+/, "").trim();
+}
+
+// Cómo se muestra en pantalla: "Sitio N".
+function formatSitio(value: string): string {
+  return `Sitio ${value}`;
+}
+
+function explainSiteError(msg: string): string {
+  if (/duplicate key|unique/i.test(msg)) {
+    return "Ese sitio ya existe en esa manzana.";
+  }
+  return msg;
+}
+
 function ManzanasTab() {
   const sitesQ = useSites();
   const invalidate = useInvalidateSitesV2();
