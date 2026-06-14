@@ -494,7 +494,7 @@ function ManzanasTab() {
             {filtered.map((s) => (
               <tr key={s.id} className="border-t border-border/60">
                 <td className="px-4 py-2.5 font-medium">M{s.manzana}</td>
-                <td className="px-4 py-2.5">{s.sitio}</td>
+                <td className="px-4 py-2.5">{formatSitio(s.sitio)}</td>
                 <td className="px-4 py-2.5">
                   <span className="rounded bg-secondary px-2 py-0.5 text-xs font-semibold">
                     {s.house_type}
