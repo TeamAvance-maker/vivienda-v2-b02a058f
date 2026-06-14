@@ -12,6 +12,7 @@ import { InventorySection } from "@/sections/inventory";
 import { MaterialsSection } from "@/sections/materials";
 import { ReceptionsSection } from "@/sections/receptions";
 import { ReportsSection } from "@/sections/reports";
+import { SitesSection } from "@/sections/sites";
 import { useConfig } from "@/lib/queries";
 
 export const Route = createFileRoute("/")({
@@ -21,7 +22,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Control de puertas, cerraduras y ferretería para obra: stock, recepciones, entregas, inventario y alertas.",
+          "Control de avance por sitio y vale tipo: matriz de 102 casas, entregas manuales y auto-completado.",
       },
     ],
   }),
@@ -29,12 +30,13 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const [tab, setTab] = useState<TabKey>("dashboard");
+  const [tab, setTab] = useState<TabKey>("sitios");
   const cfg = useConfig();
 
   return (
     <>
       <AppShell active={tab} onChange={setTab} projectName={cfg.data?.name ?? "Mi Obra"}>
+        {tab === "sitios" && <SitesSection />}
         {tab === "dashboard" && <DashboardSection />}
         {tab === "recepciones" && <ReceptionsSection />}
         {tab === "entregas" && <DeliveriesSection />}
@@ -50,3 +52,4 @@ function Index() {
     </>
   );
 }
+
