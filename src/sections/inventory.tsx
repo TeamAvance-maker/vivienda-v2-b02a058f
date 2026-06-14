@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 
 export function InventorySection() {
   const list = useInventory();
+  const adjustments = useAdjustments();
   const materials = useMaterialsV2();
   const stock = useVStock();
   const invalidate = useInvalidateAll();
