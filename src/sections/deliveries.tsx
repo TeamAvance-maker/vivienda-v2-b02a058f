@@ -1,41 +1,23 @@
-import { ChevronDown, Pencil, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Pencil, Trash2 } from "lucide-react";
 import { EditDialog } from "@/components/edit-dialog";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { useMutation } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { SectionHeader } from "@/components/app-shell";
 import { SearchableSelect } from "@/components/searchable-select";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
-import { supabase } from "@/integrations/supabase/client";
 import {
   useDeliveries,
   useDeliveryHouses,
   useDeliveryItems,
   useHouseTypes,
-  useInvalidateAll,
   useMaterials,
-  useReqs,
-  useVStock,
 } from "@/lib/queries";
 import {
   useSites,
@@ -45,151 +27,47 @@ import {
   useMaterialsV2,
   useSiteDeliveries,
   useSiteDeliveryItems,
+  useInvalidateSitesV2,
 } from "@/lib/sites-queries";
 import { SiteValeDialog } from "@/sections/sites";
 import { buildMaps, cellStatus } from "@/lib/sites-compute";
-import type { Site, ValeTypeV2 } from "@/lib/sites-types";
+import { createSiteDeliveriesBatchFn } from "@/lib/admin.functions";
+import { getConversion, toCatalogQty, toValeQty, round2 } from "@/lib/unit-conversion";
+import type { Site, ValeTypeV2, ValeStage, HouseTypeV2 } from "@/lib/sites-types";
 import type { Handedness } from "@/lib/types";
 import { HAND_LABEL } from "@/lib/types";
-import { fmtDate, fmtNumber, get, makeMap } from "@/lib/compute";
+import { fmtDate } from "@/lib/compute";
 import { cn } from "@/lib/utils";
 
-
-type ManualLine = { material_code: string; handedness: Handedness; qty: number };
-
 export function DeliveriesSection() {
-  const today = new Date().toISOString().slice(0, 10);
   const deliveries = useDeliveries();
   const items = useDeliveryItems();
   const dh = useDeliveryHouses();
   const materials = useMaterials();
   const types = useHouseTypes();
-  const reqs = useReqs();
-  const stock = useVStock();
-  const invalidate = useInvalidateAll();
-
-  // Manual mode state
-  const [manualDate, setManualDate] = useState(today);
-  const [manualNote, setManualNote] = useState("");
-  const [manualLines, setManualLines] = useState<ManualLine[]>([]);
-  const [manualForm, setManualForm] = useState<ManualLine>({
-    material_code: "",
-    handedness: "none",
-    qty: 1,
-  });
-
-  const mat = materials.data?.find((m) => m.code === manualForm.material_code);
-  const handOpts: Handedness[] = mat?.tracks_handedness ? ["left", "right"] : ["none"];
-
-  function addManualLine() {
-    if (!manualForm.material_code) return toast.error("Selecciona material");
-    if (!manualForm.qty || manualForm.qty <= 0) return toast.error("Cantidad inválida");
-    setManualLines((l) => [...l, { ...manualForm, handedness: handOpts.includes(manualForm.handedness) ? manualForm.handedness : handOpts[0] }]);
-    setManualForm({ material_code: "", handedness: "none", qty: 1 });
-  }
-
-  async function saveManual() {
-    if (manualLines.length === 0) return toast.error("Agrega al menos un ítem");
-    // valida stock
-    const sm = makeMap(stock.data);
-    for (const l of manualLines) {
-      if (get(sm, l.material_code, l.handedness) < l.qty) {
-        return toast.error(`Stock insuficiente de ${l.material_code} ${HAND_LABEL[l.handedness]}`);
-      }
-    }
-    const { data: del, error } = await supabase
-      .from("deliveries" as never)
-      .insert({ date: manualDate, mode: "manual", note: manualNote } as any)
-      .select("id")
-      .single();
-    if (error || !del) return toast.error(error?.message ?? "Error");
-    const { error: e2 } = await supabase.from("delivery_items" as never).insert(
-      manualLines.map((l) => ({
-        delivery_id: (del as any).id,
-        material_code: l.material_code,
-        handedness: l.handedness,
-        qty: l.qty,
-      })) as any,
-    );
-    if (e2) return toast.error(e2.message);
-    toast.success("Entrega registrada");
-    setManualLines([]);
-    setManualNote("");
-    invalidate();
-  }
-
-  // By-house mode state
-  const [byhDate, setByhDate] = useState(today);
-  const [byhNote, setByhNote] = useState("");
-  const [byhRows, setByhRows] = useState<{ house_type_code: string; qty: number }[]>([]);
-  const [byhForm, setByhForm] = useState({ house_type_code: "", qty: 1 });
-  const [previewOpen, setPreviewOpen] = useState(false);
-
-  function addByhRow() {
-    if (!byhForm.house_type_code) return toast.error("Selecciona tipo");
-    if (!byhForm.qty || byhForm.qty <= 0) return toast.error("Cantidad inválida");
-    setByhRows((rs) => [...rs, byhForm]);
-    setByhForm({ house_type_code: "", qty: 1 });
-  }
-
-  const derivedItems = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const row of byhRows) {
-      const rs = (reqs.data ?? []).filter((r) => r.house_type_code === row.house_type_code);
-      for (const r of rs) {
-        const k = `${r.material_code}__${r.handedness}`;
-        map.set(k, (map.get(k) ?? 0) + r.qty * row.qty);
-      }
-    }
-    return [...map.entries()].map(([k, qty]) => {
-      const [material_code, handedness] = k.split("__") as [string, Handedness];
-      return { material_code, handedness, qty };
-    });
-  }, [byhRows, reqs.data]);
-
-  const stockMap = makeMap(stock.data);
-  const stockIssues = derivedItems.filter((d) => get(stockMap, d.material_code, d.handedness) < d.qty);
-
-  async function confirmByh() {
-    setPreviewOpen(false);
-    const { data: del, error } = await supabase
-      .from("deliveries" as never)
-      .insert({ date: byhDate, mode: "by_house", note: byhNote } as any)
-      .select("id")
-      .single();
-    if (error || !del) return toast.error(error?.message ?? "Error");
-    const id = (del as any).id;
-    const e1 = (
-      await supabase.from("delivery_houses" as never).insert(
-        byhRows.map((r) => ({ delivery_id: id, ...r })) as any,
-      )
-    ).error;
-    if (e1) return toast.error(e1.message);
-    const e2 = (
-      await supabase.from("delivery_items" as never).insert(
-        derivedItems.map((d) => ({ delivery_id: id, ...d })) as any,
-      )
-    ).error;
-    if (e2) return toast.error(e2.message);
-    toast.success("Entrega por viviendas registrada");
-    setByhRows([]);
-    setByhNote("");
-    invalidate();
-  }
 
   return (
     <div className="space-y-6">
       <SectionHeader
         title="Entregas a terreno"
-        description="Descarga material de bodega: por unidades sueltas o por viviendas completas. Las viviendas entregadas se marcan como ejecutadas."
+        description="Registra entregas a sitios: por vale (un sitio) o por grupo de casas (varios sitios de una misma manzana de un solo paso)."
       />
 
       <div className="surface-card p-3 md:p-4">
-        <ByValeTab />
+        <Tabs defaultValue="vale" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-2 md:w-auto md:inline-flex">
+            <TabsTrigger value="vale">Por vale</TabsTrigger>
+            <TabsTrigger value="grupo">Por grupo de casas</TabsTrigger>
+          </TabsList>
+          <TabsContent value="vale" className="m-0">
+            <ByValeTab />
+          </TabsContent>
+          <TabsContent value="grupo" className="m-0">
+            <ByGroupTab />
+          </TabsContent>
+        </Tabs>
       </div>
 
-
-      {/* Listado de entregas */}
       <div className="surface-card overflow-hidden">
         <div className="border-b border-border/60 px-4 py-3 font-display text-base font-semibold">
           Historial de entregas
@@ -216,7 +94,6 @@ export function DeliveriesSection() {
           )}
         </div>
       </div>
-
     </div>
   );
 }
@@ -226,7 +103,6 @@ function DeliveryRow({
   items,
   houses,
   materials,
-  houseTypes,
 }: {
   d: any;
   items: any[];
@@ -365,7 +241,7 @@ function DeliveryRow({
 }
 
 // ============================================================
-// Pestaña: Entrega por vale / sitio (reutiliza diálogo de Sitios)
+// Pestaña: Entrega por vale / sitio
 // ============================================================
 function ByValeTab() {
   const sitesQ = useSites();
@@ -505,3 +381,394 @@ function ByValeTab() {
   );
 }
 
+// ============================================================
+// Pestaña: Entrega por GRUPO de casas
+// ============================================================
+function ByGroupTab() {
+  const sitesQ = useSites();
+  const vtQ = useValeTypes();
+  const stagesQ = useValeStages();
+  const reqsQ = useValeReqs();
+  const matsQ = useMaterialsV2();
+  const delivQ = useSiteDeliveries();
+  const itemsQ = useSiteDeliveryItems();
+  const invalidate = useInvalidateSitesV2();
+  const batchFn = useServerFn(createSiteDeliveriesBatchFn);
+
+  const [manzana, setManzana] = useState<string>("");
+  const [houseType, setHouseType] = useState<string>("");
+  const [valeId, setValeId] = useState<string>("");
+  const [stageId, setStageId] = useState<string>("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [rows, setRows] = useState<{ material_id: string; qty: number; required: number }[]>([]);
+  const [note, setNote] = useState("");
+  const [pass, setPass] = useState("");
+
+  const ready =
+    !sitesQ.isLoading && !vtQ.isLoading && !stagesQ.isLoading &&
+    !reqsQ.isLoading && !matsQ.isLoading && !delivQ.isLoading && !itemsQ.isLoading;
+
+  const maps = useMemo(() => {
+    if (!stagesQ.data || !reqsQ.data || !delivQ.data || !itemsQ.data || !matsQ.data) return null;
+    return buildMaps({
+      stages: stagesQ.data, reqs: reqsQ.data,
+      deliveries: delivQ.data, items: itemsQ.data, materials: matsQ.data,
+    });
+  }, [stagesQ.data, reqsQ.data, delivQ.data, itemsQ.data, matsQ.data]);
+
+  const manzanas = useMemo(
+    () => Array.from(new Set((sitesQ.data ?? []).map((s) => s.manzana))).sort((a, b) => a - b),
+    [sitesQ.data],
+  );
+
+  // Tipos de casa presentes en la manzana
+  const houseTypesInManzana = useMemo(() => {
+    if (!manzana) return [];
+    const set = new Set<HouseTypeV2>();
+    for (const s of sitesQ.data ?? []) {
+      if (String(s.manzana) === manzana) set.add(s.house_type);
+    }
+    return Array.from(set).sort();
+  }, [sitesQ.data, manzana]);
+
+  const vales = useMemo(
+    () => (vtQ.data ?? []).slice().sort((a, b) => a.sort_order - b.sort_order),
+    [vtQ.data],
+  );
+
+  const stages = useMemo(() => {
+    if (!valeId || !stagesQ.data) return [];
+    return stagesQ.data
+      .filter((s) => s.vale_type_id === valeId)
+      .sort((a, b) => a.stage_number - b.stage_number);
+  }, [stagesQ.data, valeId]);
+
+  // Sitios candidatos: misma manzana + mismo tipo
+  const candidateSites = useMemo(() => {
+    if (!manzana || !houseType) return [] as Site[];
+    return (sitesQ.data ?? [])
+      .filter((s) => String(s.manzana) === manzana && s.house_type === houseType)
+      .sort((a, b) => a.sitio.localeCompare(b.sitio, "es", { numeric: true }));
+  }, [sitesQ.data, manzana, houseType]);
+
+  // Estado por sitio respecto a la etapa elegida
+  function siteStageStatus(site: Site): "complete" | "partial" | "empty" {
+    if (!stageId || !maps) return "empty";
+    const reqs = maps.reqsByStageHouse.get(stageId)?.get(site.house_type) ?? [];
+    if (reqs.length === 0) return "empty";
+    const delivered = maps.deliveredBySiteStageMat.get(site.id)?.get(stageId) ?? new Map();
+    let hasAny = false;
+    let allOk = true;
+    for (const r of reqs) {
+      const got = delivered.get(r.material_id) ?? 0;
+      if (got > 0) hasAny = true;
+      if (got < r.qty) allOk = false;
+    }
+    if (allOk) return "complete";
+    if (hasAny) return "partial";
+    return "empty";
+  }
+
+  // Sitios visibles: ocultar completos, mostrar parciales con etiqueta
+  const visibleSites = useMemo(
+    () => candidateSites.filter((s) => siteStageStatus(s) !== "complete"),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [candidateSites, stageId, maps],
+  );
+
+  // Cuando cambia etapa o tipo: recalcular filas con req. por casa (prellena auto)
+  function rebuildRowsFor(stId: string, ht: string) {
+    if (!stId || !ht || !maps) {
+      setRows([]);
+      return;
+    }
+    const reqs = maps.reqsByStageHouse.get(stId)?.get(ht as HouseTypeV2) ?? [];
+    setRows(reqs.map((r) => ({ material_id: r.material_id, qty: r.qty, required: r.qty })));
+  }
+
+  function onChangeManzana(v: string) {
+    setManzana(v);
+    setHouseType("");
+    setSelected(new Set());
+    setRows([]);
+  }
+  function onChangeHouseType(v: string) {
+    setHouseType(v);
+    setSelected(new Set());
+    rebuildRowsFor(stageId, v);
+  }
+  function onChangeVale(v: string) {
+    setValeId(v);
+    setStageId("");
+    setRows([]);
+  }
+  function onChangeStage(v: string) {
+    setStageId(v);
+    rebuildRowsFor(v, houseType);
+  }
+
+  function toggleSite(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function selectAll() {
+    setSelected(new Set(visibleSites.map((s) => s.id)));
+  }
+  function clearAll() {
+    setSelected(new Set());
+  }
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const items = rows
+        .filter((r) => r.qty > 0)
+        .map((r) => ({ material_id: r.material_id, qty: Number(r.qty) }));
+      if (items.length === 0) throw new Error("No hay cantidades para entregar");
+      if (selected.size === 0) throw new Error("Selecciona al menos un sitio");
+      if (!pass) throw new Error("Contraseña requerida");
+      return await batchFn({
+        data: {
+          passphrase: pass,
+          site_ids: Array.from(selected),
+          vale_stage_id: stageId,
+          mode: "manual",
+          note: note || `Grupo manzana ${manzana} · ${selected.size} sitios`,
+          items,
+        },
+      });
+    },
+    onSuccess: (res: any) => {
+      toast.success(`Entregas creadas: ${res.deliveries} sitios · ${res.items} ítems`);
+      invalidate();
+      setSelected(new Set());
+      setPass("");
+      setNote("");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Error"),
+  });
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-muted-foreground">
+        Selecciona la manzana, el tipo de casa, el vale y la etapa, luego marca los sitios del grupo.
+        Las cantidades se ingresan <strong>por casa</strong> y se registran como entregas separadas para cada sitio seleccionado.
+      </p>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+        <div>
+          <Label>Manzana</Label>
+          <SearchableSelect
+            value={manzana}
+            onChange={onChangeManzana}
+            placeholder="Selecciona manzana"
+            searchPlaceholder="Buscar manzana…"
+            options={manzanas.map((m) => ({ value: String(m), label: `Manzana ${m}`, keywords: String(m) }))}
+          />
+        </div>
+        <div>
+          <Label>Tipo de casa</Label>
+          <SearchableSelect
+            value={houseType}
+            onChange={onChangeHouseType}
+            placeholder={manzana ? "Selecciona tipo" : "Primero la manzana"}
+            searchPlaceholder="Buscar tipo…"
+            disabled={!manzana}
+            options={houseTypesInManzana.map((t) => ({ value: t, label: `Tipo ${t}`, keywords: t }))}
+          />
+        </div>
+        <div>
+          <Label>Vale tipo</Label>
+          <SearchableSelect
+            value={valeId}
+            onChange={onChangeVale}
+            placeholder="Selecciona vale"
+            searchPlaceholder="Buscar vale…"
+            options={vales.map((v) => ({
+              value: v.id,
+              label: v.name,
+              hint: v.section,
+              keywords: `${v.code} ${v.name} ${v.section}`,
+            }))}
+          />
+        </div>
+        <div>
+          <Label>Etapa</Label>
+          <SearchableSelect
+            value={stageId}
+            onChange={onChangeStage}
+            placeholder={valeId ? "Selecciona etapa" : "Primero el vale"}
+            searchPlaceholder="Buscar etapa…"
+            disabled={!valeId}
+            options={stages.map((st) => ({
+              value: st.id,
+              label: `Etapa ${st.stage_number}${st.name ? ` · ${st.name}` : ""}`,
+              keywords: String(st.stage_number),
+            }))}
+          />
+        </div>
+      </div>
+
+      {!ready && <div className="text-xs text-muted-foreground">Cargando datos…</div>}
+
+      {manzana && houseType && stageId && maps && (
+        <>
+          {/* Lista de sitios */}
+          <div className="rounded-lg border border-border bg-background/60 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div className="text-sm font-medium">
+                Sitios disponibles ({visibleSites.length})
+                <span className="ml-2 text-xs text-muted-foreground">
+                  Los sitios con esta etapa <strong>completa</strong> se ocultan.
+                </span>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" onClick={selectAll} disabled={visibleSites.length === 0}>
+                  Marcar todos
+                </Button>
+                <Button size="sm" variant="ghost" onClick={clearAll} disabled={selected.size === 0}>
+                  Limpiar
+                </Button>
+              </div>
+            </div>
+            {visibleSites.length === 0 ? (
+              <div className="py-4 text-center text-xs text-muted-foreground">
+                No hay sitios pendientes (todos completos o sin requerimientos para esta etapa/tipo).
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6">
+                {visibleSites.map((s) => {
+                  const st = siteStageStatus(s);
+                  const checked = selected.has(s.id);
+                  return (
+                    <label
+                      key={s.id}
+                      className={cn(
+                        "flex cursor-pointer items-center justify-between gap-2 rounded-md border border-border/60 bg-secondary/20 px-2 py-1.5 text-xs transition-colors",
+                        checked && "border-primary bg-primary/10",
+                      )}
+                    >
+                      <span className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleSite(s.id)}
+                          className="h-3.5 w-3.5"
+                        />
+                        <span className="font-medium">Sitio {s.sitio}</span>
+                      </span>
+                      {st === "partial" && (
+                        <Badge variant="outline" className="border-amber-500/40 bg-amber-500/10 text-[10px] text-amber-700">
+                          parcial
+                        </Badge>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Tabla de cantidades por casa */}
+          {rows.length > 0 && (
+            <div className="overflow-hidden rounded-lg border border-border/60">
+              <div className="bg-secondary/30 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Cantidades a entregar por casa
+              </div>
+              <table className="min-w-full text-xs">
+                <thead className="bg-secondary/40 text-left text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <tr>
+                    <th className="px-2 py-2">Material</th>
+                    <th className="px-2 py-2 text-right">Req. por casa</th>
+                    <th className="px-2 py-2 text-right">Entregar por casa</th>
+                    <th className="px-2 py-2 text-right">Total grupo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((r, i) => {
+                    const mat = maps.matById.get(r.material_id);
+                    const conv = getConversion(mat?.code);
+                    const displayed = conv ? toValeQty(mat?.code, r.qty) : r.qty;
+                    const total = round2(r.qty * selected.size);
+                    return (
+                      <tr key={r.material_id} className="border-t border-border/60">
+                        <td className="px-2 py-1.5">
+                          {mat?.description}
+                          {conv && (
+                            <div className="text-[10px] text-muted-foreground">
+                              ingresa en {conv.valeUnit} ({conv.note})
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-2 py-1.5 text-right tabular-nums">
+                          {r.required} {mat?.unit}
+                        </td>
+                        <td className="px-2 py-1.5 text-right">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={displayed}
+                            onChange={(e) => {
+                              const v = Number(e.target.value);
+                              const safe = isNaN(v) ? 0 : v;
+                              const catalogQty = conv ? toCatalogQty(mat?.code, safe) : round2(safe);
+                              setRows((rs) =>
+                                rs.map((x, j) => (j === i ? { ...x, qty: catalogQty } : x)),
+                              );
+                            }}
+                            className="h-7 w-24 text-right"
+                          />
+                          {conv && r.qty > 0 && (
+                            <div className="mt-0.5 text-[10px] text-muted-foreground">
+                              = {r.qty} {mat?.unit}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-2 py-1.5 text-right tabular-nums font-medium">
+                          {total} {mat?.unit}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div>
+              <Label>Nota (opcional)</Label>
+              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Comentario..." />
+            </div>
+            <div>
+              <Label>Contraseña de obra</Label>
+              <Input
+                type="password"
+                value={pass}
+                onChange={(e) => setPass(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+            <div className="text-sm">
+              <span className="chip">{selected.size} sitios seleccionados</span>
+              <span className="ml-2 chip">{rows.filter((r) => r.qty > 0).length} materiales</span>
+            </div>
+            <Button
+              onClick={() => mutation.mutate()}
+              disabled={mutation.isPending || selected.size === 0 || !pass || rows.every((r) => r.qty <= 0)}
+            >
+              {mutation.isPending ? "Guardando…" : `Registrar entregas (${selected.size})`}
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

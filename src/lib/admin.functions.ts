@@ -214,4 +214,56 @@ export const createSiteDeliveryFn = createServerFn({ method: "POST" })
     return { ok: true, delivery_id: (deliv as { id: string }).id, count: rows.length };
   });
 
+// Crea una entrega por cada sitio del grupo, con los MISMOS ítems (qty por casa).
+const createBatchSchema = z.object({
+  passphrase: z.string().min(1),
+  site_ids: z.array(z.string().uuid()).min(1),
+  vale_stage_id: z.string().uuid(),
+  mode: z.enum(["manual", "auto"]),
+  note: z.string().optional(),
+  items: z
+    .array(
+      z.object({
+        material_id: z.string().uuid(),
+        qty: z.number().positive(),
+      }),
+    )
+    .min(1),
+});
+
+export const createSiteDeliveriesBatchFn = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => createBatchSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { checkPassphrase } = await import("./admin.server");
+    checkPassphrase(data.passphrase);
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+
+    const headerRows = data.site_ids.map((sid) => ({
+      site_id: sid,
+      vale_stage_id: data.vale_stage_id,
+      mode: data.mode,
+      note: data.note ?? "",
+    }));
+    const { data: delivs, error: e1 } = await supabaseAdmin
+      .from("site_deliveries")
+      .insert(headerRows as any)
+      .select("id, site_id");
+    if (e1 || !delivs) throw new Error(e1?.message ?? "Error al crear entregas");
+
+    const itemRows: { delivery_id: string; material_id: string; qty: number }[] = [];
+    for (const d of delivs as { id: string; site_id: string }[]) {
+      for (const it of data.items) {
+        itemRows.push({ delivery_id: d.id, material_id: it.material_id, qty: it.qty });
+      }
+    }
+    const { error: e2 } = await supabaseAdmin
+      .from("site_delivery_items")
+      .insert(itemRows as any);
+    if (e2) throw new Error(e2.message);
+
+    return { ok: true, deliveries: delivs.length, items: itemRows.length };
+  });
+
 
