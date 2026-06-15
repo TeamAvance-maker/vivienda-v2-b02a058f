@@ -815,6 +815,7 @@ function DeliveryDialog({
   onDone: () => void;
 }) {
   const invalidate = useInvalidateSitesV2();
+  const createDeliv = useServerFn(createSiteDeliveryFn);
   const reqs = maps.reqsByStageHouse.get(stage.id)?.get(site.house_type) ?? [];
   const delivered = maps.deliveredBySiteStageMat.get(site.id)?.get(stage.id) ?? new Map();
 
@@ -826,6 +827,7 @@ function DeliveryDialog({
     }),
   );
   const [note, setNote] = useState("");
+  const [pass, setPass] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -833,44 +835,39 @@ function DeliveryDialog({
   const willOverdeliver = rows.some((r) => r.already + r.qty > r.required);
 
   async function save() {
-    setSaving(true);
-    const { data: deliv, error: e1 } = await supabase
-      .from("site_deliveries" as never)
-      .insert({
-        site_id: site.id,
-        vale_stage_id: stage.id,
-        mode,
-        note,
-      } as never)
-      .select("id")
-      .single();
-    if (e1 || !deliv) {
-      toast.error(e1?.message ?? "Error al guardar entrega");
-      setSaving(false);
+    if (!pass) {
+      toast.error("Contraseña requerida");
       return;
     }
     const items = rows
       .filter((r) => r.qty > 0)
-      .map((r) => ({
-        delivery_id: (deliv as { id: string }).id,
-        material_id: r.material_id,
-        qty: r.qty,
-      }));
-    if (items.length > 0) {
-      const { error: e2 } = await supabase
-        .from("site_delivery_items" as never)
-        .insert(items as never);
-      if (e2) {
-        toast.error(e2.message);
-        setSaving(false);
-        return;
-      }
+      .map((r) => ({ material_id: r.material_id, qty: r.qty }));
+    if (items.length === 0) {
+      toast.error("No hay cantidades para entregar");
+      return;
     }
-    toast.success(`Entrega registrada (${items.length} materiales)`);
-    invalidate();
-    setSaving(false);
-    onDone();
+    setSaving(true);
+    try {
+      await createDeliv({
+        data: {
+          passphrase: pass,
+          site_id: site.id,
+          vale_stage_id: stage.id,
+          mode,
+          note,
+          items,
+        },
+      });
+      toast.success(`Entrega registrada (${items.length} materiales)`);
+      invalidate();
+      onDone();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Error al guardar entrega");
+    } finally {
+      setSaving(false);
+    }
   }
+
 
   return (
     <Dialog open onOpenChange={(o) => !o && onDone()}>
