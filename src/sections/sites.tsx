@@ -351,7 +351,7 @@ function FilterSelect({
 // Diálogo detalle de un sitio × vale
 // ============================================================
 
-function SiteValeDialog({
+export function SiteValeDialog({
   site,
   vale,
   maps,
