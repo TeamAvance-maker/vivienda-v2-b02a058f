@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
-import { editSiteDeliveryFn } from "@/lib/admin.functions";
+import { createSiteDeliveryFn, editSiteDeliveryFn } from "@/lib/admin.functions";
 import { getConversion, toCatalogQty, toValeQty, round2 } from "@/lib/unit-conversion";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
 import { Button } from "@/components/ui/button";
@@ -815,6 +815,7 @@ function DeliveryDialog({
   onDone: () => void;
 }) {
   const invalidate = useInvalidateSitesV2();
+  const createDeliv = useServerFn(createSiteDeliveryFn);
   const reqs = maps.reqsByStageHouse.get(stage.id)?.get(site.house_type) ?? [];
   const delivered = maps.deliveredBySiteStageMat.get(site.id)?.get(stage.id) ?? new Map();
 
@@ -826,6 +827,7 @@ function DeliveryDialog({
     }),
   );
   const [note, setNote] = useState("");
+  const [pass, setPass] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -833,44 +835,39 @@ function DeliveryDialog({
   const willOverdeliver = rows.some((r) => r.already + r.qty > r.required);
 
   async function save() {
-    setSaving(true);
-    const { data: deliv, error: e1 } = await supabase
-      .from("site_deliveries" as never)
-      .insert({
-        site_id: site.id,
-        vale_stage_id: stage.id,
-        mode,
-        note,
-      } as never)
-      .select("id")
-      .single();
-    if (e1 || !deliv) {
-      toast.error(e1?.message ?? "Error al guardar entrega");
-      setSaving(false);
+    if (!pass) {
+      toast.error("Contraseña requerida");
       return;
     }
     const items = rows
       .filter((r) => r.qty > 0)
-      .map((r) => ({
-        delivery_id: (deliv as { id: string }).id,
-        material_id: r.material_id,
-        qty: r.qty,
-      }));
-    if (items.length > 0) {
-      const { error: e2 } = await supabase
-        .from("site_delivery_items" as never)
-        .insert(items as never);
-      if (e2) {
-        toast.error(e2.message);
-        setSaving(false);
-        return;
-      }
+      .map((r) => ({ material_id: r.material_id, qty: r.qty }));
+    if (items.length === 0) {
+      toast.error("No hay cantidades para entregar");
+      return;
     }
-    toast.success(`Entrega registrada (${items.length} materiales)`);
-    invalidate();
-    setSaving(false);
-    onDone();
+    setSaving(true);
+    try {
+      await createDeliv({
+        data: {
+          passphrase: pass,
+          site_id: site.id,
+          vale_stage_id: stage.id,
+          mode,
+          note,
+          items,
+        },
+      });
+      toast.success(`Entrega registrada (${items.length} materiales)`);
+      invalidate();
+      onDone();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Error al guardar entrega");
+    } finally {
+      setSaving(false);
+    }
   }
+
 
   return (
     <Dialog open onOpenChange={(o) => !o && onDone()}>
@@ -954,6 +951,17 @@ function DeliveryDialog({
             <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Comentario..." />
           </div>
 
+          <div className="border-t border-border/60 pt-3">
+            <Label>Contraseña de obra</Label>
+            <Input
+              type="password"
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+              placeholder="••••••••"
+            />
+          </div>
+
+
           {willOverdeliver && (
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700">
               ⚠️ Estás entregando más de lo que pide el vale en algún material. Asegúrate de
@@ -966,7 +974,7 @@ function DeliveryDialog({
           <Button variant="outline" onClick={onDone} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={() => setConfirmOpen(true)} disabled={saving || totalLines === 0}>
+          <Button onClick={() => setConfirmOpen(true)} disabled={saving || totalLines === 0 || !pass}>
             {saving ? "Guardando…" : `Confirmar (${totalLines} materiales)`}
           </Button>
         </DialogFooter>
