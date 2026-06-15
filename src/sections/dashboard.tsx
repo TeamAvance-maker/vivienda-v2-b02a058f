@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { AlertTriangle, Boxes, Home, PackageCheck, TrendingUp, Truck, Wrench } from "lucide-react";
+import { useMemo } from "react";
+import { AlertTriangle, Boxes, CheckCircle2, Clock, Grid3x3, Home, Layers, PackageCheck, TrendingUp, Truck, Wrench } from "lucide-react";
 import {
   useConfig,
   useHouseTypes,
@@ -12,9 +13,20 @@ import {
   useVRequired,
   useVStock,
 } from "@/lib/queries";
-import { fmtNumber, housesPossible, incompleteHouses, makeMap, pendingHouses, sumMap } from "@/lib/compute";
+import {
+  useSites,
+  useValeTypes,
+  useValeStages,
+  useValeReqs,
+  useMaterialsV2,
+  useSiteDeliveries,
+  useSiteDeliveryItems,
+} from "@/lib/sites-queries";
+import { buildMaps, cellStatus } from "@/lib/sites-compute";
+import { fmtDate, fmtNumber, housesPossible, incompleteHouses, makeMap, pendingHouses, sumMap } from "@/lib/compute";
 import { HAND_SHORT } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
 
 function KPI({
   icon: Icon,
