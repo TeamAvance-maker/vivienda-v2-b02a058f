@@ -568,3 +568,145 @@ function DeliveryRow({
     </div>
   );
 }
+
+// ============================================================
+// Pestaña: Entrega por vale / sitio (reutiliza diálogo de Sitios)
+// ============================================================
+function ByValeTab() {
+  const sitesQ = useSites();
+  const vtQ = useValeTypes();
+  const stagesQ = useValeStages();
+  const reqsQ = useValeReqs();
+  const matsQ = useMaterialsV2();
+  const delivQ = useSiteDeliveries();
+  const itemsQ = useSiteDeliveryItems();
+
+  const [manzana, setManzana] = useState<string>("");
+  const [siteId, setSiteId] = useState<string>("");
+  const [valeId, setValeId] = useState<string>("");
+  const [opened, setOpened] = useState<{ site: Site; vale: ValeTypeV2 } | null>(null);
+
+  const ready =
+    !sitesQ.isLoading && !vtQ.isLoading && !stagesQ.isLoading &&
+    !reqsQ.isLoading && !matsQ.isLoading && !delivQ.isLoading && !itemsQ.isLoading;
+
+  const maps = useMemo(() => {
+    if (!stagesQ.data || !reqsQ.data || !delivQ.data || !itemsQ.data || !matsQ.data) return null;
+    return buildMaps({
+      stages: stagesQ.data, reqs: reqsQ.data,
+      deliveries: delivQ.data, items: itemsQ.data, materials: matsQ.data,
+    });
+  }, [stagesQ.data, reqsQ.data, delivQ.data, itemsQ.data, matsQ.data]);
+
+  const manzanas = useMemo(
+    () => Array.from(new Set((sitesQ.data ?? []).map((s) => s.manzana))).sort((a, b) => a - b),
+    [sitesQ.data],
+  );
+  const sitesOfManzana = useMemo(
+    () => (sitesQ.data ?? [])
+      .filter((s) => manzana && String(s.manzana) === manzana)
+      .sort((a, b) => a.sitio.localeCompare(b.sitio, "es", { numeric: true })),
+    [sitesQ.data, manzana],
+  );
+  const vales = useMemo(
+    () => (vtQ.data ?? []).slice().sort((a, b) => a.sort_order - b.sort_order),
+    [vtQ.data],
+  );
+
+  const selectedSite = sitesOfManzana.find((s) => s.id === siteId) ?? null;
+  const selectedVale = vales.find((v) => v.id === valeId) ?? null;
+
+  function openDialog() {
+    if (!selectedSite || !selectedVale) {
+      toast.error("Selecciona manzana, sitio y vale tipo");
+      return;
+    }
+    setOpened({ site: selectedSite, vale: selectedVale });
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-muted-foreground">
+        Selecciona manzana → sitio → vale tipo y abre el panel para entregar manual o auto-completar lo que falta.
+      </p>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div>
+          <Label>Manzana</Label>
+          <SearchableSelect
+            value={manzana}
+            onChange={(v) => { setManzana(v); setSiteId(""); }}
+            placeholder="Selecciona manzana"
+            searchPlaceholder="Buscar manzana…"
+            options={manzanas.map((m) => ({ value: String(m), label: `Manzana ${m}`, keywords: String(m) }))}
+          />
+        </div>
+        <div>
+          <Label>Sitio</Label>
+          <SearchableSelect
+            value={siteId}
+            onChange={setSiteId}
+            placeholder={manzana ? "Selecciona sitio" : "Primero la manzana"}
+            searchPlaceholder="Buscar sitio…"
+            disabled={!manzana}
+            options={sitesOfManzana.map((s) => ({
+              value: s.id,
+              label: `Sitio ${s.sitio}`,
+              hint: `Tipo ${s.house_type}`,
+              keywords: `${s.sitio} ${s.house_type}`,
+            }))}
+          />
+        </div>
+        <div>
+          <Label>Vale tipo</Label>
+          <SearchableSelect
+            value={valeId}
+            onChange={setValeId}
+            placeholder="Selecciona vale tipo"
+            searchPlaceholder="Buscar vale…"
+            options={vales.map((v) => ({
+              value: v.id,
+              label: v.name,
+              hint: v.section,
+              keywords: `${v.code} ${v.name} ${v.section}`,
+            }))}
+          />
+        </div>
+      </div>
+
+      {selectedSite && selectedVale && maps && (
+        <div className="rounded-lg border border-border bg-background/60 p-3 text-sm">
+          <div className="mb-2 flex items-center justify-between">
+            <div>
+              <div className="font-medium">
+                Manzana {selectedSite.manzana} · Sitio {selectedSite.sitio}
+                <span className="ml-2 text-xs text-muted-foreground">Tipo {selectedSite.house_type}</span>
+              </div>
+              <div className="text-xs text-muted-foreground">{selectedVale.name}</div>
+            </div>
+            <span className="chip">
+              Estado: {cellStatus(selectedSite, selectedVale, maps)}
+            </span>
+          </div>
+          <Button onClick={openDialog} className="w-full md:w-auto">
+            Abrir panel de entrega
+          </Button>
+        </div>
+      )}
+
+      {!ready && (
+        <div className="text-xs text-muted-foreground">Cargando datos…</div>
+      )}
+
+      {opened && maps && (
+        <SiteValeDialog
+          site={opened.site}
+          vale={opened.vale}
+          maps={maps}
+          onClose={() => setOpened(null)}
+        />
+      )}
+    </div>
+  );
+}
+
