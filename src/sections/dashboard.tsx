@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 import { AlertTriangle, Boxes, CheckCircle2, Clock, Grid3x3, Home, Layers, PackageCheck, TrendingUp, Truck, Wrench } from "lucide-react";
 import {
   useConfig,
