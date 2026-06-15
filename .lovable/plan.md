@@ -1,67 +1,74 @@
+# Re-revisión de vales con las dos nuevas reglas
 
-# Comparar el PDF de vales con el sistema
+## Las reglas que me diste
 
-## Lo que tenemos
+1. **El PDF manda.** Los 49 vales del PDF (120 páginas) son la verdad. Si en el sistema sobra algo que el PDF no tiene → se saca del sistema. Si al PDF le falta algo o está en blanco → igual se respeta (vale vacío = vale vacío).
+2. **Materiales duplicados/no unificados se arreglan.** Antes de comparar, aplico la unificación que ya habíamos acordado (M0012→M0010, M0207→M0206, "gas butano" == "Gas butano", "GRAPAS 2" == "grapas 2", etc.). Así no marco como "falta" o "sobra" algo que en realidad es el mismo material con otro nombre.
 
-- **PDF oficial:** `VALES_TIPO_SEPARADOS_ADONAY-2.pdf` con **120 páginas**, una página por (vale + tipo de casa + etapa). Cada página tiene una tabla con `Cantidad | Unidad | Descripción`.
-- **Sistema:** 49 tipos de vales en la base de datos, con sus etapas, materiales y cantidades por tipo de casa (A1, A2, B, C).
-- **Recordatorio del usuario:** el PDF tiene los materiales **duplicados** (M0012, M0207, etc. que ya unificamos). Cuando compare contra el sistema, tengo que mapear los duplicados al código bueno antes de marcar una diferencia.
+## Lo que voy a hacer (sólo lectura, sin tocar la base aún)
 
-## Paso 1: Extraer todos los vales del PDF
+### Paso 1 — Normalizar nombres del PDF
 
-Leer las 120 páginas con `pdfplumber` y armar una lista de:
-- Nombre del vale (ej: "VALE TIPO CANALIZACIONES MURO")
-- Tipo de casa (A, A1, A2, B, C)
-- Etapa (Etapa 1, 2, 3…)
-- Lista de materiales con cantidad, unidad y descripción
+Aplico mi lista de unificaciones a las descripciones del PDF antes de buscarlas en el sistema:
 
-Guardar en `/tmp/vales_pdf.json` para reusarlo sin re-procesar el PDF.
+- Normalizo mayúsculas/minúsculas, espacios y comillas.
+- Mapeo duplicados conocidos (los 8 grupos del archivo `Materiales_Duplicados_Para_Revisar.xlsx` + los que ya unificamos antes).
+- Si después de normalizar un material del PDF sigue sin existir en `materials_v2`, queda en la lista "hay que crearlo en el sistema".
 
-## Paso 2: Hacer match entre PDF y sistema
+### Paso 2 — Comparar PDF → Sistema (PDF como verdad)
 
-Por cada material del PDF:
-1. Buscar el material en `materials_v2` por descripción (case-insensitive, ignorando espacios extra).
-2. Si la descripción está en la lista de duplicados unificados (M0012→M0010, M0207→M0206, etc.), apuntar al código bueno.
-3. Buscar el vale en `vale_types_v2` por nombre.
-4. Buscar la etapa en `vale_stages` por número.
-5. Buscar la cantidad esperada en `vale_reqs` para ese (vale + etapa + tipo de casa + material).
+Para cada una de las 120 páginas (vale + tipo casa + etapa):
 
-## Paso 3: Clasificar diferencias
+- ¿Existe el vale en `vale_types_v2`? Si no → **CREAR vale**.
+- ¿Existe la etapa? Si no → **CREAR etapa**.
+- Para cada material del PDF en esa etapa/casa:
+  - Si la cantidad y unidad coinciden → ✅ OK.
+  - Si la cantidad o unidad difieren → **ACTUALIZAR** al valor del PDF.
+  - Si no está en el sistema → **AGREGAR** al sistema.
+- Para cada material que el sistema tiene en ese vale/etapa/casa y que **no** aparece en el PDF → **QUITAR** del sistema (porque el PDF es la verdad).
+- Si una página del PDF está en blanco (sin materiales) → el vale/etapa queda vacío en el sistema también (se borran las filas que sobren).
 
-Cada línea cae en una de estas categorías:
+### Paso 3 — Clasificar todo en categorías de acción
 
-| Categoría | Significado |
-|---|---|
-| ✅ OK | Material existe, cantidad coincide |
-| ⚠️ Cantidad distinta | El material está pero con otra cantidad |
-| ⚠️ Unidad distinta | Está pero con otra unidad |
-| ❌ Falta en sistema | El PDF lo tiene, el sistema no |
-| ❌ Sobra en sistema | El sistema lo tiene, el PDF no |
-| ❓ No reconocido | No encontré el material en el catálogo (typo, descripción nueva) |
-| 🔀 Mapeo a unificado | Era un duplicado, se mapeó al código bueno |
+Cada diferencia cae en una de estas, ya pensadas como "qué hay que hacer":
 
-## Paso 4: Entregar dos archivos
 
-1. **Excel (`comparacion_vales.xlsx`)** con 4 hojas:
-   - **Resumen:** conteo de cada categoría por vale.
-   - **Diferencias críticas:** solo las filas con ❌ y ⚠️ (lo que hay que revisar).
-   - **Todo:** la comparación completa fila por fila.
-   - **No reconocidos:** materiales del PDF que no calzan con ningún código.
+| Acción                        | Significado                                                                               |
+| ----------------------------- | ----------------------------------------------------------------------------------------- |
+| ➕ Agregar material al vale    | El PDF lo tiene, el sistema no                                                            |
+| ➖ Quitar material del vale    | El sistema lo tiene, el PDF no                                                            |
+| 🔧 Cambiar cantidad           | Mismo material, cantidad distinta — gana la del PDF                                       |
+| 🔧 Cambiar unidad             | Mismo material, unidad distinta — gana la del PDF                                         |
+| 🆕 Crear material en catálogo | El PDF nombra un material que no existe en `materials_v2` ni siquiera después de unificar |
+| 🆕 Crear vale o etapa         | El PDF tiene un vale/etapa que el sistema no tiene                                        |
+| 🔀 Unificar duplicado         | Dos códigos distintos en el sistema apuntan al mismo material — se conserva uno           |
+| ✅ OK                          | Coincide perfecto                                                                         |
 
-2. **PDF del sistema (`vales_sistema.pdf`)** con una página por vale, mostrando lo que el sistema cree que es cada vale (etapas, materiales, cantidades por tipo de casa) — para que puedas revisar visualmente lado a lado con tu PDF oficial.
 
-## Cosas que voy a chequear con cuidado
+### Paso 4 — Entregables
 
-- **Tipos de casa:** el PDF dice "Tipo A" (sin distinguir A1/A2). Voy a asumir que "Tipo A" del PDF = A1 + A2 en el sistema, salvo cuando el PDF diga explícitamente A1 o A2 (como en las puertas).
-- **Etapas:** algunos vales en el PDF están sin número de etapa explícito. Los voy a emparejar por orden de aparición.
-- **Tornillos y otras cosas que se parecen:** ya vimos que la medida + rosca + punta los hace distintos. Si el PDF dice `TORNILLO LENTEJA 8X3/4"` y el sistema tiene varios `LENTEJA 8X3/4` con distintas roscas/puntas, lo marco como ❓ y te lo paso para que decidas.
-- **Materiales unificados:** llevo una lista interna (M0010←M0012, M0206←M0207, etc.) para no marcar como "falta" lo que en realidad ya quedó bajo otro código.
+1. `**comparacion_vales_v2.xlsx**` con 5 hojas:
+  - **Resumen:** conteo de acciones por vale.
+  - **Plan de cambios:** la lista accionable, fila por fila, lista para revisar antes de migrar.
+  - **Materiales a crear:** los que el PDF nombra y no existen.
+  - **Unificaciones aplicadas:** qué nombres del PDF mapeé a qué código.
+  - **Todo (trazabilidad):** comparación completa.
+2. `**vales_sistema_v2.pdf**` actualizado mostrando cómo quedaría el sistema **después** de aplicar el plan (para que lo compares visualmente con tu PDF original).
 
-## Lo que NO voy a tocar
+### Paso 5 — Lo que NO hago todavía
 
-- Nada se modifica en la base de datos. Esto es solo un reporte de lectura.
-- Después de revisar el reporte tú decides qué cambios aplicar y los hacemos en una migración aparte.
+- **No toco la base de datos.** Esto sigue siendo sólo el reporte.
+- Cuando me digas "OK, aplica", recién ahí preparo una migración con todos los cambios juntos (crear vales/etapas/materiales, ajustar cantidades, quitar lo que sobra, unificar duplicados).
+
+## Supuestos que mantengo del análisis anterior
+
+- "Tipo A" del PDF = A1 y A2 en el sistema. se dublica, es decir, TIPO A1 y TIPO A2
+- Etapas sin número se elimina la palabra ETAPA O ETAPAS,
+- Tornillos/materiales muy parecidos: si el PDF dice algo genérico y el sistema tiene varias variantes (rosca/punta), te lo marco aparte para que decidas tú cuál es — SI ASUMES, RECUERDA LO QUE TE EXPLIQUE DE LOS TORNILLOS Y SUS CARACTERISTICAS.  
+RECUERDA QUE TODOS LOS MATERIALES DEBES ANALIZARLOS CON MAYUSCULAS
 
 ## Tiempo estimado
 
-Procesar el PDF + comparar + generar Excel/PDF: alrededor de 1–2 minutos de ejecución una vez que pase a modo build.
+1–2 minutos de ejecución cuando pase a modo build.
+
+¿Le doy con esto, o quieres ajustar alguna regla antes?
