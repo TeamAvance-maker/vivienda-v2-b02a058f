@@ -369,7 +369,7 @@ export function SiteValeDialog({
 }) {
   const stages = maps.stagesByVale.get(vale.id) ?? [];
   const [activeStage, setActiveStage] = useState<ValeStage | null>(stages[0] ?? null);
-  const [mode, setMode] = useState<"manual" | "auto" | null>(null);
+  const [mode, setMode] = useState<"group" | "auto" | null>(null);
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
