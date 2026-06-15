@@ -1,5 +1,7 @@
 import { motion } from "framer-motion";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 import { AlertTriangle, Boxes, CheckCircle2, Clock, Grid3x3, Home, Layers, PackageCheck, TrendingUp, Truck, Wrench } from "lucide-react";
 import {
   useConfig,
@@ -426,65 +428,8 @@ export function DashboardSection() {
       </div>
 
       {/* Tabla maestra */}
-      <div className="surface-card p-5">
-        <div className="mb-3 flex items-end justify-between">
-          <div>
-            <h3 className="font-display text-lg font-semibold">Tabla maestra de control</h3>
-            <p className="text-xs text-muted-foreground">
-              Necesario / Recepcionado / Entregado / Saldo / Pendiente por comprar
-            </p>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr className="border-b border-border">
-                <th className="py-2 pr-3">Material</th>
-                <th className="py-2 pr-3">Sentido</th>
-                <th className="py-2 pr-3 text-right">Necesario</th>
-                <th className="py-2 pr-3 text-right">Recepcionado</th>
-                <th className="py-2 pr-3 text-right">Entregado</th>
-                <th className="py-2 pr-3 text-right">Saldo</th>
-                <th className="py-2 pr-3 text-right">Pend. comprar</th>
-                <th className="py-2 pr-3 text-right">% Cumpl.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {masterRows.map((r) => (
-                <tr key={`${r.code}-${r.hand}`} className="border-b border-border/50">
-                  <td className="py-2 pr-3">
-                    <div className="font-medium">{r.code}</div>
-                    <div className="text-xs text-muted-foreground">{r.mat?.description ?? "—"}</div>
-                  </td>
-                  <td className="py-2 pr-3">
-                    <span className="chip">{HAND_SHORT[r.hand as keyof typeof HAND_SHORT]}</span>
-                  </td>
-                  <td className="py-2 pr-3 text-right num-display">{fmtNumber(r.required)}</td>
-                  <td className="py-2 pr-3 text-right num-display">{fmtNumber(r.received)}</td>
-                  <td className="py-2 pr-3 text-right num-display">{fmtNumber(r.delivered)}</td>
-                  <td
-                    className={cn(
-                      "py-2 pr-3 text-right num-display",
-                      r.saldo <= 0 && "text-destructive",
-                    )}
-                  >
-                    {fmtNumber(r.saldo)}
-                  </td>
-                  <td className="py-2 pr-3 text-right num-display">{fmtNumber(r.pendienteRecep)}</td>
-                  <td className="py-2 pr-3 text-right num-display">{r.pct}%</td>
-                </tr>
-              ))}
-              {masterRows.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="py-8 text-center text-muted-foreground">
-                    {loading ? "Cargando…" : "Aún no hay datos para mostrar."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <MasterTable rows={masterRows} loading={loading} />
+
 
       {/* Alertas */}
       <div className="surface-card p-5">
@@ -529,3 +474,103 @@ export function DashboardSection() {
     </div>
   );
 }
+
+type MasterRow = {
+  code: string;
+  hand: string;
+  mat?: { description?: string } | undefined;
+  required: number;
+  received: number;
+  delivered: number;
+  saldo: number;
+  pendienteRecep: number;
+  pct: number;
+};
+
+function MasterTable({ rows, loading }: { rows: MasterRow[]; loading: boolean }) {
+  const [q, setQ] = useState("");
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return rows;
+    return rows.filter(
+      (r) =>
+        r.code.toLowerCase().includes(s) ||
+        (r.mat?.description ?? "").toLowerCase().includes(s),
+    );
+  }, [rows, q]);
+
+  return (
+    <div className="surface-card p-5">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h3 className="font-display text-lg font-semibold">Tabla maestra de control</h3>
+          <p className="text-xs text-muted-foreground">
+            Necesario / Recepcionado / Entregado / Saldo / Pendiente por comprar
+          </p>
+        </div>
+        <div className="relative w-full sm:w-72">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar por código o descripción…"
+            className="pl-8"
+          />
+        </div>
+      </div>
+      <div className="text-xs text-muted-foreground mb-2">
+        Mostrando {filtered.length} de {rows.length} materiales
+      </div>
+      <div className="max-h-[60vh] overflow-auto rounded-md border border-border/60">
+        <table className="min-w-full text-sm">
+          <thead className="sticky top-0 z-10 bg-card text-left text-xs uppercase tracking-wider text-muted-foreground shadow-sm">
+            <tr className="border-b border-border">
+              <th className="py-2 px-3">Material</th>
+              <th className="py-2 px-3">Sentido</th>
+              <th className="py-2 px-3 text-right">Necesario</th>
+              <th className="py-2 px-3 text-right">Recepcionado</th>
+              <th className="py-2 px-3 text-right">Entregado</th>
+              <th className="py-2 px-3 text-right">Saldo</th>
+              <th className="py-2 px-3 text-right">Pend. comprar</th>
+              <th className="py-2 px-3 text-right">% Cumpl.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r) => (
+              <tr key={`${r.code}-${r.hand}`} className="border-b border-border/50">
+                <td className="py-2 px-3">
+                  <div className="font-medium">{r.code}</div>
+                  <div className="text-xs text-muted-foreground">{r.mat?.description ?? "—"}</div>
+                </td>
+                <td className="py-2 px-3">
+                  <span className="chip">{HAND_SHORT[r.hand as keyof typeof HAND_SHORT]}</span>
+                </td>
+                <td className="py-2 px-3 text-right num-display">{fmtNumber(r.required)}</td>
+                <td className="py-2 px-3 text-right num-display">{fmtNumber(r.received)}</td>
+                <td className="py-2 px-3 text-right num-display">{fmtNumber(r.delivered)}</td>
+                <td
+                  className={cn(
+                    "py-2 px-3 text-right num-display",
+                    r.saldo <= 0 && "text-destructive",
+                  )}
+                >
+                  {fmtNumber(r.saldo)}
+                </td>
+                <td className="py-2 px-3 text-right num-display">{fmtNumber(r.pendienteRecep)}</td>
+                <td className="py-2 px-3 text-right num-display">{r.pct}%</td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr>
+                <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                  {loading ? "Cargando…" : rows.length === 0 ? "Aún no hay datos para mostrar." : "Sin resultados para tu búsqueda."}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
