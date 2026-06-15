@@ -974,7 +974,7 @@ function DeliveryDialog({
           <Button variant="outline" onClick={onDone} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={() => setConfirmOpen(true)} disabled={saving || totalLines === 0}>
+          <Button onClick={() => setConfirmOpen(true)} disabled={saving || totalLines === 0 || !pass}>
             {saving ? "Guardando…" : `Confirmar (${totalLines} materiales)`}
           </Button>
         </DialogFooter>
