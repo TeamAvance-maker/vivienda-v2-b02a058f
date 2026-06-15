@@ -725,6 +725,8 @@ function EditDeliveryDialog({
               <tbody>
                 {rows.map((r, i) => {
                   const mat = maps.matById.get(r.material_id);
+                  const conv = getConversion(mat?.code);
+                  const displayed = conv ? toValeQty(mat?.code, r.qty) : r.qty;
                   return (
                     <tr key={r.material_id} className="border-t border-border/60">
                       <td className="px-2 py-1.5">{mat?.description}</td>
@@ -733,19 +735,28 @@ function EditDeliveryDialog({
                           type="number"
                           step="0.01"
                           min="0"
-                          value={r.qty}
+                          value={displayed}
                           onChange={(e) => {
                             const v = Number(e.target.value);
+                            const safe = isNaN(v) ? 0 : v;
+                            const catalogQty = conv ? toCatalogQty(mat?.code, safe) : round2(safe);
                             setRows((rs) =>
                               rs.map((x, j) =>
-                                j === i ? { ...x, qty: isNaN(v) ? 0 : v } : x,
+                                j === i ? { ...x, qty: catalogQty } : x,
                               ),
                             );
                           }}
                           className="h-7 w-24 text-right"
                         />
+                        {conv && (
+                          <div className="mt-0.5 text-[10px] text-muted-foreground">
+                            = {r.qty} {mat?.unit} ({conv.note})
+                          </div>
+                        )}
                       </td>
-                      <td className="px-2 py-1.5 text-muted-foreground">{mat?.unit}</td>
+                      <td className="px-2 py-1.5 text-muted-foreground">
+                        {conv ? conv.valeUnit : mat?.unit}
+                      </td>
                     </tr>
                   );
                 })}
