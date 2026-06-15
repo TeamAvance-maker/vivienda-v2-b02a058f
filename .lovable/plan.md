@@ -30,11 +30,16 @@ Confirmé que tienen rendimientos distintos por casa, así que **no los toco**:
 - M0078 (0.05/casa) ≠ M0079 (0.2/casa)
 - M0170 (0.13 y 1) ≠ M0171 (0.67)
 
-### 4) Tornillos (C) — pendiente
-Igual que las puertas: lo dejamos para cuando me cuentes cómo llegan a la obra (si vienen en cajas distintas según punta/rosca o no).
+### 4) Tornillos (C) — resuelto, no se tocan
+Cada código de tornillo es un material distinto aunque la descripción se parezca, porque varían en:
+- **Medida** (mm y pulgadas, ej: cabeza lenteja 8 1/2)
+- **Tipo de rosca** (fina o gruesa)
+- **Tipo de punta** (fina o gruesa)
+
+Cada combinación tiene un propósito distinto en obra, así que se mantienen separados.
 
 ### 5) Puertas (D) — pendiente
-Lo vemos después. Primero me explicas cómo te llegan a obra (puerta suelta DER, suelta IZQ, o caja kit con las dos) y ahí decidimos.
+Lo vemos después. El usuario aclara mañana cómo llegan a obra (puerta suelta DER, suelta IZQ, o caja kit con las dos) y ahí decidimos.
 
 ## Lo que NO voy a tocar
 - Tornillos M0257/M0260/M0283/M0258/M0261
