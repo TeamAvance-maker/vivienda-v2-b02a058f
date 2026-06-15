@@ -798,7 +798,7 @@ function EditDeliveryDialog({
 
 
 // ============================================================
-// Diálogo de entrega (manual o auto-completar)
+// Diálogo de entrega (grupal o auto-completar — total o parcial)
 // ============================================================
 
 function DeliveryDialog({
@@ -810,14 +810,20 @@ function DeliveryDialog({
 }: {
   site: Site;
   stage: ValeStage;
-  mode: "manual" | "auto";
+  mode: "group" | "auto";
   maps: Maps;
   onDone: () => void;
 }) {
   const invalidate = useInvalidateSitesV2();
   const createDeliv = useServerFn(createSiteDeliveryFn);
+  const createGroup = useServerFn(createGroupSiteDeliveryFn);
+  const sitesQ = useSites();
+
   const reqs = maps.reqsByStageHouse.get(stage.id)?.get(site.house_type) ?? [];
   const delivered = maps.deliveredBySiteStageMat.get(site.id)?.get(stage.id) ?? new Map();
+
+  // Sub-modo solo para "auto": total (lo que falta) | parcial (0 y el usuario edita)
+  const [autoFill, setAutoFill] = useState<"total" | "partial">("total");
 
   const [rows, setRows] = useState(() =>
     reqs.map((r) => {
@@ -826,13 +832,49 @@ function DeliveryDialog({
       return { material_id: r.material_id, qty: mode === "auto" ? falta : 0, required: r.qty, already: got };
     }),
   );
+
+  // Al cambiar Total/Parcial, recalcula prellenado (solo en auto)
+  function applyAutoFill(next: "total" | "partial") {
+    setAutoFill(next);
+    setRows((rs) =>
+      rs.map((r) => ({
+        ...r,
+        qty: next === "total" ? Math.max(0, r.required - r.already) : 0,
+      })),
+    );
+  }
+
+  // Selector de sitios (solo modo grupal): sitios de la misma manzana y mismo tipo
+  const groupCandidates = useMemo(() => {
+    if (mode !== "group") return [];
+    return (sitesQ.data ?? [])
+      .filter((s) => s.manzana === site.manzana && s.house_type === site.house_type)
+      .sort((a, b) => a.sitio.localeCompare(b.sitio, "es", { numeric: true }));
+  }, [sitesQ.data, site.manzana, site.house_type, mode]);
+
+  const [selectedSiteIds, setSelectedSiteIds] = useState<string[]>(() =>
+    mode === "group" ? [site.id] : [],
+  );
+
+  function toggleSite(id: string) {
+    setSelectedSiteIds((xs) =>
+      xs.includes(id) ? xs.filter((x) => x !== id) : [...xs, id],
+    );
+  }
+  function selectAllSites() {
+    setSelectedSiteIds(groupCandidates.map((s) => s.id));
+  }
+  function clearSites() {
+    setSelectedSiteIds([]);
+  }
+
   const [note, setNote] = useState("");
   const [pass, setPass] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const totalLines = rows.filter((r) => r.qty > 0).length;
-  const willOverdeliver = rows.some((r) => r.already + r.qty > r.required);
+  const willOverdeliver = mode === "auto" && rows.some((r) => r.already + r.qty > r.required);
 
   async function save() {
     if (!pass) {
@@ -846,19 +888,38 @@ function DeliveryDialog({
       toast.error("No hay cantidades para entregar");
       return;
     }
+
+    if (mode === "group" && selectedSiteIds.length === 0) {
+      toast.error("Selecciona al menos un sitio");
+      return;
+    }
+
     setSaving(true);
     try {
-      await createDeliv({
-        data: {
-          passphrase: pass,
-          site_id: site.id,
-          vale_stage_id: stage.id,
-          mode,
-          note,
-          items,
-        },
-      });
-      toast.success(`Entrega registrada (${items.length} materiales)`);
+      if (mode === "group") {
+        const res = await createGroup({
+          data: {
+            passphrase: pass,
+            site_ids: selectedSiteIds,
+            vale_stage_id: stage.id,
+            note,
+            items,
+          },
+        });
+        toast.success(`Entrega grupal: ${res.deliveries} sitios × ${items.length} materiales`);
+      } else {
+        await createDeliv({
+          data: {
+            passphrase: pass,
+            site_id: site.id,
+            vale_stage_id: stage.id,
+            mode,
+            note,
+            items,
+          },
+        });
+        toast.success(`Entrega registrada (${items.length} materiales)`);
+      }
       invalidate();
       onDone();
     } catch (e: any) {
@@ -868,30 +929,107 @@ function DeliveryDialog({
     }
   }
 
-
   return (
     <Dialog open onOpenChange={(o) => !o && onDone()}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {mode === "auto" ? "Auto-completar lo que falta" : "Entregar manual"}
+            {mode === "auto" ? "Auto-completar entrega" : "Entrega grupal"}
           </DialogTitle>
           <DialogDescription>
-            Manzana {site.manzana} · Sitio {site.sitio} · Etapa {stage.stage_number}.{" "}
-            {mode === "auto"
-              ? "Las cantidades vienen prellenadas con lo que falta. Puedes ajustarlas si entregas de más por pérdida o extravío."
-              : "Escribe cuánto entregas hoy de cada material."}
+            {mode === "auto" ? (
+              <>
+                Manzana {site.manzana} · Sitio {site.sitio} · Etapa {stage.stage_number}.
+                Elige si entregas el total faltante o solo una parte.
+              </>
+            ) : (
+              <>
+                Aplica la misma entrega a varios sitios de la Manzana {site.manzana}
+                (tipo {site.house_type}) en la Etapa {stage.stage_number}. Se registra
+                una entrega por cada sitio seleccionado.
+              </>
+            )}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3">
+          {mode === "auto" && (
+            <div className="flex items-center gap-2 rounded-md border border-border/60 bg-secondary/30 p-2 text-xs">
+              <span className="font-medium">Tipo de entrega:</span>
+              <Button
+                type="button"
+                size="sm"
+                variant={autoFill === "total" ? "default" : "outline"}
+                onClick={() => applyAutoFill("total")}
+              >
+                Total (lo que falta)
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={autoFill === "partial" ? "default" : "outline"}
+                onClick={() => applyAutoFill("partial")}
+              >
+                Parcial (yo indico)
+              </Button>
+            </div>
+          )}
+
+          {mode === "group" && (
+            <div className="rounded-md border border-border/60 p-2">
+              <div className="mb-2 flex items-center justify-between">
+                <Label className="text-xs">
+                  Sitios de la Manzana {site.manzana} · tipo {site.house_type}
+                  <span className="ml-2 text-muted-foreground">
+                    ({selectedSiteIds.length}/{groupCandidates.length} seleccionados)
+                  </span>
+                </Label>
+                <div className="flex gap-1">
+                  <Button type="button" size="sm" variant="ghost" onClick={selectAllSites}>
+                    Todos
+                  </Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={clearSites}>
+                    Ninguno
+                  </Button>
+                </div>
+              </div>
+              <div className="flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
+                {groupCandidates.map((s) => {
+                  const on = selectedSiteIds.includes(s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => toggleSite(s.id)}
+                      className={cn(
+                        "rounded-full border px-2.5 py-1 text-xs transition-colors",
+                        on
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-border bg-background hover:bg-secondary/60",
+                      )}
+                    >
+                      Sitio {s.sitio}
+                    </button>
+                  );
+                })}
+                {groupCandidates.length === 0 && (
+                  <span className="text-xs text-muted-foreground">
+                    No hay otros sitios del mismo tipo en esta manzana.
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="overflow-hidden rounded-lg border border-border/60">
             <table className="min-w-full text-xs">
               <thead className="bg-secondary/40 text-left text-[10px] uppercase tracking-wider text-muted-foreground">
                 <tr>
                   <th className="px-2 py-2">Material</th>
                   <th className="px-2 py-2 text-right">Req.</th>
-                  <th className="px-2 py-2 text-right">Ya entregado</th>
+                  {mode === "auto" && (
+                    <th className="px-2 py-2 text-right">Ya entregado</th>
+                  )}
                   <th className="px-2 py-2 text-right">Entregar ahora</th>
                 </tr>
               </thead>
@@ -899,7 +1037,7 @@ function DeliveryDialog({
                 {rows.map((r, i) => {
                   const mat = maps.matById.get(r.material_id);
                   const conv = getConversion(mat?.code);
-                  const over = r.already + r.qty > r.required;
+                  const over = mode === "auto" && r.already + r.qty > r.required;
                   const displayed = conv ? toValeQty(mat?.code, r.qty) : r.qty;
                   return (
                     <tr key={r.material_id} className="border-t border-border/60">
@@ -914,9 +1052,11 @@ function DeliveryDialog({
                       <td className="px-2 py-1.5 text-right tabular-nums">
                         {r.required} {mat?.unit}
                       </td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">
-                        {r.already} {mat?.unit}
-                      </td>
+                      {mode === "auto" && (
+                        <td className="px-2 py-1.5 text-right tabular-nums">
+                          {r.already} {mat?.unit}
+                        </td>
+                      )}
                       <td className="px-2 py-1.5 text-right">
                         <Input
                           type="number"
@@ -961,7 +1101,6 @@ function DeliveryDialog({
             />
           </div>
 
-
           {willOverdeliver && (
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700">
               ⚠️ Estás entregando más de lo que pide el vale en algún material. Asegúrate de
@@ -974,8 +1113,20 @@ function DeliveryDialog({
           <Button variant="outline" onClick={onDone} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={() => setConfirmOpen(true)} disabled={saving || totalLines === 0 || !pass}>
-            {saving ? "Guardando…" : `Confirmar (${totalLines} materiales)`}
+          <Button
+            onClick={() => setConfirmOpen(true)}
+            disabled={
+              saving ||
+              totalLines === 0 ||
+              !pass ||
+              (mode === "group" && selectedSiteIds.length === 0)
+            }
+          >
+            {saving
+              ? "Guardando…"
+              : mode === "group"
+                ? `Confirmar (${selectedSiteIds.length} sitios × ${totalLines} materiales)`
+                : `Confirmar (${totalLines} materiales)`}
           </Button>
         </DialogFooter>
 
@@ -984,8 +1135,18 @@ function DeliveryDialog({
             <AlertDialogHeader>
               <AlertDialogTitle>¿Confirmar entrega?</AlertDialogTitle>
               <AlertDialogDescription>
-                Vas a registrar {totalLines} materiales para Manzana {site.manzana} · Sitio {site.sitio} ·
-                Etapa {stage.stage_number}. Esta acción queda en el historial.
+                {mode === "group" ? (
+                  <>
+                    Vas a registrar {totalLines} materiales en {selectedSiteIds.length}{" "}
+                    sitios de la Manzana {site.manzana} (Etapa {stage.stage_number}).
+                    Cada sitio queda con su propio registro.
+                  </>
+                ) : (
+                  <>
+                    Vas a registrar {totalLines} materiales para Manzana {site.manzana} ·
+                    Sitio {site.sitio} · Etapa {stage.stage_number}.
+                  </>
+                )}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
