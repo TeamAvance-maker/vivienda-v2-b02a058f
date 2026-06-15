@@ -951,6 +951,17 @@ function DeliveryDialog({
             <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Comentario..." />
           </div>
 
+          <div className="border-t border-border/60 pt-3">
+            <Label>Contraseña de obra</Label>
+            <Input
+              type="password"
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+              placeholder="••••••••"
+            />
+          </div>
+
+
           {willOverdeliver && (
             <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-700">
               ⚠️ Estás entregando más de lo que pide el vale en algún material. Asegúrate de
