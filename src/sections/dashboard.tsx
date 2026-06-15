@@ -299,7 +299,89 @@ export function DashboardSection() {
         />
       </div>
 
+      {/* Avance Sitios × Vales */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <KPI icon={Grid3x3} label="Sitio × Vale aplicables" value={fmtNumber(valeKpis.total)} />
+        <KPI
+          icon={CheckCircle2}
+          label="Vales completos"
+          tone="good"
+          value={fmtNumber(valeKpis.completas)}
+          hint={valeKpis.total ? `${((valeKpis.completas / valeKpis.total) * 100).toFixed(1)}%` : "—"}
+        />
+        <KPI
+          icon={Layers}
+          label="Vales parciales"
+          value={fmtNumber(valeKpis.parciales)}
+          hint={valeKpis.total ? `${((valeKpis.parciales / valeKpis.total) * 100).toFixed(1)}%` : "—"}
+        />
+        <KPI
+          icon={Clock}
+          label="Vales sin tocar"
+          value={fmtNumber(valeKpis.vacias)}
+          hint={valeKpis.total ? `${((valeKpis.vacias / valeKpis.total) * 100).toFixed(1)}%` : "—"}
+        />
+      </div>
+
+      {/* Avance por manzana */}
+      {valeKpis.porManzana.length > 0 && (
+        <div className="surface-card p-5">
+          <div className="mb-3 flex items-end justify-between">
+            <h3 className="font-display text-lg font-semibold">Avance por manzana</h3>
+            <span className="chip">{valeKpis.porManzana.length} manzanas</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {valeKpis.porManzana.map((m) => (
+              <div key={m.manzana} className="rounded-xl border border-border bg-background/60 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="font-display text-base font-semibold">Manzana {m.manzana}</div>
+                  <span className="chip">{m.completas}/{m.total}</span>
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all"
+                    style={{ width: `${m.pct}%` }}
+                  />
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {m.pct.toFixed(1)}% de vales completos
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Últimas entregas por vale */}
+      {ultimasEntregas.length > 0 && (
+        <div className="surface-card p-5">
+          <div className="mb-3 flex items-end justify-between">
+            <h3 className="font-display text-lg font-semibold">Últimas entregas por vale</h3>
+            <span className="chip">{ultimasEntregas.length}</span>
+          </div>
+          <ul className="divide-y divide-border/50 text-sm">
+            {ultimasEntregas.map((e) => (
+              <li key={e.id} className="flex items-center justify-between py-2">
+                <div className="min-w-0">
+                  <div className="truncate font-medium">
+                    {e.site ? `M${e.site.manzana} · Sitio ${e.site.sitio}` : "—"}
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {e.vale?.name ?? "Vale"}{e.stageNum ? ` · Etapa ${e.stageNum}` : ""}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {fmtDate(e.date)} · {e.mode === "auto" ? "Auto-completar" : "Manual"}
+                  </div>
+                </div>
+                <span className="chip">{e.materialCount} materiales</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Viviendas por tipo */}
+
       <div className="surface-card p-5">
         <div className="mb-3 flex items-end justify-between">
           <h3 className="font-display text-lg font-semibold">Avance por tipo de vivienda</h3>
