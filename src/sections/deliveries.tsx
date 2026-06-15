@@ -188,8 +188,14 @@ export function DeliveriesSection() {
         <Tabs defaultValue="byhouse">
           <TabsList className="w-full">
             <TabsTrigger value="byhouse" className="flex-1">Por viviendas</TabsTrigger>
+            <TabsTrigger value="byvale" className="flex-1">Por vale / sitio</TabsTrigger>
             <TabsTrigger value="manual" className="flex-1">Manual</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="byvale" className="p-3">
+            <ByValeTab />
+          </TabsContent>
+
 
           <TabsContent value="byhouse" className="space-y-4 p-3">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
