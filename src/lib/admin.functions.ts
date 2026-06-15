@@ -163,3 +163,55 @@ export const editSiteDeliveryFn = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Crea una entrega (site_deliveries) + sus ítems en una sola llamada con contraseña.
+const createDeliverySchema = z.object({
+  passphrase: z.string().min(1),
+  site_id: z.string().uuid(),
+  vale_stage_id: z.string().uuid(),
+  mode: z.enum(["manual", "auto"]),
+  note: z.string().optional(),
+  items: z
+    .array(
+      z.object({
+        material_id: z.string().uuid(),
+        qty: z.number().positive(),
+      }),
+    )
+    .min(1),
+});
+
+export const createSiteDeliveryFn = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => createDeliverySchema.parse(input))
+  .handler(async ({ data }) => {
+    const { checkPassphrase } = await import("./admin.server");
+    checkPassphrase(data.passphrase);
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+
+    const { data: deliv, error: e1 } = await supabaseAdmin
+      .from("site_deliveries")
+      .insert({
+        site_id: data.site_id,
+        vale_stage_id: data.vale_stage_id,
+        mode: data.mode,
+        note: data.note ?? "",
+      } as any)
+      .select("id")
+      .single();
+    if (e1 || !deliv) throw new Error(e1?.message ?? "Error al crear entrega");
+
+    const rows = data.items.map((it) => ({
+      delivery_id: (deliv as { id: string }).id,
+      material_id: it.material_id,
+      qty: it.qty,
+    }));
+    const { error: e2 } = await supabaseAdmin
+      .from("site_delivery_items")
+      .insert(rows as any);
+    if (e2) throw new Error(e2.message);
+
+    return { ok: true, delivery_id: (deliv as { id: string }).id, count: rows.length };
+  });
+
+
