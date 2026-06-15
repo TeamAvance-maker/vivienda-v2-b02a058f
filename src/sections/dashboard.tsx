@@ -428,65 +428,8 @@ export function DashboardSection() {
       </div>
 
       {/* Tabla maestra */}
-      <div className="surface-card p-5">
-        <div className="mb-3 flex items-end justify-between">
-          <div>
-            <h3 className="font-display text-lg font-semibold">Tabla maestra de control</h3>
-            <p className="text-xs text-muted-foreground">
-              Necesario / Recepcionado / Entregado / Saldo / Pendiente por comprar
-            </p>
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wider text-muted-foreground">
-              <tr className="border-b border-border">
-                <th className="py-2 pr-3">Material</th>
-                <th className="py-2 pr-3">Sentido</th>
-                <th className="py-2 pr-3 text-right">Necesario</th>
-                <th className="py-2 pr-3 text-right">Recepcionado</th>
-                <th className="py-2 pr-3 text-right">Entregado</th>
-                <th className="py-2 pr-3 text-right">Saldo</th>
-                <th className="py-2 pr-3 text-right">Pend. comprar</th>
-                <th className="py-2 pr-3 text-right">% Cumpl.</th>
-              </tr>
-            </thead>
-            <tbody>
-              {masterRows.map((r) => (
-                <tr key={`${r.code}-${r.hand}`} className="border-b border-border/50">
-                  <td className="py-2 pr-3">
-                    <div className="font-medium">{r.code}</div>
-                    <div className="text-xs text-muted-foreground">{r.mat?.description ?? "—"}</div>
-                  </td>
-                  <td className="py-2 pr-3">
-                    <span className="chip">{HAND_SHORT[r.hand as keyof typeof HAND_SHORT]}</span>
-                  </td>
-                  <td className="py-2 pr-3 text-right num-display">{fmtNumber(r.required)}</td>
-                  <td className="py-2 pr-3 text-right num-display">{fmtNumber(r.received)}</td>
-                  <td className="py-2 pr-3 text-right num-display">{fmtNumber(r.delivered)}</td>
-                  <td
-                    className={cn(
-                      "py-2 pr-3 text-right num-display",
-                      r.saldo <= 0 && "text-destructive",
-                    )}
-                  >
-                    {fmtNumber(r.saldo)}
-                  </td>
-                  <td className="py-2 pr-3 text-right num-display">{fmtNumber(r.pendienteRecep)}</td>
-                  <td className="py-2 pr-3 text-right num-display">{r.pct}%</td>
-                </tr>
-              ))}
-              {masterRows.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="py-8 text-center text-muted-foreground">
-                    {loading ? "Cargando…" : "Aún no hay datos para mostrar."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <MasterTable rows={masterRows} loading={loading} />
+
 
       {/* Alertas */}
       <div className="surface-card p-5">
