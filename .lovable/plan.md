@@ -1,51 +1,67 @@
-## Qué voy a hacer
 
-Una sola migración SQL que limpia el catálogo en 3 frentes. Lo de puertas lo dejamos para después.
+# Comparar el PDF de vales con el sistema
 
-### 1) Normalizar unidades (A)
-Pasar todas las unidades a MAYÚSCULAS y singular:
-- `un`, `uni` → **UN**
-- `m2` → **M2**
-- `ROLLOS` → **ROLLO**
-- Mismo trato para `KG`, `GL`, `SACO`, `TINETA`, `M`.
+## Lo que tenemos
 
-Resultado: cada concepto con una sola etiqueta.
+- **PDF oficial:** `VALES_TIPO_SEPARADOS_ADONAY-2.pdf` con **120 páginas**, una página por (vale + tipo de casa + etapa). Cada página tiene una tabla con `Cantidad | Unidad | Descripción`.
+- **Sistema:** 49 tipos de vales en la base de datos, con sus etapas, materiales y cantidades por tipo de casa (A1, A2, B, C).
+- **Recordatorio del usuario:** el PDF tiene los materiales **duplicados** (M0012, M0207, etc. que ya unificamos). Cuando compare contra el sistema, tengo que mapear los duplicados al código bueno antes de marcar una diferencia.
 
-### 2) Unificar 8 duplicados claros (B)
-Para cada par: muevo todos los vales y recepciones del código duplicado al código bueno, y después borro el duplicado.
+## Paso 1: Extraer todos los vales del PDF
 
-| Se queda | Se borra | Motivo |
-|---|---|---|
-| M0010 | M0012 | Mismo anclaje AN 90 |
-| M0206 | M0207 | Typo "1 UNPARA" |
-| M0208 | M0209 | Espacio extra |
-| M0253 | M0254 | Typo "PUNTAFINA" |
-| M0147 | M0148 | "DE 3 M" vs "DE 3 METROS" |
-| M0159 | M0160 | "DE 3,20 M" vs "DE 3,20 METROS" |
-| M0290 | M0292 | Singular vs plural |
-| M0291 | M0293 | Singular vs plural |
+Leer las 120 páginas con `pdfplumber` y armar una lista de:
+- Nombre del vale (ej: "VALE TIPO CANALIZACIONES MURO")
+- Tipo de casa (A, A1, A2, B, C)
+- Etapa (Etapa 1, 2, 3…)
+- Lista de materiales con cantidad, unidad y descripción
 
-### 3) Dudosos (B) — quedan aparte
-Confirmé que tienen rendimientos distintos por casa, así que **no los toco**:
-- M0078 (0.05/casa) ≠ M0079 (0.2/casa)
-- M0170 (0.13 y 1) ≠ M0171 (0.67)
+Guardar en `/tmp/vales_pdf.json` para reusarlo sin re-procesar el PDF.
 
-### 4) Tornillos (C) — resuelto, no se tocan
-Cada código de tornillo es un material distinto aunque la descripción se parezca, porque varían en:
-- **Medida** (mm y pulgadas, ej: cabeza lenteja 8 1/2)
-- **Tipo de rosca** (fina o gruesa)
-- **Tipo de punta** (fina o gruesa)
+## Paso 2: Hacer match entre PDF y sistema
 
-Cada combinación tiene un propósito distinto en obra, así que se mantienen separados.
+Por cada material del PDF:
+1. Buscar el material en `materials_v2` por descripción (case-insensitive, ignorando espacios extra).
+2. Si la descripción está en la lista de duplicados unificados (M0012→M0010, M0207→M0206, etc.), apuntar al código bueno.
+3. Buscar el vale en `vale_types_v2` por nombre.
+4. Buscar la etapa en `vale_stages` por número.
+5. Buscar la cantidad esperada en `vale_reqs` para ese (vale + etapa + tipo de casa + material).
 
-### 5) Puertas (D) — pendiente
-Lo vemos después. El usuario aclara mañana cómo llegan a obra (puerta suelta DER, suelta IZQ, o caja kit con las dos) y ahí decidimos.
+## Paso 3: Clasificar diferencias
+
+Cada línea cae en una de estas categorías:
+
+| Categoría | Significado |
+|---|---|
+| ✅ OK | Material existe, cantidad coincide |
+| ⚠️ Cantidad distinta | El material está pero con otra cantidad |
+| ⚠️ Unidad distinta | Está pero con otra unidad |
+| ❌ Falta en sistema | El PDF lo tiene, el sistema no |
+| ❌ Sobra en sistema | El sistema lo tiene, el PDF no |
+| ❓ No reconocido | No encontré el material en el catálogo (typo, descripción nueva) |
+| 🔀 Mapeo a unificado | Era un duplicado, se mapeó al código bueno |
+
+## Paso 4: Entregar dos archivos
+
+1. **Excel (`comparacion_vales.xlsx`)** con 4 hojas:
+   - **Resumen:** conteo de cada categoría por vale.
+   - **Diferencias críticas:** solo las filas con ❌ y ⚠️ (lo que hay que revisar).
+   - **Todo:** la comparación completa fila por fila.
+   - **No reconocidos:** materiales del PDF que no calzan con ningún código.
+
+2. **PDF del sistema (`vales_sistema.pdf`)** con una página por vale, mostrando lo que el sistema cree que es cada vale (etapas, materiales, cantidades por tipo de casa) — para que puedas revisar visualmente lado a lado con tu PDF oficial.
+
+## Cosas que voy a chequear con cuidado
+
+- **Tipos de casa:** el PDF dice "Tipo A" (sin distinguir A1/A2). Voy a asumir que "Tipo A" del PDF = A1 + A2 en el sistema, salvo cuando el PDF diga explícitamente A1 o A2 (como en las puertas).
+- **Etapas:** algunos vales en el PDF están sin número de etapa explícito. Los voy a emparejar por orden de aparición.
+- **Tornillos y otras cosas que se parecen:** ya vimos que la medida + rosca + punta los hace distintos. Si el PDF dice `TORNILLO LENTEJA 8X3/4"` y el sistema tiene varios `LENTEJA 8X3/4` con distintas roscas/puntas, lo marco como ❓ y te lo paso para que decidas.
+- **Materiales unificados:** llevo una lista interna (M0010←M0012, M0206←M0207, etc.) para no marcar como "falta" lo que en realidad ya quedó bajo otro código.
 
 ## Lo que NO voy a tocar
-- Tornillos M0257/M0260/M0283/M0258/M0261
-- Puertas y el campo `tracks_handedness`
-- Kits M0184/M0185/M0186
-- Códigos, RLS, ni la estructura de las tablas
 
-## Detalle técnico
-Una sola migración con: `UPDATE materials_v2 SET unit = ...`, luego `UPDATE vale_reqs/receptions/delivery_items SET material_id = <id del bueno>` para cada par, y al final `DELETE FROM materials_v2 WHERE code IN (...)`. Todo dentro de una transacción para que si algo falla, no quede a medias.
+- Nada se modifica en la base de datos. Esto es solo un reporte de lectura.
+- Después de revisar el reporte tú decides qué cambios aplicar y los hacemos en una migración aparte.
+
+## Tiempo estimado
+
+Procesar el PDF + comparar + generar Excel/PDF: alrededor de 1–2 minutos de ejecución una vez que pase a modo build.
