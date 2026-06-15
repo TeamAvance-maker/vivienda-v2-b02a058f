@@ -1,7 +1,11 @@
 import { useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { useMutation } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { supabase } from "@/integrations/supabase/client";
+import { editSiteDeliveryFn } from "@/lib/admin.functions";
+import { requestAdminMutation } from "@/components/passphrase-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -525,9 +529,261 @@ function StageDetail({
           </tbody>
         </table>
       </div>
+
+      <DeliveryHistoryList site={site} stage={stage} maps={maps} />
     </div>
   );
 }
+
+// ============================================================
+// Historial de entregas por sitio × etapa (editar / eliminar)
+// ============================================================
+
+function DeliveryHistoryList({
+  site,
+  stage,
+  maps,
+}: {
+  site: Site;
+  stage: ValeStage;
+  maps: Maps;
+}) {
+  const delivQ = useSiteDeliveries();
+  const itemsQ = useSiteDeliveryItems();
+  const [editing, setEditing] = useState<string | null>(null);
+
+  const list = useMemo(() => {
+    const ds = (delivQ.data ?? []).filter(
+      (d) => d.site_id === site.id && d.vale_stage_id === stage.id,
+    );
+    const itemsByDeliv = new Map<string, { material_id: string; qty: number }[]>();
+    for (const it of itemsQ.data ?? []) {
+      if (!itemsByDeliv.has(it.delivery_id)) itemsByDeliv.set(it.delivery_id, []);
+      itemsByDeliv.get(it.delivery_id)!.push({ material_id: it.material_id, qty: Number(it.qty) });
+    }
+    return ds
+      .map((d) => ({ ...d, items: itemsByDeliv.get(d.id) ?? [] }))
+      .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+  }, [delivQ.data, itemsQ.data, site.id, stage.id]);
+
+  if (delivQ.isLoading || itemsQ.isLoading) return null;
+
+  return (
+    <div className="space-y-2">
+      <h4 className="font-display text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Historial de entregas
+      </h4>
+      {list.length === 0 ? (
+        <div className="rounded-lg border border-border/60 bg-secondary/20 p-3 text-center text-xs text-muted-foreground">
+          Sin entregas registradas para esta etapa.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {list.map((d) => (
+            <div
+              key={d.id}
+              className="rounded-lg border border-border/60 bg-secondary/10 p-3 text-xs"
+            >
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="space-x-2">
+                  <span className="font-medium">
+                    {d.created_at
+                      ? new Date(d.created_at).toLocaleString("es-CL", {
+                          dateStyle: "short",
+                          timeStyle: "short",
+                        })
+                      : "—"}
+                  </span>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {d.mode === "auto" ? "auto" : "manual"}
+                  </Badge>
+                  {d.note && (
+                    <span className="text-muted-foreground italic">“{d.note}”</span>
+                  )}
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2"
+                    onClick={() => setEditing(d.id)}
+                  >
+                    <Pencil className="h-3 w-3" /> Editar
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 px-2 text-destructive"
+                    onClick={() =>
+                      requestAdminMutation({
+                        table: "site_deliveries",
+                        action: "delete",
+                        match: { id: d.id },
+                        description: `Vas a eliminar esta entrega (${d.items.length} materiales) del ${new Date(d.created_at ?? "").toLocaleString("es-CL")}. Los ítems entregados también se borrarán.`,
+                      })
+                    }
+                  >
+                    <Trash2 className="h-3 w-3" /> Eliminar
+                  </Button>
+                </div>
+              </div>
+              <ul className="space-y-0.5 pl-2">
+                {d.items.map((it) => {
+                  const mat = maps.matById.get(it.material_id);
+                  return (
+                    <li key={it.material_id} className="flex justify-between gap-2">
+                      <span className="truncate">{mat?.description ?? it.material_id}</span>
+                      <span className="tabular-nums text-muted-foreground">
+                        {it.qty} {mat?.unit ?? ""}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editing && (
+        <EditDeliveryDialog
+          deliveryId={editing}
+          initialItems={
+            list.find((d) => d.id === editing)?.items ?? []
+          }
+          initialNote={list.find((d) => d.id === editing)?.note ?? ""}
+          maps={maps}
+          onClose={() => setEditing(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditDeliveryDialog({
+  deliveryId,
+  initialItems,
+  initialNote,
+  maps,
+  onClose,
+}: {
+  deliveryId: string;
+  initialItems: { material_id: string; qty: number }[];
+  initialNote: string;
+  maps: Maps;
+  onClose: () => void;
+}) {
+  const invalidate = useInvalidateSitesV2();
+  const editFn = useServerFn(editSiteDeliveryFn);
+  const [rows, setRows] = useState(initialItems.map((it) => ({ ...it })));
+  const [note, setNote] = useState(initialNote);
+  const [pass, setPass] = useState("");
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      await editFn({
+        data: {
+          passphrase: pass,
+          delivery_id: deliveryId,
+          items: rows
+            .filter((r) => r.qty > 0)
+            .map((r) => ({ material_id: r.material_id, qty: Number(r.qty) })),
+          note,
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Entrega actualizada");
+      invalidate();
+      onClose();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Error"),
+  });
+
+  return (
+    <Dialog open onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-h-[90vh] max-w-xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Editar entrega</DialogTitle>
+          <DialogDescription>
+            Ajusta las cantidades entregadas. Si pones 0 en un material, esa línea
+            se elimina de la entrega.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-3">
+          <div className="overflow-hidden rounded-lg border border-border/60">
+            <table className="min-w-full text-xs">
+              <thead className="bg-secondary/40 text-left text-[10px] uppercase tracking-wider text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-2">Material</th>
+                  <th className="px-2 py-2 text-right">Cantidad</th>
+                  <th className="px-2 py-2">Unidad</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => {
+                  const mat = maps.matById.get(r.material_id);
+                  return (
+                    <tr key={r.material_id} className="border-t border-border/60">
+                      <td className="px-2 py-1.5">{mat?.description}</td>
+                      <td className="px-2 py-1.5 text-right">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={r.qty}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            setRows((rs) =>
+                              rs.map((x, j) =>
+                                j === i ? { ...x, qty: isNaN(v) ? 0 : v } : x,
+                              ),
+                            );
+                          }}
+                          className="h-7 w-24 text-right"
+                        />
+                      </td>
+                      <td className="px-2 py-1.5 text-muted-foreground">{mat?.unit}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <div>
+            <Label>Nota</Label>
+            <Input value={note} onChange={(e) => setNote(e.target.value)} />
+          </div>
+
+          <div className="border-t border-border/60 pt-3">
+            <Label>Contraseña de obra</Label>
+            <Input
+              type="password"
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+              placeholder="••••••••"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={mutation.isPending}>
+            Cancelar
+          </Button>
+          <Button
+            disabled={!pass || mutation.isPending}
+            onClick={() => mutation.mutate()}
+          >
+            {mutation.isPending ? "Guardando…" : "Guardar cambios"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 
 // ============================================================
 // Diálogo de entrega (manual o auto-completar)

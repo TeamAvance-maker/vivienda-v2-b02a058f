@@ -108,3 +108,58 @@ export const adminMutateFn = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// Reemplaza por completo los ítems de una entrega site_deliveries.
+// Útil para editar cantidades entregadas en bloque con UNA sola contraseña.
+const editDeliverySchema = z.object({
+  passphrase: z.string().min(1),
+  delivery_id: z.string().uuid(),
+  items: z
+    .array(
+      z.object({
+        material_id: z.string().uuid(),
+        qty: z.number().positive(),
+      }),
+    )
+    .min(0),
+  note: z.string().optional(),
+});
+
+export const editSiteDeliveryFn = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => editDeliverySchema.parse(input))
+  .handler(async ({ data }) => {
+    const { checkPassphrase } = await import("./admin.server");
+    checkPassphrase(data.passphrase);
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+
+    const { error: delErr } = await supabaseAdmin
+      .from("site_delivery_items")
+      .delete()
+      .eq("delivery_id", data.delivery_id);
+    if (delErr) throw new Error(delErr.message);
+
+    if (data.items.length > 0) {
+      const rows = data.items.map((it) => ({
+        delivery_id: data.delivery_id,
+        material_id: it.material_id,
+        qty: it.qty,
+      }));
+      const { error: insErr } = await supabaseAdmin
+        .from("site_delivery_items")
+        .insert(rows as any);
+      if (insErr) throw new Error(insErr.message);
+    }
+
+    if (data.note !== undefined) {
+      const { error: updErr } = await supabaseAdmin
+        .from("site_deliveries")
+        .update({ note: data.note } as any)
+        .eq("id", data.delivery_id);
+      if (updErr) throw new Error(updErr.message);
+    }
+
+    return { ok: true };
+  });
+
