@@ -1,74 +1,87 @@
-# Re-revisión de vales con las dos nuevas reglas
+## Lo que vamos a hacer (en cristiano 🧱)
 
-## Las reglas que me diste
+Hoy tenemos **dos mundos** en la app que no se hablan:
+- **Inicio + Entregas** (lo viejo): mide por *tipo de casa*.
+- **Sitios y Vales** (lo nuevo): mide por *manzana/sitio × vale tipo*, con etapas.
 
-1. **El PDF manda.** Los 49 vales del PDF (120 páginas) son la verdad. Si en el sistema sobra algo que el PDF no tiene → se saca del sistema. Si al PDF le falta algo o está en blanco → igual se respeta (vale vacío = vale vacío).
-2. **Materiales duplicados/no unificados se arreglan.** Antes de comparar, aplico la unificación que ya habíamos acordado (M0012→M0010, M0207→M0206, "gas butano" == "Gas butano", "GRAPAS 2" == "grapas 2", etc.). Así no marco como "falta" o "sobra" algo que en realidad es el mismo material con otro nombre.
+Vamos a conectarlos para que las entregas por vale **se vean en el Inicio**, agregamos un acceso rápido desde **Entregas**, y ponemos una **búsqueda** en todos los desplegables de materiales (que hoy son largos y molestos de scrollear).
 
-## Lo que voy a hacer (sólo lectura, sin tocar la base aún)
+---
 
-### Paso 1 — Normalizar nombres del PDF
+## 1. Nueva pestaña "Por vale / sitio" en **Entregas**
 
-Aplico mi lista de unificaciones a las descripciones del PDF antes de buscarlas en el sistema:
+En la sección **Entregas** (donde hoy hay 2 pestañas: *Por viviendas* y *Manual*) agregamos una **tercera pestaña**: **"Por vale / sitio"**.
 
-- Normalizo mayúsculas/minúsculas, espacios y comillas.
-- Mapeo duplicados conocidos (los 8 grupos del archivo `Materiales_Duplicados_Para_Revisar.xlsx` + los que ya unificamos antes).
-- Si después de normalizar un material del PDF sigue sin existir en `materials_v2`, queda en la lista "hay que crearlo en el sistema".
+Flujo dentro de la pestaña, paso a paso:
+1. Eliges **Manzana** (con buscador).
+2. Eliges **Sitio** (se filtra según la manzana).
+3. Eliges **Vale tipo** (con buscador, agrupado por sección).
+4. Eliges **Etapa** del vale.
+5. Te muestra la tabla *Requerido / Ya entregado / Falta* y dos botones:
+   - **Entregar manual** (escribes cantidades).
+   - **Auto-completar lo que falta** (rellena con lo que falta).
+6. Confirmas → queda registrado.
 
-### Paso 2 — Comparar PDF → Sistema (PDF como verdad)
+Por dentro reutiliza exactamente la misma lógica del diálogo que ya existe en *Sitios y Vales* — no duplicamos código, solo le ponemos otra puerta de entrada.
 
-Para cada una de las 120 páginas (vale + tipo casa + etapa):
+---
 
-- ¿Existe el vale en `vale_types_v2`? Si no → **CREAR vale**.
-- ¿Existe la etapa? Si no → **CREAR etapa**.
-- Para cada material del PDF en esa etapa/casa:
-  - Si la cantidad y unidad coinciden → ✅ OK.
-  - Si la cantidad o unidad difieren → **ACTUALIZAR** al valor del PDF.
-  - Si no está en el sistema → **AGREGAR** al sistema.
-- Para cada material que el sistema tiene en ese vale/etapa/casa y que **no** aparece en el PDF → **QUITAR** del sistema (porque el PDF es la verdad).
-- Si una página del PDF está en blanco (sin materiales) → el vale/etapa queda vacío en el sistema también (se borran las filas que sobren).
+## 2. El **Inicio** muestra el avance de vales
 
-### Paso 3 — Clasificar todo en categorías de acción
+En la pantalla de Inicio agregamos **4 cosas nuevas**, sin tocar lo que ya hay arriba:
 
-Cada diferencia cae en una de estas, ya pensadas como "qué hay que hacer":
+### a) Tarjetas KPI "Avance Sitios × Vales"
+Cuatro tarjetitas nuevas:
+- **Combinaciones aplicables** (cuántos sitio×vale-tipo cuentan en total).
+- **Completas** (verde, con %).
+- **Parciales** (amarillo, con %).
+- **Sin tocar** (gris, con %).
 
+### b) Barra de avance **por manzana**
+Una tarjeta con una barrita por cada manzana: *Manzana 1 → 12/40 vales completos (30%)*, *Manzana 2 → …*, etc.
 
-| Acción                        | Significado                                                                               |
-| ----------------------------- | ----------------------------------------------------------------------------------------- |
-| ➕ Agregar material al vale    | El PDF lo tiene, el sistema no                                                            |
-| ➖ Quitar material del vale    | El sistema lo tiene, el PDF no                                                            |
-| 🔧 Cambiar cantidad           | Mismo material, cantidad distinta — gana la del PDF                                       |
-| 🔧 Cambiar unidad             | Mismo material, unidad distinta — gana la del PDF                                         |
-| 🆕 Crear material en catálogo | El PDF nombra un material que no existe en `materials_v2` ni siquiera después de unificar |
-| 🆕 Crear vale o etapa         | El PDF tiene un vale/etapa que el sistema no tiene                                        |
-| 🔀 Unificar duplicado         | Dos códigos distintos en el sistema apuntan al mismo material — se conserva uno           |
-| ✅ OK                          | Coincide perfecto                                                                         |
+### c) Las entregas por vale **suman en la "Tabla maestra de control"**
+Hoy esa tabla mira solo las *Entregas* viejas. Vamos a hacer que también sume las entregas hechas por vale/sitio, **emparejando por código de material**. Así la columna **"Entregado"** refleja la realidad total, y de paso el **Saldo** queda correcto.
 
+> ⚠️ Detalle importante: los materiales del mundo viejo (`materials`) y del nuevo (`materials_v2`) se unen por `code`. Si un material existe en uno y no en otro, igual aparecerá; simplemente quedará "huérfano" de un lado. Te lo aviso porque puede que veas alguna fila nueva en la tabla.
 
-### Paso 4 — Entregables
+### d) Lista **"Últimas entregas por vale"**
+Una tarjeta al final con las últimas 10 entregas (fecha · Manzana/Sitio · Vale · cuántos materiales), ordenadas de más reciente a más antigua.
 
-1. `**comparacion_vales_v2.xlsx**` con 5 hojas:
-  - **Resumen:** conteo de acciones por vale.
-  - **Plan de cambios:** la lista accionable, fila por fila, lista para revisar antes de migrar.
-  - **Materiales a crear:** los que el PDF nombra y no existen.
-  - **Unificaciones aplicadas:** qué nombres del PDF mapeé a qué código.
-  - **Todo (trazabilidad):** comparación completa.
-2. `**vales_sistema_v2.pdf**` actualizado mostrando cómo quedaría el sistema **después** de aplicar el plan (para que lo compares visualmente con tu PDF original).
+---
 
-### Paso 5 — Lo que NO hago todavía
+## 3. **Búsqueda** en todos los selects de materiales 🔍
 
-- **No toco la base de datos.** Esto sigue siendo sólo el reporte.
-- Cuando me digas "OK, aplica", recién ahí preparo una migración con todos los cambios juntos (crear vales/etapas/materiales, ajustar cantidades, quitar lo que sobra, unificar duplicados).
+Hoy cuando hay que elegir un material, sale un Select gigante con scroll eterno. Lo reemplazamos por un **combobox con campo de búsqueda** (escribes "M00" o parte del nombre y te filtra).
 
-## Supuestos que mantengo del análisis anterior
+Lugares donde aplica:
+- **Entregas → Manual** (selector de material).
+- **Entregas → Por vale/sitio** (selectores nuevos: manzana, sitio, vale).
+- **Vale Tipo** (cuando se editan requerimientos de un vale).
+- **Casas** y **Tipos de casa** (cuando se elige material para un requerimiento).
+- **Recepciones** (selector de material).
+- **Sitios y Vales** (los filtros de manzana/tipo casa/sección).
 
-- "Tipo A" del PDF = A1 y A2 en el sistema. se dublica, es decir, TIPO A1 y TIPO A2
-- Etapas sin número se elimina la palabra ETAPA O ETAPAS,
-- Tornillos/materiales muy parecidos: si el PDF dice algo genérico y el sistema tiene varias variantes (rosca/punta), te lo marco aparte para que decidas tú cuál es — SI ASUMES, RECUERDA LO QUE TE EXPLIQUE DE LOS TORNILLOS Y SUS CARACTERISTICAS.  
-RECUERDA QUE TODOS LOS MATERIALES DEBES ANALIZARLOS CON MAYUSCULAS
+Hago **un solo componente reutilizable** (`SearchableSelect`) y lo enchufo en todos esos lugares — así si mañana mejora, mejora en todos lados.
 
-## Tiempo estimado
+---
 
-1–2 minutos de ejecución cuando pase a modo build.
+## Lo que **NO** voy a tocar (para no romper nada)
 
-¿Le doy con esto, o quieres ajustar alguna regla antes?
+- La estructura de la base de datos: no se crean ni borran tablas.
+- Las entregas viejas (*Por viviendas* y *Manual*) siguen funcionando idénticas.
+- La matriz colorida de *Sitios y Vales* queda igual (es la fuente de verdad).
+- Reglas de stock, autenticación, ni el módulo de Materiales/Recepciones (solo se les cambia el desplegable por uno con buscador).
+
+---
+
+## Detalle técnico (por si te interesa, pero puedes saltar)
+
+- Nuevo componente `src/components/searchable-select.tsx` basado en shadcn `Popover` + `Command` (que ya están en el proyecto).
+- `src/sections/deliveries.tsx`: nueva `TabsTrigger` "Por vale/sitio" + un componente `<DeliverByValeTab/>` que importa y reutiliza `SiteValeDialog` / `DeliveryDialog` de `src/sections/sites.tsx` (los exporto).
+- `src/sections/dashboard.tsx`: nueva sección KPIs (reutiliza `buildMaps` y `cellStatus` de `sites.tsx`, los muevo a `src/lib/sites-compute.ts`), barra por manzana, fusión de `site_delivery_items` agregados por `material_code` dentro de `masterRows`, y lista de últimas entregas.
+- Sin cambios de schema ni migraciones; todo se calcula en cliente con las queries ya existentes.
+
+---
+
+¿Le damos? Si algo no te cuadra dime y lo ajustamos antes de tocar código. 👍

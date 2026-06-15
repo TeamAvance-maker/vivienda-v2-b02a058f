@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
-import { AlertTriangle, Boxes, Home, PackageCheck, TrendingUp, Truck, Wrench } from "lucide-react";
+import { useMemo } from "react";
+import { AlertTriangle, Boxes, CheckCircle2, Clock, Grid3x3, Home, Layers, PackageCheck, TrendingUp, Truck, Wrench } from "lucide-react";
 import {
   useConfig,
   useHouseTypes,
@@ -12,9 +13,20 @@ import {
   useVRequired,
   useVStock,
 } from "@/lib/queries";
-import { fmtNumber, housesPossible, incompleteHouses, makeMap, pendingHouses, sumMap } from "@/lib/compute";
+import {
+  useSites,
+  useValeTypes,
+  useValeStages,
+  useValeReqs,
+  useMaterialsV2,
+  useSiteDeliveries,
+  useSiteDeliveryItems,
+} from "@/lib/sites-queries";
+import { buildMaps, cellStatus } from "@/lib/sites-compute";
+import { fmtDate, fmtNumber, housesPossible, incompleteHouses, makeMap, pendingHouses, sumMap } from "@/lib/compute";
 import { HAND_SHORT } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
 
 function KPI({
   icon: Icon,
@@ -64,6 +76,15 @@ export function DashboardSection() {
   const vExecuted = useVExecuted();
   const overrides = useOverrides();
 
+  // V2 (sitios y vales)
+  const sitesQ = useSites();
+  const vtQ = useValeTypes();
+  const stagesQ = useValeStages();
+  const reqsV2Q = useValeReqs();
+  const matsV2Q = useMaterialsV2();
+  const sDelivQ = useSiteDeliveries();
+  const sItemsQ = useSiteDeliveryItems();
+
   const loading =
     cfg.isLoading || houseTypes.isLoading || materials.isLoading || reqs.isLoading;
 
@@ -79,6 +100,20 @@ export function DashboardSection() {
 
   const reqMap = makeMap(vRequired.data);
   const deliveredMap = makeMap(vDelivered.data);
+
+  // Entregas v2 agregadas por código de material (handedness "none")
+  const v2DeliveredByCode = useMemo(() => {
+    const map = new Map<string, number>();
+    const matById = new Map((matsV2Q.data ?? []).map((m) => [m.id, m]));
+    const delivById = new Map((sDelivQ.data ?? []).map((d) => [d.id, d]));
+    for (const it of sItemsQ.data ?? []) {
+      if (!delivById.has(it.delivery_id)) continue;
+      const m = matById.get(it.material_id);
+      if (!m) continue;
+      map.set(m.code, (map.get(m.code) ?? 0) + Number(it.qty));
+    }
+    return map;
+  }, [matsV2Q.data, sDelivQ.data, sItemsQ.data]);
 
   const possible = housesPossible({
     houseTypes: ht,
@@ -99,12 +134,75 @@ export function DashboardSection() {
 
   const pendientes = pendingHouses(ht, vExecuted.data ?? []);
 
+  // KPIs Sitios × Vales
+  const v2Maps = useMemo(() => {
+    if (!stagesQ.data || !reqsV2Q.data || !sDelivQ.data || !sItemsQ.data || !matsV2Q.data) return null;
+    return buildMaps({
+      stages: stagesQ.data, reqs: reqsV2Q.data,
+      deliveries: sDelivQ.data, items: sItemsQ.data, materials: matsV2Q.data,
+    });
+  }, [stagesQ.data, reqsV2Q.data, sDelivQ.data, sItemsQ.data, matsV2Q.data]);
+
+  const valeKpis = useMemo(() => {
+    if (!v2Maps || !sitesQ.data || !vtQ.data) return { total: 0, completas: 0, parciales: 0, vacias: 0, porManzana: [] as { manzana: number; total: number; completas: number; pct: number }[] };
+    let total = 0, completas = 0, parciales = 0, vacias = 0;
+    const perManz = new Map<number, { total: number; completas: number }>();
+    for (const s of sitesQ.data) {
+      for (const v of vtQ.data) {
+        const st = cellStatus(s, v, v2Maps);
+        if (st === "na") continue;
+        total++;
+        const m = perManz.get(s.manzana) ?? { total: 0, completas: 0 };
+        m.total++;
+        if (st === "complete") { completas++; m.completas++; }
+        else if (st === "partial") parciales++;
+        else vacias++;
+        perManz.set(s.manzana, m);
+      }
+    }
+    const porManzana = [...perManz.entries()]
+      .map(([manzana, v]) => ({ manzana, ...v, pct: v.total ? (v.completas / v.total) * 100 : 0 }))
+      .sort((a, b) => a.manzana - b.manzana);
+    return { total, completas, parciales, vacias, porManzana };
+  }, [v2Maps, sitesQ.data, vtQ.data]);
+
+  // Últimas entregas por vale
+  const ultimasEntregas = useMemo(() => {
+    const sitesById = new Map((sitesQ.data ?? []).map((s) => [s.id, s]));
+    const stagesById = new Map((stagesQ.data ?? []).map((s) => [s.id, s]));
+    const valeById = new Map((vtQ.data ?? []).map((v) => [v.id, v]));
+    const countByDeliv = new Map<string, number>();
+    for (const it of sItemsQ.data ?? []) {
+      countByDeliv.set(it.delivery_id, (countByDeliv.get(it.delivery_id) ?? 0) + 1);
+    }
+    return (sDelivQ.data ?? [])
+      .slice()
+      .sort((a, b) => (b.created_at ?? b.date ?? "").localeCompare(a.created_at ?? a.date ?? ""))
+      .slice(0, 10)
+      .map((d) => {
+        const site = sitesById.get(d.site_id);
+        const stage = stagesById.get(d.vale_stage_id);
+        const vale = stage ? valeById.get(stage.vale_type_id) : undefined;
+        return {
+          id: d.id,
+          date: d.date,
+          site,
+          vale,
+          stageNum: stage?.stage_number,
+          materialCount: countByDeliv.get(d.id) ?? 0,
+          mode: d.mode,
+        };
+      });
+  }, [sDelivQ.data, sItemsQ.data, sitesQ.data, stagesQ.data, vtQ.data]);
+
   // Tabla maestra
   const allKeys = new Set<string>([
     ...reqMap.keys(),
     ...(vReceived.data ?? []).map((r) => `${r.material_code}__${r.handedness}`),
     ...deliveredMap.keys(),
     ...stockMap.keys(),
+    // claves nuevas v2 (handedness "none")
+    ...[...v2DeliveredByCode.keys()].map((c) => `${c}__none`),
   ]);
   const masterRows = [...allKeys]
     .map((k) => {
@@ -112,7 +210,9 @@ export function DashboardSection() {
       const required = reqMap.get(k) ?? 0;
       const received =
         (vReceived.data ?? []).find((r) => `${r.material_code}__${r.handedness}` === k)?.qty ?? 0;
-      const delivered = deliveredMap.get(k) ?? 0;
+      const deliveredV1 = deliveredMap.get(k) ?? 0;
+      const deliveredV2 = hand === "none" ? (v2DeliveredByCode.get(code) ?? 0) : 0;
+      const delivered = deliveredV1 + deliveredV2;
       const saldo = received - delivered;
       const pendienteRecep = Math.max(0, required - received);
       const pct = required > 0 ? Math.min(100, Math.round((received / required) * 100)) : 0;
@@ -120,6 +220,8 @@ export function DashboardSection() {
       return { code, hand, mat, required, received, delivered, saldo, pendienteRecep, pct };
     })
     .sort((a, b) => (a.mat?.sort_order ?? 99) - (b.mat?.sort_order ?? 99) || a.code.localeCompare(b.code));
+
+
 
   return (
     <div className="space-y-6">
@@ -197,7 +299,89 @@ export function DashboardSection() {
         />
       </div>
 
+      {/* Avance Sitios × Vales */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <KPI icon={Grid3x3} label="Sitio × Vale aplicables" value={fmtNumber(valeKpis.total)} />
+        <KPI
+          icon={CheckCircle2}
+          label="Vales completos"
+          tone="good"
+          value={fmtNumber(valeKpis.completas)}
+          hint={valeKpis.total ? `${((valeKpis.completas / valeKpis.total) * 100).toFixed(1)}%` : "—"}
+        />
+        <KPI
+          icon={Layers}
+          label="Vales parciales"
+          value={fmtNumber(valeKpis.parciales)}
+          hint={valeKpis.total ? `${((valeKpis.parciales / valeKpis.total) * 100).toFixed(1)}%` : "—"}
+        />
+        <KPI
+          icon={Clock}
+          label="Vales sin tocar"
+          value={fmtNumber(valeKpis.vacias)}
+          hint={valeKpis.total ? `${((valeKpis.vacias / valeKpis.total) * 100).toFixed(1)}%` : "—"}
+        />
+      </div>
+
+      {/* Avance por manzana */}
+      {valeKpis.porManzana.length > 0 && (
+        <div className="surface-card p-5">
+          <div className="mb-3 flex items-end justify-between">
+            <h3 className="font-display text-lg font-semibold">Avance por manzana</h3>
+            <span className="chip">{valeKpis.porManzana.length} manzanas</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {valeKpis.porManzana.map((m) => (
+              <div key={m.manzana} className="rounded-xl border border-border bg-background/60 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="font-display text-base font-semibold">Manzana {m.manzana}</div>
+                  <span className="chip">{m.completas}/{m.total}</span>
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all"
+                    style={{ width: `${m.pct}%` }}
+                  />
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {m.pct.toFixed(1)}% de vales completos
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Últimas entregas por vale */}
+      {ultimasEntregas.length > 0 && (
+        <div className="surface-card p-5">
+          <div className="mb-3 flex items-end justify-between">
+            <h3 className="font-display text-lg font-semibold">Últimas entregas por vale</h3>
+            <span className="chip">{ultimasEntregas.length}</span>
+          </div>
+          <ul className="divide-y divide-border/50 text-sm">
+            {ultimasEntregas.map((e) => (
+              <li key={e.id} className="flex items-center justify-between py-2">
+                <div className="min-w-0">
+                  <div className="truncate font-medium">
+                    {e.site ? `M${e.site.manzana} · Sitio ${e.site.sitio}` : "—"}
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      {e.vale?.name ?? "Vale"}{e.stageNum ? ` · Etapa ${e.stageNum}` : ""}
+                    </span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {fmtDate(e.date)} · {e.mode === "auto" ? "Auto-completar" : "Manual"}
+                  </div>
+                </div>
+                <span className="chip">{e.materialCount} materiales</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Viviendas por tipo */}
+
       <div className="surface-card p-5">
         <div className="mb-3 flex items-end justify-between">
           <h3 className="font-display text-lg font-semibold">Avance por tipo de vivienda</h3>
