@@ -168,7 +168,7 @@ const createDeliverySchema = z.object({
   passphrase: z.string().min(1),
   site_id: z.string().uuid(),
   vale_stage_id: z.string().uuid(),
-  mode: z.enum(["manual", "auto"]),
+  mode: z.enum(["manual", "auto", "group"]),
   note: z.string().optional(),
   items: z
     .array(
@@ -212,6 +212,60 @@ export const createSiteDeliveryFn = createServerFn({ method: "POST" })
     if (e2) throw new Error(e2.message);
 
     return { ok: true, delivery_id: (deliv as { id: string }).id, count: rows.length };
+  });
+
+// Crea una entrega grupal: misma cantidad de materiales para varios sitios
+// (típicamente de la misma manzana). Genera UN site_delivery por cada site_id
+// para mantener el registro separado por sitio.
+const createGroupDeliverySchema = z.object({
+  passphrase: z.string().min(1),
+  site_ids: z.array(z.string().uuid()).min(1).max(200),
+  vale_stage_id: z.string().uuid(),
+  note: z.string().optional(),
+  items: z
+    .array(
+      z.object({
+        material_id: z.string().uuid(),
+        qty: z.number().positive(),
+      }),
+    )
+    .min(1),
+});
+
+export const createGroupSiteDeliveryFn = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => createGroupDeliverySchema.parse(input))
+  .handler(async ({ data }) => {
+    const { checkPassphrase } = await import("./admin.server");
+    checkPassphrase(data.passphrase);
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+
+    const headers = data.site_ids.map((sid) => ({
+      site_id: sid,
+      vale_stage_id: data.vale_stage_id,
+      mode: "group",
+      note: data.note ?? "",
+    }));
+    const { data: delivs, error: e1 } = await supabaseAdmin
+      .from("site_deliveries")
+      .insert(headers as any)
+      .select("id, site_id");
+    if (e1 || !delivs) throw new Error(e1?.message ?? "Error al crear entregas");
+
+    const rows = (delivs as { id: string; site_id: string }[]).flatMap((d) =>
+      data.items.map((it) => ({
+        delivery_id: d.id,
+        material_id: it.material_id,
+        qty: it.qty,
+      })),
+    );
+    const { error: e2 } = await supabaseAdmin
+      .from("site_delivery_items")
+      .insert(rows as any);
+    if (e2) throw new Error(e2.message);
+
+    return { ok: true, deliveries: delivs.length, items_per_site: data.items.length };
   });
 
 
