@@ -217,45 +217,6 @@ export function DeliveriesSection() {
         </div>
       </div>
 
-      {/* Preview dialog */}
-      <AlertDialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <AlertDialogContent className="max-w-lg">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar entrega por viviendas</AlertDialogTitle>
-            <AlertDialogDescription>
-              Se descontará el siguiente material del stock y las viviendas se marcarán como ejecutadas.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="max-h-72 space-y-1 overflow-auto rounded-lg border border-border bg-background/60 p-3 text-sm">
-            {derivedItems.map((d) => {
-              const issue = get(stockMap, d.material_code, d.handedness) < d.qty;
-              return (
-                <div
-                  key={`${d.material_code}-${d.handedness}`}
-                  className={cn("flex items-center justify-between", issue && "text-destructive")}
-                >
-                  <span>{d.material_code} · {HAND_LABEL[d.handedness]}</span>
-                  <span className="num-display">
-                    {fmtNumber(d.qty)}{" "}
-                    <span className="text-xs text-muted-foreground">
-                      (stock: {fmtNumber(get(stockMap, d.material_code, d.handedness))})
-                    </span>
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          {stockIssues.length > 0 && (
-            <div className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              Hay {stockIssues.length} material(es) con stock insuficiente. Aun así puedes confirmar; el saldo quedará negativo.
-            </div>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmByh}>Confirmar</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
