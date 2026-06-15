@@ -470,7 +470,7 @@ function StageDetail({
   site: Site;
   stage: ValeStage;
   maps: Maps;
-  onAction: (m: "manual" | "auto") => void;
+  onAction: (m: "group" | "auto") => void;
 }) {
   const reqs = maps.reqsByStageHouse.get(stage.id)?.get(site.house_type) ?? [];
   const delivered = maps.deliveredBySiteStageMat.get(site.id)?.get(stage.id) ?? new Map();
@@ -482,11 +482,11 @@ function StageDetail({
           Etapa {stage.stage_number} — materiales requeridos
         </h3>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => onAction("manual")}>
-            Entregar manual
+          <Button size="sm" variant="outline" onClick={() => onAction("group")}>
+            Entrega grupal
           </Button>
           <Button size="sm" onClick={() => onAction("auto")}>
-            Auto-completar lo que falta
+            Auto-completar
           </Button>
         </div>
       </div>
