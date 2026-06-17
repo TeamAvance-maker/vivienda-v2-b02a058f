@@ -206,22 +206,20 @@ export function ValeTipoSection() {
         </div>
         <div>
           <Label>Vale tipo</Label>
-          <Select
+          <SearchableSelect
             value={valeTypeId}
-            onValueChange={(v) => {
+            onChange={(v) => {
               setValeTypeId(v);
               setStageId("");
             }}
-          >
-            <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
-            <SelectContent className="max-h-80">
-              {sortedValeTypes.map((vt) => (
-                <SelectItem key={vt.id} value={vt.id}>
-                  {vt.code} · {vt.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            placeholder="Selecciona vale tipo"
+            searchPlaceholder="Buscar vale…"
+            options={sortedValeTypes.map((vt) => ({
+              value: vt.id,
+              label: `${vt.code} · ${vt.name}`,
+              keywords: `${vt.code} ${vt.name}`,
+            }))}
+          />
         </div>
         <div>
           <Label>Etapa</Label>
