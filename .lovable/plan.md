@@ -1,87 +1,104 @@
-## Lo que vamos a hacer (en cristiano 🧱)
 
-Hoy tenemos **dos mundos** en la app que no se hablan:
-- **Inicio + Entregas** (lo viejo): mide por *tipo de casa*.
-- **Sitios y Vales** (lo nuevo): mide por *manzana/sitio × vale tipo*, con etapas.
+## Qué voy a hacer (explicado simple)
 
-Vamos a conectarlos para que las entregas por vale **se vean en el Inicio**, agregamos un acceso rápido desde **Entregas**, y ponemos una **búsqueda** en todos los desplegables de materiales (que hoy son largos y molestos de scrollear).
+Imagínate que tu sistema actual es una caja de herramientas que ya sirve para ver sitios, vales y entregas. Lo que vas a tener ahora es **una nueva ventana** dentro de la misma app que se llama **"Plano"**. Esa ventana muestra el dibujo del loteo (el SVG que mandaste) y, al pinchar un sitio o una manzana, te abre una ficha con los datos **reales** de tus vales — no inventados.
 
----
-
-## 1. Nueva pestaña "Por vale / sitio" en **Entregas**
-
-En la sección **Entregas** (donde hoy hay 2 pestañas: *Por viviendas* y *Manual*) agregamos una **tercera pestaña**: **"Por vale / sitio"**.
-
-Flujo dentro de la pestaña, paso a paso:
-1. Eliges **Manzana** (con buscador).
-2. Eliges **Sitio** (se filtra según la manzana).
-3. Eliges **Vale tipo** (con buscador, agrupado por sección).
-4. Eliges **Etapa** del vale.
-5. Te muestra la tabla *Requerido / Ya entregado / Falta* y dos botones:
-   - **Entregar manual** (escribes cantidades).
-   - **Auto-completar lo que falta** (rellena con lo que falta).
-6. Confirmas → queda registrado.
-
-Por dentro reutiliza exactamente la misma lógica del diálogo que ya existe en *Sitios y Vales* — no duplicamos código, solo le ponemos otra puerta de entrada.
+No voy a tocar el plano (mismos colores, mismas medidas, mismos IDs, mismas coordenadas). Solo lo voy a "enchufar" a los datos que ya están en el sistema.
 
 ---
 
-## 2. El **Inicio** muestra el avance de vales
+## 1) Cómo se conecta el plano con los datos reales
 
-En la pantalla de Inicio agregamos **4 cosas nuevas**, sin tocar lo que ya hay arriba:
+El HTML crea sitios con IDs tipo `M{manzana}-S{sitio}` (ej: `M1-S57`, `M3-S6`). En tu base de datos, la tabla `sites` ya tiene los campos `manzana` (número) y `sitio` (texto). Entonces **el "puente" es simplemente: manzana + sitio**. Con eso uno cualquier rectángulo del plano con su fila real de `sites`.
 
-### a) Tarjetas KPI "Avance Sitios × Vales"
-Cuatro tarjetitas nuevas:
-- **Combinaciones aplicables** (cuántos sitio×vale-tipo cuentan en total).
-- **Completas** (verde, con %).
-- **Parciales** (amarillo, con %).
-- **Sin tocar** (gris, con %).
+Para el avance y el estado uso lo que **ya existe**:
 
-### b) Barra de avance **por manzana**
-Una tarjeta con una barrita por cada manzana: *Manzana 1 → 12/40 vales completos (30%)*, *Manzana 2 → …*, etc.
-
-### c) Las entregas por vale **suman en la "Tabla maestra de control"**
-Hoy esa tabla mira solo las *Entregas* viejas. Vamos a hacer que también sume las entregas hechas por vale/sitio, **emparejando por código de material**. Así la columna **"Entregado"** refleja la realidad total, y de paso el **Saldo** queda correcto.
-
-> ⚠️ Detalle importante: los materiales del mundo viejo (`materials`) y del nuevo (`materials_v2`) se unen por `code`. Si un material existe en uno y no en otro, igual aparecerá; simplemente quedará "huérfano" de un lado. Te lo aviso porque puede que veas alguna fila nueva en la tabla.
-
-### d) Lista **"Últimas entregas por vale"**
-Una tarjeta al final con las últimas 10 entregas (fecha · Manzana/Sitio · Vale · cuántos materiales), ordenadas de más reciente a más antigua.
+- `src/lib/sites-compute.ts` → `buildMaps` + `cellStatus(site, valeType, maps)` ya calcula `complete | partial | empty | na` para cada vale de cada sitio. Es exactamente lo que necesita el plano para colorear.
+- Avance % del sitio = vales completos / vales que le aplican × 100.
+- Estado del sitio:
+  - **Verde (terminado)**: todos los vales que aplican están `complete`.
+  - **Amarillo (en ejecución)**: al menos un vale `partial` o `complete`, pero no todos.
+  - **Gris (sin iniciar)**: ningún vale tiene entregas.
+  - **Rojo (detenido)**: por ahora no existe un campo "bloqueado" en la base. Lo dejo definido como "sin entregas hace > X días" *opcional* — si no lo quieres por ahora, solo se usan los 3 colores reales y el rojo queda reservado para más adelante.
 
 ---
 
-## 3. **Búsqueda** en todos los selects de materiales 🔍
+## 2) Archivos que voy a crear (nuevos)
 
-Hoy cuando hay que elegir un material, sale un Select gigante con scroll eterno. Lo reemplazamos por un **combobox con campo de búsqueda** (escribes "M00" o parte del nombre y te filtra).
+1. `src/sections/plano.tsx` — la sección "Plano". Es un componente React que:
+   - Trae los datos con los hooks que ya existen (`useSites`, `useValeTypes`, `useValeStages`, `useValeReqs`, `useSiteDeliveries`, `useSiteDeliveryItems`, `useMaterialsV2`).
+   - Llama a `buildMaps` y, para cada sitio, calcula avance y estado.
+   - Renderiza el SVG **idéntico** al del HTML (mismo `viewBox 0 0 627 745`, mismos rectángulos, mismas coordenadas, mismas clases CSS).
+   - Filtros arriba: Vale tipo · Manzana · Tipo casa · Sitio (input) · Estado.
+   - Al hacer click en un sitio → abre un panel lateral (uso `Sheet` de shadcn) con: sitio, manzana, tipo casa, avance %, barra de progreso, lista de vales con su estado, fecha de última entrega por vale, y materiales principales entregados. Botón "Abrir detalle" que reusa el diálogo del módulo Sitios existente (no duplico lógica).
+   - Al hacer click en una manzana → panel con: total sitios, avance promedio, terminados / en ejecución / sin iniciar, y vales más atrasados.
 
-Lugares donde aplica:
-- **Entregas → Manual** (selector de material).
-- **Entregas → Por vale/sitio** (selectores nuevos: manzana, sitio, vale).
-- **Vale Tipo** (cuando se editan requerimientos de un vale).
-- **Casas** y **Tipos de casa** (cuando se elige material para un requerimiento).
-- **Recepciones** (selector de material).
-- **Sitios y Vales** (los filtros de manzana/tipo casa/sección).
+2. `src/lib/plano-layout.ts` — un archivo con **solo los datos del SVG** (lista de sitios con `manzana, sitio, tipo, x, y, w, h, cls` y lista de `manzanas` con sus rectángulos y labels). Sacado tal cual del HTML, sin cambiar un pixel. Esto deja el `plano.tsx` limpio.
 
-Hago **un solo componente reutilizable** (`SearchableSelect`) y lo enchufo en todos esos lugares — así si mañana mejora, mejora en todos lados.
-
----
-
-## Lo que **NO** voy a tocar (para no romper nada)
-
-- La estructura de la base de datos: no se crean ni borran tablas.
-- Las entregas viejas (*Por viviendas* y *Manual*) siguen funcionando idénticas.
-- La matriz colorida de *Sitios y Vales* queda igual (es la fuente de verdad).
-- Reglas de stock, autenticación, ni el módulo de Materiales/Recepciones (solo se les cambia el desplegable por uno con buscador).
+3. `src/lib/plano-compute.ts` — funciones puras:
+   - `siteProgress(site, maps, valeTypes)` → `{ pct, status, valesDetail[] }`
+   - `manzanaSummary(sites, maps, valeTypes)` → resumen agregado.
+   - Helper `plano(valetipos, sitio, manzana, tipocasa)` expuesto (la función pública pedida) que retorna los sitios filtrados.
 
 ---
 
-## Detalle técnico (por si te interesa, pero puedes saltar)
+## 3) Archivos que voy a modificar (mínimo)
 
-- Nuevo componente `src/components/searchable-select.tsx` basado en shadcn `Popover` + `Command` (que ya están en el proyecto).
-- `src/sections/deliveries.tsx`: nueva `TabsTrigger` "Por vale/sitio" + un componente `<DeliverByValeTab/>` que importa y reutiliza `SiteValeDialog` / `DeliveryDialog` de `src/sections/sites.tsx` (los exporto).
-- `src/sections/dashboard.tsx`: nueva sección KPIs (reutiliza `buildMaps` y `cellStatus` de `sites.tsx`, los muevo a `src/lib/sites-compute.ts`), barra por manzana, fusión de `site_delivery_items` agregados por `material_code` dentro de `masterRows`, y lista de últimas entregas.
-- Sin cambios de schema ni migraciones; todo se calcula en cliente con las queries ya existentes.
+1. `src/components/app-shell.tsx` — agregar **una pestaña nueva** `"plano"` en `TabKey` y `TABS` (icono Map de lucide). Las pestañas existentes no se tocan.
+
+2. `src/routes/index.tsx` — agregar la línea:
+   ```
+   {tab === "plano" && <PlanoSection />}
+   ```
+   y su import. Nada más.
+
+**No se modifica**: `sites.tsx`, `deliveries.tsx`, `vale-tipo.tsx`, `sites-queries.ts`, `sites-compute.ts`, `sites-types.ts`, `admin.functions.ts`, ni la base de datos. Cero cambios de esquema.
 
 ---
 
-¿Le damos? Si algo no te cuadra dime y lo ajustamos antes de tocar código. 👍
+## 4) Mapeo de IDs (importante)
+
+El HTML genera IDs `M1-S57`, `M2-S3`, etc. para 102 sitios. Voy a usar **manzana + sitio** como llave de cruce con la tabla `sites` real:
+
+- Si un sitio del plano **no existe** en la BD → se pinta gris claro y al click avisa "Sitio del plano sin datos en el sistema" (no rompe).
+- Si un sitio existe en la BD pero **no está en el plano** → aparece en una pequeña alerta arriba: "X sitios reales no están dibujados en el plano". No los inventamos, solo se reporta.
+
+Esto es para que tú veas la consistencia entre el SVG y la realidad sin que nada se rompa.
+
+---
+
+## 5) Filtros y función `plano(...)`
+
+Mantengo la firma pedida:
+
+```
+plano(valetipos, sitio, manzana, tipocasa, estado?)
+```
+
+Internamente aplica las clases `is-hidden`, `is-highlight`, `is-selected` igual que el HTML original. Cuando `valetipos` está seteado, los colores de los rectángulos se recalculan **mostrando el estado de ese vale específico** en cada sitio (verde/amarillo/gris según `cellStatus`). Cuando no hay filtro de vale, se muestra el estado general del sitio.
+
+---
+
+## 6) Detalles técnicos (para revisión)
+
+- **Datos**: usa los hooks `useSites/useValeTypes/...` ya existentes en `src/lib/sites-queries.ts`. Sin nuevas tablas, sin nuevas server functions.
+- **SVG**: se renderiza desde JSX puro mapeando los arrays de `plano-layout.ts`. Mismos atributos: `viewBox="0 0 627 745"`, mismas clases (`lot`, `mz-area`, `small`, `estado-*`, `is-hidden`, etc.).
+- **CSS**: los estilos específicos del plano viven scoped en `plano.tsx` con un `<style>` local (mismo CSS del HTML, solo el bloque del mapa). El resto de la app sigue con Tailwind.
+- **Popups**: en vez del `div.popup` fixed del HTML, uso `Sheet` (shadcn) lateral derecho — consistente con el resto del sistema y responsive.
+- **Performance**: 102 sitios → render trivial. `useMemo` para los cálculos de estado por sitio.
+
+---
+
+## 7) Lo que NO voy a hacer (compromiso)
+
+- ❌ No rediseñar el SVG.
+- ❌ No mover coordenadas.
+- ❌ No cambiar IDs (`M{m}-S{n}` se mantiene).
+- ❌ No reescribir vales, entregas, sites, dashboard.
+- ❌ No agregar tablas ni migraciones.
+
+---
+
+## Resultado final
+
+Una pestaña nueva **"Plano"** en el menú superior. Al entrar ves el loteo igualito al HTML, pero los colores reflejan tus vales reales. Filtras, pinchas, y ves información viva del sistema. Todo lo demás sigue funcionando exactamente como ahora.
