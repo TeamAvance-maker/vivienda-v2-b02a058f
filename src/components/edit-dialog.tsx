@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/searchable-select";
 import { adminMutateFn } from "@/lib/admin.functions";
 import { useInvalidateAll } from "@/lib/queries";
 
