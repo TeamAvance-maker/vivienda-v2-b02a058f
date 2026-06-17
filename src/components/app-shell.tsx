@@ -16,7 +16,6 @@ import { Logo } from "./logo";
 import { cn } from "@/lib/utils";
 
 export type TabKey =
-  | "sitios"
   | "plano"
   | "dashboard"
   | "recepciones"
@@ -28,7 +27,6 @@ export type TabKey =
   | "config";
 
 export const TABS: { key: TabKey; label: string; short: string; icon: typeof Home }[] = [
-  { key: "sitios", label: "Sitios y Vales", short: "Sitios", icon: Grid3x3 },
   { key: "plano", label: "Plano", short: "Plano", icon: MapIcon },
   { key: "dashboard", label: "Inicio", short: "Inicio", icon: Home },
   { key: "recepciones", label: "Recepciones", short: "Recep.", icon: PackagePlus },
