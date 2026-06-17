@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Map as MapIcon } from "lucide-react";
+import { ChevronDown, ChevronRight, Map as MapIcon } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,23 +17,27 @@ import {
 } from "@/lib/sites-queries";
 import { buildMaps } from "@/lib/sites-compute";
 import { PLANO_LOTS, PLANO_MANZANAS, type PlanoLot } from "@/lib/plano-layout";
-import { siteProgress, manzanaSummary, STATUS_LABEL, type SiteOverallStatus } from "@/lib/plano-compute";
-import type { Site, ValeTypeV2 } from "@/lib/sites-types";
+import {
+  siteProgress,
+  manzanaSummary,
+  stageCellStatus,
+  valeBreakdown,
+  STATUS_LABEL,
+  type SiteOverallStatus,
+} from "@/lib/plano-compute";
+import type { CellStatus, Site, ValeStage, ValeTypeV2 } from "@/lib/sites-types";
+
+type ValeFilter =
+  | { type: "all" }
+  | { type: "vale"; valeTypeId: string }
+  | { type: "stage"; valeTypeId: string; stageId: string };
 
 type Filters = {
-  valeTypeId: string; // "" = todos
+  vale: ValeFilter;
   manzana: string;
   tipo: string;
   sitio: string;
   estado: string;
-};
-
-const STATUS_FILL: Record<SiteOverallStatus, string> = {
-  terminado: "#bbf7d0",
-  "en-ejecucion": "#fde68a",
-  "sin-iniciar": "#f8fafc",
-  bloqueado: "#fecaca",
-  na: "#f1f5f9",
 };
 
 const TIPO_FILL: Record<string, string> = {
@@ -43,11 +47,18 @@ const TIPO_FILL: Record<string, string> = {
   C: "#ffd3e8",
 };
 
-const CELL_FILL: Record<"complete" | "partial" | "empty" | "na", string> = {
+const CELL_FILL: Record<CellStatus, string> = {
   complete: "#bbf7d0",
   partial: "#fde68a",
   empty: "#f8fafc",
   na: "#f1f5f9",
+};
+
+const STATUS_FROM_CELL: Record<CellStatus, SiteOverallStatus> = {
+  complete: "terminado",
+  partial: "en-ejecucion",
+  empty: "sin-iniciar",
+  na: "na",
 };
 
 export function PlanoSection() {
@@ -60,16 +71,14 @@ export function PlanoSection() {
   const matsQ = useMaterialsV2();
 
   const [filters, setFilters] = useState<Filters>({
-    valeTypeId: "",
+    vale: { type: "all" },
     manzana: "",
     tipo: "",
     sitio: "",
     estado: "",
   });
   const [selected, setSelected] = useState<
-    | { kind: "site"; lot: PlanoLot }
-    | { kind: "manzana"; id: string }
-    | null
+    { kind: "site"; lot: PlanoLot } | { kind: "manzana"; id: string } | null
   >(null);
 
   const loading =
@@ -92,7 +101,6 @@ export function PlanoSection() {
     });
   }, [stagesQ.data, reqsQ.data, delivQ.data, itemsQ.data, matsQ.data]);
 
-  // Index sitios reales por "M-S"
   const siteByKey = useMemo(() => {
     const m = new Map<string, Site>();
     (sitesQ.data ?? []).forEach((s) => m.set(`${s.manzana}-${s.sitio}`, s));
@@ -100,12 +108,34 @@ export function PlanoSection() {
   }, [sitesQ.data]);
 
   const valeTypes = vtQ.data ?? [];
+  const valeStages = stagesQ.data ?? [];
+  const stagesByVale = useMemo(() => {
+    const m = new Map<string, ValeStage[]>();
+    for (const s of valeStages) {
+      if (!m.has(s.vale_type_id)) m.set(s.vale_type_id, []);
+      m.get(s.vale_type_id)!.push(s);
+    }
+    for (const arr of m.values()) arr.sort((a, b) => a.stage_number - b.stage_number);
+    return m;
+  }, [valeStages]);
 
-  // Calcular avance/estado para cada lote del plano
+  const selectedValeType = useMemo(() => {
+    if (filters.vale.type === "all") return null;
+    const id = filters.vale.valeTypeId;
+    return valeTypes.find((v) => v.id === id) ?? null;
+  }, [filters.vale, valeTypes]);
+
+  const selectedStage = useMemo(() => {
+    if (filters.vale.type !== "stage") return null;
+    const id = filters.vale.stageId;
+    return valeStages.find((s) => s.id === id) ?? null;
+  }, [filters.vale, valeStages]);
+
+  // Info por lote
   const lotInfo = useMemo(() => {
     const out = new Map<
       string,
-      { site: Site | null; pct: number; status: SiteOverallStatus; cellStatusForFilter?: "complete" | "partial" | "empty" | "na" }
+      { site: Site | null; pct: number; status: SiteOverallStatus; cellForFilter?: CellStatus }
     >();
     for (const lot of PLANO_LOTS) {
       const site = siteByKey.get(`${lot.manzana}-${lot.sitio}`) ?? null;
@@ -114,52 +144,116 @@ export function PlanoSection() {
         continue;
       }
       const prog = siteProgress(site, valeTypes, maps);
-      let cellStat: "complete" | "partial" | "empty" | "na" | undefined;
-      if (filters.valeTypeId) {
-        const v = prog.vales.find((x) => x.valeTypeId === filters.valeTypeId);
-        cellStat = v?.status ?? "na";
+      let cell: CellStatus | undefined;
+      if (filters.vale.type === "vale" && selectedValeType) {
+        const v = prog.vales.find((x) => x.valeTypeId === selectedValeType.id);
+        cell = v?.status ?? "na";
+      } else if (filters.vale.type === "stage" && selectedStage) {
+        cell = stageCellStatus(site, selectedStage, maps);
       }
-      out.set(lot.id, { site, pct: prog.pct, status: prog.status, cellStatusForFilter: cellStat });
+      out.set(lot.id, { site, pct: prog.pct, status: prog.status, cellForFilter: cell });
     }
     return out;
-  }, [siteByKey, maps, valeTypes, filters.valeTypeId]);
+  }, [siteByKey, maps, valeTypes, filters.vale, selectedValeType, selectedStage]);
 
-  // Sitios reales no dibujados
   const sitiosFueraDelPlano = useMemo(() => {
     const drawn = new Set(PLANO_LOTS.map((l) => `${l.manzana}-${l.sitio}`));
     return (sitesQ.data ?? []).filter((s) => !drawn.has(`${s.manzana}-${s.sitio}`));
   }, [sitesQ.data]);
 
+  const hasValeFilter = filters.vale.type !== "all";
+
   const isVisible = (lot: PlanoLot) => {
     if (filters.sitio && lot.sitio !== filters.sitio.trim()) return false;
     if (filters.manzana && lot.manzana !== filters.manzana) return false;
     if (filters.tipo && lot.tipo !== filters.tipo) return false;
-    if (filters.estado) {
+    if (filters.estado && hasValeFilter) {
       const info = lotInfo.get(lot.id);
-      if (!info || info.status !== filters.estado) return false;
+      const st = info?.cellForFilter ? STATUS_FROM_CELL[info.cellForFilter] : "na";
+      if (st !== filters.estado) return false;
     }
     return true;
   };
 
   const limpiar = () =>
-    setFilters({ valeTypeId: "", manzana: "", tipo: "", sitio: "", estado: "" });
+    setFilters({ vale: { type: "all" }, manzana: "", tipo: "", sitio: "", estado: "" });
 
-  // Resumen global
-  const resumen = useMemo(() => {
-    const progresses = PLANO_LOTS.map((l) => {
-      const info = lotInfo.get(l.id);
-      return { status: info?.status ?? ("na" as SiteOverallStatus), pct: info?.pct ?? 0 };
-    });
-    return manzanaSummary(
-      progresses.map((p) => ({
-        pct: p.pct,
-        status: p.status,
-        vales: [],
-        applicable: 0,
-        completos: 0,
-      })),
-    );
-  }, [lotInfo]);
+  // Stats globales del plano (sobre sitios reales, todos los vales)
+  const stats = useMemo(() => {
+    let total = 0;
+    let sumPct = 0;
+    let term = 0,
+      exe = 0,
+      sin = 0;
+    let valesAppl = 0;
+    let valesComp = 0;
+    const porTipo: Record<string, number> = {};
+    for (const lot of PLANO_LOTS) {
+      const info = lotInfo.get(lot.id);
+      if (!info?.site || !maps) continue;
+      total++;
+      porTipo[lot.tipo] = (porTipo[lot.tipo] ?? 0) + 1;
+      const prog = siteProgress(info.site, valeTypes, maps);
+      sumPct += prog.pct;
+      valesAppl += prog.applicable;
+      valesComp += prog.completos;
+      if (prog.status === "terminado") term++;
+      else if (prog.status === "en-ejecucion") exe++;
+      else sin++;
+    }
+    return {
+      total,
+      avancePct: total === 0 ? 0 : Math.round(sumPct / total),
+      term,
+      exe,
+      sin,
+      porTipo,
+      valesAppl,
+      valesComp,
+    };
+  }, [lotInfo, maps, valeTypes]);
+
+  // Stats del vale/etapa seleccionado
+  const filterStats = useMemo(() => {
+    if (!hasValeFilter) return null;
+    let c = 0,
+      p = 0,
+      e = 0,
+      na = 0;
+    for (const lot of PLANO_LOTS) {
+      const info = lotInfo.get(lot.id);
+      const st = info?.cellForFilter ?? "na";
+      if (st === "complete") c++;
+      else if (st === "partial") p++;
+      else if (st === "empty") e++;
+      else na++;
+    }
+    return { c, p, e, na };
+  }, [lotInfo, hasValeFilter]);
+
+  // Valor actual del Select de vale (string serializado)
+  const valeSelectValue =
+    filters.vale.type === "all"
+      ? "all"
+      : filters.vale.type === "vale"
+        ? `v:${filters.vale.valeTypeId}`
+        : `s:${filters.vale.stageId}`;
+
+  const onChangeValeSelect = (v: string) => {
+    if (v === "all") setFilters((f) => ({ ...f, vale: { type: "all" }, estado: "" }));
+    else if (v.startsWith("v:")) {
+      const id = v.slice(2);
+      setFilters((f) => ({ ...f, vale: { type: "vale", valeTypeId: id } }));
+    } else if (v.startsWith("s:")) {
+      const stageId = v.slice(2);
+      const stage = valeStages.find((s) => s.id === stageId);
+      if (stage)
+        setFilters((f) => ({
+          ...f,
+          vale: { type: "stage", valeTypeId: stage.vale_type_id, stageId },
+        }));
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -188,27 +282,76 @@ export function PlanoSection() {
         <div>
           <h2 className="text-xl font-semibold">Plano interactivo</h2>
           <p className="text-sm text-muted-foreground">
-            Loteo conectado a vales reales. Click en sitio o manzana para ver detalle.
+            Click en sitio o manzana para ver detalle. Selecciona un vale o etapa para colorear por estado.
           </p>
         </div>
       </div>
 
+      {/* Estadísticas generales */}
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6">
+        <StatCard label="Total sitios" value={stats.total} />
+        <StatCard label="Avance global" value={`${stats.avancePct}%`} accent="#2563eb" />
+        <StatCard label="Terminados" value={stats.term} accent="#16a34a" />
+        <StatCard label="En ejecución" value={stats.exe} accent="#d97706" />
+        <StatCard label="Sin iniciar" value={stats.sin} accent="#64748b" />
+        <StatCard
+          label="Vales completos"
+          value={`${stats.valesComp}/${stats.valesAppl}`}
+          accent="#0ea5e9"
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-muted-foreground">Distribución por tipo:</span>
+        {Object.entries(stats.porTipo).map(([k, v]) => (
+          <Badge key={k} variant="outline" style={{ background: TIPO_FILL[k] }}>
+            {k}: {v}
+          </Badge>
+        ))}
+        {filterStats && (
+          <>
+            <span className="mx-2 h-3 border-l" />
+            <span className="text-muted-foreground">
+              {selectedStage
+                ? `Etapa "${selectedStage.name}":`
+                : selectedValeType
+                  ? `Vale ${selectedValeType.code}:`
+                  : ""}
+            </span>
+            <Badge style={{ background: "#bbf7d0" }}>Completo: {filterStats.c}</Badge>
+            <Badge style={{ background: "#fde68a" }}>Parcial: {filterStats.p}</Badge>
+            <Badge style={{ background: "#f8fafc" }} variant="outline">
+              Sin entregar: {filterStats.e}
+            </Badge>
+            <Badge variant="outline">N/A: {filterStats.na}</Badge>
+          </>
+        )}
+      </div>
+
       {/* Filtros */}
       <div className="grid grid-cols-2 gap-2 rounded-2xl border bg-card p-3 md:grid-cols-6">
-        <div>
+        <div className="md:col-span-2">
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Vale tipo
+            Vale tipo / Etapa
           </label>
-          <Select
-            value={filters.valeTypeId || "all"}
-            onValueChange={(v) => setFilters((f) => ({ ...f, valeTypeId: v === "all" ? "" : v }))}
-          >
-            <SelectTrigger><SelectValue /></SelectTrigger>
+          <Select value={valeSelectValue} onValueChange={onChangeValeSelect}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              {valeTypes.map((v) => (
-                <SelectItem key={v.id} value={v.id}>{v.code} · {v.name}</SelectItem>
-              ))}
+              {valeTypes.map((vt) => {
+                const stages = stagesByVale.get(vt.id) ?? [];
+                return [
+                  <SelectItem key={`v:${vt.id}`} value={`v:${vt.id}`}>
+                    <b>{vt.code}</b> · {vt.name}
+                  </SelectItem>,
+                  ...stages.map((st) => (
+                    <SelectItem key={`s:${st.id}`} value={`s:${st.id}`}>
+                      &nbsp;&nbsp;&nbsp;└ E{st.stage_number} · {st.name}
+                    </SelectItem>
+                  )),
+                ];
+              })}
             </SelectContent>
           </Select>
         </div>
@@ -220,11 +363,15 @@ export function PlanoSection() {
             value={filters.manzana || "all"}
             onValueChange={(v) => setFilters((f) => ({ ...f, manzana: v === "all" ? "" : v }))}
           >
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todas</SelectItem>
               {["1", "2", "3", "4", "5"].map((m) => (
-                <SelectItem key={m} value={m}>Manzana {m}</SelectItem>
+                <SelectItem key={m} value={m}>
+                  Manzana {m}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -237,11 +384,15 @@ export function PlanoSection() {
             value={filters.tipo || "all"}
             onValueChange={(v) => setFilters((f) => ({ ...f, tipo: v === "all" ? "" : v }))}
           >
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
               {["A1", "A2", "B", "C"].map((t) => (
-                <SelectItem key={t} value={t}>{t}</SelectItem>
+                <SelectItem key={t} value={t}>
+                  {t}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -258,38 +409,28 @@ export function PlanoSection() {
         </div>
         <div>
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Estado
+            Estado {hasValeFilter ? "" : "(elige vale)"}
           </label>
           <Select
             value={filters.estado || "all"}
             onValueChange={(v) => setFilters((f) => ({ ...f, estado: v === "all" ? "" : v }))}
+            disabled={!hasValeFilter}
           >
-            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="terminado">Terminado</SelectItem>
-              <SelectItem value="en-ejecucion">En ejecución</SelectItem>
-              <SelectItem value="sin-iniciar">Sin iniciar</SelectItem>
-              <SelectItem value="bloqueado">Detenido</SelectItem>
+              <SelectItem value="terminado">Completo</SelectItem>
+              <SelectItem value="en-ejecucion">Parcial</SelectItem>
+              <SelectItem value="sin-iniciar">Sin entregar</SelectItem>
             </SelectContent>
           </Select>
         </div>
-        <div className="flex items-end">
-          <Button variant="outline" className="w-full" onClick={limpiar}>Limpiar</Button>
-        </div>
-        <div className="col-span-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground md:col-span-6">
-          <LegendChip color="#bbf7d0" label="Terminado" />
-          <LegendChip color="#fde68a" label="En ejecución" />
-          <LegendChip color="#f8fafc" label="Sin iniciar" />
-          <LegendChip color="#fecaca" label="Detenido" />
-          <span className="mx-2 h-3 border-l" />
-          <LegendChip color="#eaf6ff" label="A1" />
-          <LegendChip color="#ffffff" label="A2" />
-          <LegendChip color="#fff1b8" label="B" />
-          <LegendChip color="#ffd3e8" label="C" />
-          {filters.valeTypeId && (
-            <Badge variant="secondary">Mostrando estado de vale seleccionado</Badge>
-          )}
+        <div className="md:col-span-6 flex justify-end">
+          <Button variant="outline" onClick={limpiar}>
+            Limpiar filtros
+          </Button>
         </div>
       </div>
 
@@ -299,79 +440,77 @@ export function PlanoSection() {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-        {/* Mapa */}
-        <div className="overflow-auto rounded-2xl border bg-card p-3 shadow-sm">
-          {loading && <div className="p-6 text-sm text-muted-foreground">Cargando datos…</div>}
-          <svg className="plano-svg" viewBox="0 0 627 745" aria-label="Plano loteo">
-            <rect className="road" x="0" y="0" width="627" height="745" rx="10" />
-            <g>
-              {PLANO_MANZANAS.map((m) => (
+      <div className="overflow-auto rounded-2xl border bg-card p-3 shadow-sm">
+        {loading && <div className="p-6 text-sm text-muted-foreground">Cargando datos…</div>}
+        <svg className="plano-svg" viewBox="0 0 627 745" aria-label="Plano loteo">
+          <rect className="road" x="0" y="0" width="627" height="745" rx="10" />
+          <g>
+            {PLANO_MANZANAS.map((m) => (
+              <g
+                key={m.id}
+                className="mz-area"
+                onClick={() => setSelected({ kind: "manzana", id: m.id })}
+              >
+                <rect className="mz-outline" x={m.x} y={m.y} width={m.w} height={m.h} rx={7} />
+                <text className="mz-title" x={m.labelX} y={m.labelY}>
+                  {m.title}
+                </text>
+                <rect
+                  className="corner"
+                  x={m.x + m.w - 11}
+                  y={m.y + m.h - 10}
+                  width={9}
+                  height={9}
+                  rx={1}
+                />
+              </g>
+            ))}
+          </g>
+          <g>
+            {PLANO_LOTS.map((lot) => {
+              const info = lotInfo.get(lot.id);
+              // Color por defecto = tipo de casa. Sólo si hay filtro de vale/etapa cambia.
+              let fill = TIPO_FILL[lot.tipo] ?? "#ffffff";
+              if (hasValeFilter && info?.cellForFilter) {
+                fill = CELL_FILL[info.cellForFilter];
+              }
+              const visible = isVisible(lot);
+              const isSel = selected?.kind === "site" && selected.lot.id === lot.id;
+              const classes = ["lot"];
+              if (lot.cls) classes.push(lot.cls);
+              if (!visible) classes.push("is-hidden");
+              else if (
+                filters.sitio ||
+                filters.manzana ||
+                filters.tipo ||
+                filters.estado ||
+                hasValeFilter
+              )
+                classes.push("is-highlight");
+              if (isSel) classes.push("is-selected");
+              return (
                 <g
-                  key={m.id}
-                  className="mz-area"
-                  onClick={() => setSelected({ kind: "manzana", id: m.id })}
+                  key={lot.id}
+                  className={classes.join(" ")}
+                  onClick={() => setSelected({ kind: "site", lot })}
                 >
-                  <rect className="mz-outline" x={m.x} y={m.y} width={m.w} height={m.h} rx={7} />
-                  <text className="mz-title" x={m.labelX} y={m.labelY}>{m.title}</text>
-                  <rect className="corner" x={m.x + m.w - 11} y={m.y + m.h - 10} width={9} height={9} rx={1} />
+                  <rect x={lot.x} y={lot.y} width={lot.w} height={lot.h} style={{ fill }} />
+                  <text className="num" x={lot.x + lot.w / 2} y={lot.y + lot.h * 0.45}>
+                    {lot.sitio}
+                  </text>
+                  <text className="tipo" x={lot.x + lot.w / 2} y={lot.y + lot.h * 0.74}>
+                    {lot.tipo}
+                  </text>
                 </g>
-              ))}
-            </g>
-            <g>
-              {PLANO_LOTS.map((lot) => {
-                const info = lotInfo.get(lot.id);
-                let fill = TIPO_FILL[lot.tipo] ?? "#ffffff";
-                if (filters.valeTypeId && info?.cellStatusForFilter) {
-                  fill = CELL_FILL[info.cellStatusForFilter];
-                } else if (info && info.status !== "na") {
-                  fill = STATUS_FILL[info.status];
-                }
-                const visible = isVisible(lot);
-                const isSel =
-                  selected?.kind === "site" && selected.lot.id === lot.id;
-                const classes = ["lot"];
-                if (lot.cls) classes.push(lot.cls);
-                if (!visible) classes.push("is-hidden");
-                else if (
-                  filters.sitio ||
-                  filters.manzana ||
-                  filters.tipo ||
-                  filters.estado ||
-                  filters.valeTypeId
-                )
-                  classes.push("is-highlight");
-                if (isSel) classes.push("is-selected");
-                return (
-                  <g
-                    key={lot.id}
-                    className={classes.join(" ")}
-                    onClick={() => setSelected({ kind: "site", lot })}
-                  >
-                    <rect x={lot.x} y={lot.y} width={lot.w} height={lot.h} style={{ fill }} />
-                    <text className="num" x={lot.x + lot.w / 2} y={lot.y + lot.h * 0.45}>{lot.sitio}</text>
-                    <text className="tipo" x={lot.x + lot.w / 2} y={lot.y + lot.h * 0.74}>{lot.tipo}</text>
-                  </g>
-                );
-              })}
-            </g>
-          </svg>
-        </div>
-
-        {/* Resumen lateral */}
-        <aside className="space-y-2 rounded-2xl border bg-card p-4 text-sm shadow-sm">
-          <h3 className="font-semibold">Resumen</h3>
-          <Metric label="Total sitios (plano)" value={resumen.total} />
-          <Metric label="Avance promedio" value={`${resumen.avancePromedio}%`} />
-          <Metric label="Terminados" value={resumen.terminados} accent="#16a34a" />
-          <Metric label="En ejecución" value={resumen.enEjecucion} accent="#d97706" />
-          <Metric label="Sin iniciar" value={resumen.sinIniciar} accent="#64748b" />
-        </aside>
+              );
+            })}
+          </g>
+        </svg>
       </div>
 
       {/* Panel sitio */}
       <Sheet open={selected?.kind === "site"} onOpenChange={(o) => !o && setSelected(null)}>
-        <SheetContent className="w-[420px] max-w-[95vw] overflow-y-auto sm:max-w-[420px]">
+        <SheetContent className="w-[460px] max-w-[95vw] overflow-y-auto sm:max-w-[460px]">
           {selected?.kind === "site" && (
             <SitePanel
               lot={selected.lot}
@@ -386,32 +525,30 @@ export function PlanoSection() {
       {/* Panel manzana */}
       <Sheet open={selected?.kind === "manzana"} onOpenChange={(o) => !o && setSelected(null)}>
         <SheetContent className="w-[420px] max-w-[95vw] overflow-y-auto sm:max-w-[420px]">
-          {selected?.kind === "manzana" && (
-            <ManzanaPanel id={selected.id} lotInfo={lotInfo} />
-          )}
+          {selected?.kind === "manzana" && <ManzanaPanel id={selected.id} lotInfo={lotInfo} />}
         </SheetContent>
       </Sheet>
     </div>
   );
 }
 
-function LegendChip({ color, label }: { color: string; label: string }) {
+function StatCard({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string | number;
+  accent?: string;
+}) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2 py-0.5">
-      <span
-        className="inline-block h-3 w-3 rounded border"
-        style={{ background: color, borderColor: "#cbd5e1" }}
-      />
-      {label}
-    </span>
-  );
-}
-
-function Metric({ label, value, accent }: { label: string; value: string | number; accent?: string }) {
-  return (
-    <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
-      <span className="text-xs text-muted-foreground">{label}</span>
-      <b className="text-sm" style={accent ? { color: accent } : undefined}>{value}</b>
+    <div className="rounded-xl border bg-card p-3 shadow-sm">
+      <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        {label}
+      </div>
+      <div className="mt-1 text-xl font-bold" style={accent ? { color: accent } : undefined}>
+        {value}
+      </div>
     </div>
   );
 }
@@ -427,11 +564,15 @@ function SitePanel({
   valeTypes: ValeTypeV2[];
   maps: ReturnType<typeof buildMaps> | null;
 }) {
+  const [openVale, setOpenVale] = useState<string | null>(null);
+
   if (!site || !maps) {
     return (
       <>
         <SheetHeader>
-          <SheetTitle>Sitio {lot.sitio} · Manzana {lot.manzana}</SheetTitle>
+          <SheetTitle>
+            Sitio {lot.sitio} · Manzana {lot.manzana}
+          </SheetTitle>
           <SheetDescription>Tipo casa {lot.tipo}</SheetDescription>
         </SheetHeader>
         <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
@@ -440,11 +581,16 @@ function SitePanel({
       </>
     );
   }
+
   const prog = siteProgress(site, valeTypes, maps);
+  const conEntregas = prog.vales.filter((v) => v.status === "complete" || v.status === "partial");
+
   return (
     <>
       <SheetHeader>
-        <SheetTitle>Sitio {site.sitio} · Manzana {site.manzana}</SheetTitle>
+        <SheetTitle>
+          Sitio {site.sitio} · Manzana {site.manzana}
+        </SheetTitle>
         <SheetDescription>
           Tipo casa <b>{site.house_type}</b> · {STATUS_LABEL[prog.status]}
         </SheetDescription>
@@ -461,32 +607,112 @@ function SitePanel({
           </div>
         </div>
         <div>
-          <h4 className="mb-2 text-sm font-semibold">Vales</h4>
-          <ul className="space-y-1.5">
-            {prog.vales
-              .filter((v) => v.status !== "na")
-              .map((v) => (
-                <li
-                  key={v.valeTypeId}
-                  className="flex items-center justify-between rounded-md border bg-muted/30 px-2.5 py-1.5 text-xs"
-                >
-                  <span>
-                    <b>{v.code}</b> · {v.name}
-                  </span>
-                  <ValeStatusBadge status={v.status} />
-                </li>
-              ))}
-            {prog.vales.filter((v) => v.status !== "na").length === 0 && (
-              <li className="text-xs text-muted-foreground">No hay vales aplicables.</li>
-            )}
-          </ul>
+          <h4 className="mb-2 text-sm font-semibold">Vales con entregas</h4>
+          {conEntregas.length === 0 ? (
+            <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+              Aún sin entregas en este sitio.
+            </div>
+          ) : (
+            <ul className="space-y-1.5">
+              {conEntregas.map((v) => {
+                const vt = valeTypes.find((x) => x.id === v.valeTypeId);
+                if (!vt) return null;
+                const open = openVale === v.valeTypeId;
+                return (
+                  <li key={v.valeTypeId} className="rounded-md border bg-muted/30">
+                    <button
+                      type="button"
+                      onClick={() => setOpenVale(open ? null : v.valeTypeId)}
+                      className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left text-xs"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        {open ? (
+                          <ChevronDown className="h-3.5 w-3.5" />
+                        ) : (
+                          <ChevronRight className="h-3.5 w-3.5" />
+                        )}
+                        <b>{vt.code}</b> · {vt.name}
+                      </span>
+                      <ValeStatusBadge status={v.status} />
+                    </button>
+                    {open && (
+                      <div className="border-t bg-background/60 px-2.5 py-2">
+                        <ValeDetail site={site} valeType={vt} maps={maps} />
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </div>
     </>
   );
 }
 
-function ValeStatusBadge({ status }: { status: "complete" | "partial" | "empty" | "na" }) {
+function ValeDetail({
+  site,
+  valeType,
+  maps,
+}: {
+  site: Site;
+  valeType: ValeTypeV2;
+  maps: ReturnType<typeof buildMaps>;
+}) {
+  const stages = valeBreakdown(site, valeType, maps);
+  if (stages.length === 0) {
+    return <div className="text-[11px] text-muted-foreground">No aplica a este tipo de casa.</div>;
+  }
+  return (
+    <div className="space-y-2">
+      {stages.map(({ stage, items, status }) => (
+        <div key={stage.id} className="rounded border bg-card p-2">
+          <div className="mb-1 flex items-center justify-between">
+            <div className="text-[11px] font-semibold">
+              E{stage.stage_number} · {stage.name}
+            </div>
+            <ValeStatusBadge status={status} />
+          </div>
+          <table className="w-full text-[10.5px]">
+            <thead className="text-muted-foreground">
+              <tr>
+                <th className="text-left font-medium">Material</th>
+                <th className="text-right font-medium">Req.</th>
+                <th className="text-right font-medium">Entreg.</th>
+                <th className="text-right font-medium">Falta</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it) => (
+                <tr key={it.material_id} className="border-t">
+                  <td className="py-0.5">
+                    <b>{it.material?.code ?? "?"}</b>{" "}
+                    <span className="text-muted-foreground">
+                      {it.material?.description ?? ""}{" "}
+                      {it.material?.unit ? `(${it.material.unit})` : ""}
+                    </span>
+                  </td>
+                  <td className="text-right tabular-nums">{it.req}</td>
+                  <td className="text-right tabular-nums">{it.delivered}</td>
+                  <td className="text-right tabular-nums">
+                    {it.missing === 0 ? (
+                      <span className="text-emerald-600">✓</span>
+                    ) : (
+                      <b className="text-amber-700">{it.missing}</b>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ValeStatusBadge({ status }: { status: CellStatus }) {
   const map = {
     complete: { label: "Completo", cls: "bg-emerald-100 text-emerald-800 border-emerald-300" },
     partial: { label: "Parcial", cls: "bg-amber-100 text-amber-800 border-amber-300" },
@@ -541,16 +767,18 @@ function ManzanaPanel({
           <Progress value={sum.avancePromedio} />
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
-          <Metric label="Total sitios" value={sum.total} />
-          <Metric label="Terminados" value={sum.terminados} accent="#16a34a" />
-          <Metric label="En ejecución" value={sum.enEjecucion} accent="#d97706" />
-          <Metric label="Sin iniciar" value={sum.sinIniciar} accent="#64748b" />
+          <StatCard label="Total sitios" value={sum.total} />
+          <StatCard label="Terminados" value={sum.terminados} accent="#16a34a" />
+          <StatCard label="En ejecución" value={sum.enEjecucion} accent="#d97706" />
+          <StatCard label="Sin iniciar" value={sum.sinIniciar} accent="#64748b" />
         </div>
         <div>
           <h4 className="mb-2 text-sm font-semibold">Distribución por tipo</h4>
           <div className="flex flex-wrap gap-1.5">
             {Object.entries(tipos).map(([k, v]) => (
-              <Badge key={k} variant="outline">{k}: {v}</Badge>
+              <Badge key={k} variant="outline">
+                {k}: {v}
+              </Badge>
             ))}
           </div>
         </div>

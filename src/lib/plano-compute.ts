@@ -1,6 +1,6 @@
 import type { Maps } from "./sites-compute";
 import { cellStatus } from "./sites-compute";
-import type { Site, ValeTypeV2 } from "./sites-types";
+import type { CellStatus, MaterialV2, Site, ValeStage, ValeTypeV2 } from "./sites-types";
 
 export type SiteOverallStatus = "terminado" | "en-ejecucion" | "sin-iniciar" | "bloqueado" | "na";
 
@@ -78,3 +78,55 @@ export const STATUS_LABEL: Record<SiteOverallStatus, string> = {
   bloqueado: "Detenido",
   na: "Sin datos",
 };
+
+// Estado de una sola etapa para un sitio
+export function stageCellStatus(site: Site, stage: ValeStage, maps: Maps): CellStatus {
+  const reqs = maps.reqsByStageHouse.get(stage.id)?.get(site.house_type) ?? [];
+  if (reqs.length === 0) return "na";
+  const delivered = maps.deliveredBySiteStageMat.get(site.id)?.get(stage.id) ?? new Map();
+  let hasAny = false;
+  let allComplete = true;
+  for (const r of reqs) {
+    const got = delivered.get(r.material_id) ?? 0;
+    if (got > 0) hasAny = true;
+    if (got < r.qty) allComplete = false;
+  }
+  if (allComplete) return "complete";
+  if (hasAny) return "partial";
+  return "empty";
+}
+
+export interface BreakdownItem {
+  material: MaterialV2 | undefined;
+  material_id: string;
+  req: number;
+  delivered: number;
+  missing: number;
+}
+export interface BreakdownStage {
+  stage: ValeStage;
+  items: BreakdownItem[];
+  status: CellStatus;
+}
+
+export function valeBreakdown(site: Site, valeType: ValeTypeV2, maps: Maps): BreakdownStage[] {
+  const stages = maps.stagesByVale.get(valeType.id) ?? [];
+  const out: BreakdownStage[] = [];
+  for (const stage of stages) {
+    const reqs = maps.reqsByStageHouse.get(stage.id)?.get(site.house_type) ?? [];
+    if (reqs.length === 0) continue;
+    const delivered = maps.deliveredBySiteStageMat.get(site.id)?.get(stage.id) ?? new Map();
+    const items: BreakdownItem[] = reqs.map((r) => {
+      const got = delivered.get(r.material_id) ?? 0;
+      return {
+        material: maps.matById.get(r.material_id),
+        material_id: r.material_id,
+        req: r.qty,
+        delivered: got,
+        missing: Math.max(0, r.qty - got),
+      };
+    });
+    out.push({ stage, items, status: stageCellStatus(site, stage, maps) });
+  }
+  return out;
+}
