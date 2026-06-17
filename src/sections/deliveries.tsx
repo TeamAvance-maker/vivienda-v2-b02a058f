@@ -284,8 +284,47 @@ function ByValeTab() {
     [vtQ.data],
   );
 
+  // Opciones combinadas: vale + sus etapas
+  const valeOptions = useMemo(() => {
+    const out: { value: string; label: string; hint?: string; keywords?: string }[] = [];
+    const stagesAll = stagesQ.data ?? [];
+    for (const v of vales) {
+      out.push({
+        value: `vale:${v.id}`,
+        label: v.name,
+        hint: v.section,
+        keywords: `${v.code} ${v.name} ${v.section}`,
+      });
+      const sts = stagesAll
+        .filter((s) => s.vale_type_id === v.id)
+        .sort((a, b) => a.stage_number - b.stage_number);
+      for (const st of sts) {
+        out.push({
+          value: `stage:${st.id}`,
+          label: `   ↳ Etapa ${st.stage_number}${st.name ? ` · ${st.name}` : ""}`,
+          hint: v.name,
+          keywords: `${v.code} ${v.name} etapa ${st.stage_number} ${st.name ?? ""}`,
+        });
+      }
+    }
+    return out;
+  }, [vales, stagesQ.data]);
+
+  // Resolución vale seleccionado a partir del valor (vale:ID o stage:ID)
+  const [valeSelectValue, setValeSelectValue] = useState<string>("");
+  const resolvedValeId = useMemo(() => {
+    if (!valeSelectValue) return "";
+    if (valeSelectValue.startsWith("vale:")) return valeSelectValue.slice(5);
+    if (valeSelectValue.startsWith("stage:")) {
+      const stId = valeSelectValue.slice(6);
+      const st = (stagesQ.data ?? []).find((x) => x.id === stId);
+      return st?.vale_type_id ?? "";
+    }
+    return "";
+  }, [valeSelectValue, stagesQ.data]);
+
   const selectedSite = sitesOfManzana.find((s) => s.id === siteId) ?? null;
-  const selectedVale = vales.find((v) => v.id === valeId) ?? null;
+  const selectedVale = vales.find((v) => v.id === resolvedValeId) ?? null;
 
   function openDialog() {
     if (!selectedSite || !selectedVale) {
@@ -298,7 +337,7 @@ function ByValeTab() {
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        Selecciona manzana → sitio → vale tipo y abre el panel para entregar manual o auto-completar lo que falta.
+        Selecciona manzana → sitio → vale tipo (o una etapa específica) y abre el panel para entregar manual o auto-completar lo que falta.
       </p>
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
@@ -329,21 +368,17 @@ function ByValeTab() {
           />
         </div>
         <div>
-          <Label>Vale tipo</Label>
+          <Label>Vale tipo / Etapa</Label>
           <SearchableSelect
-            value={valeId}
-            onChange={setValeId}
-            placeholder="Selecciona vale tipo"
-            searchPlaceholder="Buscar vale…"
-            options={vales.map((v) => ({
-              value: v.id,
-              label: v.name,
-              hint: v.section,
-              keywords: `${v.code} ${v.name} ${v.section}`,
-            }))}
+            value={valeSelectValue}
+            onChange={setValeSelectValue}
+            placeholder="Selecciona vale o etapa"
+            searchPlaceholder="Buscar vale o etapa…"
+            options={valeOptions}
           />
         </div>
       </div>
+
 
       {selectedSite && selectedVale && maps && (
         <div className="rounded-lg border border-border bg-background/60 p-3 text-sm">
