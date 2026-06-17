@@ -303,7 +303,7 @@ export function PlanoSection() {
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="text-muted-foreground">Distribución por tipo:</span>
         {Object.entries(stats.porTipo).map(([k, v]) => (
-          <Badge key={k} variant="outline" style={{ background: TIPO_FILL[k] }}>
+          <Badge key={k} variant="outline" style={{ background: TIPO_FILL[k], color: "#000", borderColor: "#0002" }}>
             {k}: {v}
           </Badge>
         ))}
@@ -317,12 +317,12 @@ export function PlanoSection() {
                   ? `Vale ${selectedValeType.code}:`
                   : ""}
             </span>
-            <Badge style={{ background: "#bbf7d0" }}>Completo: {filterStats.c}</Badge>
-            <Badge style={{ background: "#fde68a" }}>Parcial: {filterStats.p}</Badge>
-            <Badge style={{ background: "#f8fafc" }} variant="outline">
+            <Badge style={{ background: "#bbf7d0", color: "#000", borderColor: "#0002" }}>Completo: {filterStats.c}</Badge>
+            <Badge style={{ background: "#fde68a", color: "#000", borderColor: "#0002" }}>Parcial: {filterStats.p}</Badge>
+            <Badge style={{ background: "#f8fafc", color: "#000", borderColor: "#0002" }} variant="outline">
               Sin entregar: {filterStats.e}
             </Badge>
-            <Badge variant="outline">N/A: {filterStats.na}</Badge>
+            <Badge variant="outline" style={{ color: "#000", background: "#fff", borderColor: "#0002" }}>N/A: {filterStats.na}</Badge>
           </>
         )}
       </div>
