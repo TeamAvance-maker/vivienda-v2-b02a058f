@@ -12,10 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/searchable-select";
 import { SectionHeader } from "@/components/app-shell";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
-import { supabase } from "@/integrations/supabase/client";
-import { useInvalidateAll, useMaterials, useReceptions } from "@/lib/queries";
+import { useMaterials, useReceptions } from "@/lib/queries";
 import type { Handedness } from "@/lib/types";
 import { HAND_LABEL } from "@/lib/types";
 import { fmtDate, fmtNumber } from "@/lib/compute";
