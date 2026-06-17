@@ -254,7 +254,8 @@ function ByValeTab() {
 
   const [manzana, setManzana] = useState<string>("");
   const [siteId, setSiteId] = useState<string>("");
-  const [valeId, setValeId] = useState<string>("");
+  // valeId derivado del selector combinado más abajo
+
   const [opened, setOpened] = useState<{ site: Site; vale: ValeTypeV2 } | null>(null);
 
   const ready =
