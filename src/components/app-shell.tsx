@@ -3,7 +3,6 @@ import {
   Boxes,
   ClipboardCheck,
   FileSpreadsheet,
-  Grid3x3,
   Home,
   HousePlus,
   Map as MapIcon,
