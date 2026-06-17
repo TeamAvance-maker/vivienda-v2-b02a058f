@@ -11,7 +11,6 @@ import { InventorySection } from "@/sections/inventory";
 import { MaterialsSection } from "@/sections/materials";
 import { ReceptionsSection } from "@/sections/receptions";
 import { ReportsSection } from "@/sections/reports";
-import { SitesSection } from "@/sections/sites";
 import { PlanoSection } from "@/sections/plano";
 import { useConfig } from "@/lib/queries";
 
