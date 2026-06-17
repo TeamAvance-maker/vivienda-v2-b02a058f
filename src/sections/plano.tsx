@@ -18,7 +18,7 @@ import {
 import { buildMaps } from "@/lib/sites-compute";
 import { PLANO_LOTS, PLANO_MANZANAS, type PlanoLot } from "@/lib/plano-layout";
 import { siteProgress, manzanaSummary, STATUS_LABEL, type SiteOverallStatus } from "@/lib/plano-compute";
-import type { Site } from "@/lib/sites-types";
+import type { Site, ValeTypeV2 } from "@/lib/sites-types";
 
 type Filters = {
   valeTypeId: string; // "" = todos
@@ -424,9 +424,7 @@ function SitePanel({
 }: {
   lot: PlanoLot;
   site: Site | null;
-  valeTypes: ReturnType<typeof useValeTypes>["data"] extends infer T ? (T extends Array<infer U> ? U : never) : never extends never
-    ? import("@/lib/sites-types").ValeTypeV2[]
-    : never;
+  valeTypes: ValeTypeV2[];
   maps: ReturnType<typeof buildMaps> | null;
 }) {
   if (!site || !maps) {
@@ -442,7 +440,7 @@ function SitePanel({
       </>
     );
   }
-  const prog = siteProgress(site, valeTypes as never, maps);
+  const prog = siteProgress(site, valeTypes, maps);
   return (
     <>
       <SheetHeader>
