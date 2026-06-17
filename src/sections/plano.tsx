@@ -39,6 +39,7 @@ type Filters = {
   tipo: string;
   sitio: string;
   estado: string;
+  overall: "" | SiteOverallStatus;
 };
 
 const TIPO_FILL: Record<string, string> = {
