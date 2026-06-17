@@ -29,13 +29,12 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const [tab, setTab] = useState<TabKey>("sitios");
+  const [tab, setTab] = useState<TabKey>("plano");
   const cfg = useConfig();
 
   return (
     <>
       <AppShell active={tab} onChange={setTab} projectName={cfg.data?.name ?? "Mi Obra"}>
-        {tab === "sitios" && <SitesSection />}
         {tab === "plano" && <PlanoSection />}
         {tab === "dashboard" && <DashboardSection />}
         {tab === "recepciones" && <ReceptionsSection />}
