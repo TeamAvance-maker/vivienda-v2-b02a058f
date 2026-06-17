@@ -12,6 +12,7 @@ import { MaterialsSection } from "@/sections/materials";
 import { ReceptionsSection } from "@/sections/receptions";
 import { ReportsSection } from "@/sections/reports";
 import { SitesSection } from "@/sections/sites";
+import { PlanoSection } from "@/sections/plano";
 import { useConfig } from "@/lib/queries";
 
 export const Route = createFileRoute("/")({
@@ -36,6 +37,7 @@ function Index() {
     <>
       <AppShell active={tab} onChange={setTab} projectName={cfg.data?.name ?? "Mi Obra"}>
         {tab === "sitios" && <SitesSection />}
+        {tab === "plano" && <PlanoSection />}
         {tab === "dashboard" && <DashboardSection />}
         {tab === "recepciones" && <ReceptionsSection />}
         {tab === "entregas" && <DeliveriesSection />}
