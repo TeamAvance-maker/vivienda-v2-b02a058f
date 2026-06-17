@@ -1,6 +1,6 @@
 import type { Maps } from "./sites-compute";
 import { cellStatus } from "./sites-compute";
-import type { Site, ValeTypeV2 } from "./sites-types";
+import type { CellStatus, MaterialV2, Site, ValeStage, ValeTypeV2 } from "./sites-types";
 
 export type SiteOverallStatus = "terminado" | "en-ejecucion" | "sin-iniciar" | "bloqueado" | "na";
 
