@@ -121,12 +121,14 @@ export function PlanoSection() {
 
   const selectedValeType = useMemo(() => {
     if (filters.vale.type === "all") return null;
-    return valeTypes.find((v) => v.id === filters.vale.valeTypeId) ?? null;
+    const id = filters.vale.valeTypeId;
+    return valeTypes.find((v) => v.id === id) ?? null;
   }, [filters.vale, valeTypes]);
 
   const selectedStage = useMemo(() => {
     if (filters.vale.type !== "stage") return null;
-    return valeStages.find((s) => s.id === filters.vale.stageId) ?? null;
+    const id = filters.vale.stageId;
+    return valeStages.find((s) => s.id === id) ?? null;
   }, [filters.vale, valeStages]);
 
   // Info por lote
