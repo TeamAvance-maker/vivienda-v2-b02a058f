@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/searchable-select";
 import { adminMutateFn } from "@/lib/admin.functions";
 import { useInvalidateAll } from "@/lib/queries";
 
@@ -106,18 +107,33 @@ export function EditDialog({
             <div key={f.name} className="space-y-1">
               <Label>{f.label}</Label>
               {f.type === "select" ? (
-                <Select
-                  value={String(values[f.name] ?? "")}
-                  onValueChange={(v) => setValues({ ...values, [f.name]: v })}
-                  disabled={f.disabled}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {(f.options ?? []).map((o) => (
-                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                (f.options ?? []).length > 12 ? (
+                  <SearchableSelect
+                    value={String(values[f.name] ?? "")}
+                    onChange={(v) => setValues({ ...values, [f.name]: v })}
+                    disabled={f.disabled}
+                    placeholder="Selecciona…"
+                    searchPlaceholder="Buscar…"
+                    options={(f.options ?? []).map((o) => ({
+                      value: o.value,
+                      label: o.label,
+                      keywords: o.label,
+                    }))}
+                  />
+                ) : (
+                  <Select
+                    value={String(values[f.name] ?? "")}
+                    onValueChange={(v) => setValues({ ...values, [f.name]: v })}
+                    disabled={f.disabled}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {(f.options ?? []).map((o) => (
+                        <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )
               ) : (
                 <Input
                   type={f.type}

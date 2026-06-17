@@ -12,10 +12,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/searchable-select";
 import { SectionHeader } from "@/components/app-shell";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
-import { supabase } from "@/integrations/supabase/client";
-import { useInvalidateAll, useMaterials, useReceptions } from "@/lib/queries";
+import { useMaterials, useReceptions } from "@/lib/queries";
 import type { Handedness } from "@/lib/types";
 import { HAND_LABEL } from "@/lib/types";
 import { fmtDate, fmtNumber } from "@/lib/compute";
@@ -23,7 +23,6 @@ import { fmtDate, fmtNumber } from "@/lib/compute";
 export function ReceptionsSection() {
   const list = useReceptions();
   const materials = useMaterials();
-  const invalidate = useInvalidateAll();
   type Row = NonNullable<typeof list.data>[number];
   const [editing, setEditing] = useState<null | Row>(null);
   const today = new Date().toISOString().slice(0, 10);
@@ -40,21 +39,23 @@ export function ReceptionsSection() {
   const mat = materials.data?.find((m) => m.code === form.material_code);
   const handOpts: Handedness[] = mat?.tracks_handedness ? ["left", "right"] : ["none"];
 
-  async function add() {
+  function add() {
     if (!form.material_code) return toast.error("Selecciona material");
     if (!form.qty || form.qty <= 0) return toast.error("Cantidad inválida");
     const handed = handOpts.includes(form.handedness) ? form.handedness : handOpts[0];
-    const { error } = await supabase.from("receptions" as never).insert({
-      date: form.date,
-      guia: form.guia.trim(),
-      material_code: form.material_code,
-      handedness: handed,
-      qty: form.qty,
-    } as any);
-    if (error) return toast.error(error.message);
-    toast.success("Recepción registrada");
-    setForm({ ...form, guia: "", qty: 1 });
-    invalidate();
+    requestAdminMutation({
+      table: "receptions",
+      action: "insert",
+      values: {
+        date: form.date,
+        guia: form.guia.trim(),
+        material_code: form.material_code,
+        handedness: handed,
+        qty: form.qty,
+      },
+      description: `Registrar recepción del ${form.date} · ${form.material_code} · ${form.qty} u.`,
+      onSuccess: () => setForm({ ...form, guia: "", qty: 1 }),
+    });
   }
 
   const filtered = useMemo(() => {
@@ -88,22 +89,20 @@ export function ReceptionsSection() {
           </div>
           <div className="md:col-span-2">
             <Label>Material</Label>
-            <Select
+            <SearchableSelect
               value={form.material_code}
-              onValueChange={(v) => {
+              onChange={(v) => {
                 const m = materials.data?.find((x) => x.code === v);
                 setForm({ ...form, material_code: v, handedness: m?.tracks_handedness ? "left" : "none" });
               }}
-            >
-              <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
-              <SelectContent>
-                {(materials.data ?? []).map((m) => (
-                  <SelectItem key={m.code} value={m.code}>
-                    {m.code} · {m.description}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Selecciona material"
+              searchPlaceholder="Buscar por código o descripción…"
+              options={(materials.data ?? []).map((m) => ({
+                value: m.code,
+                label: `${m.code} · ${m.description}`,
+                keywords: `${m.code} ${m.description}`,
+              }))}
+            />
           </div>
           <div>
             <Label>Sentido</Label>

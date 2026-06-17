@@ -1,84 +1,54 @@
-# Plan: ajustes al menú y al Plano
+## Resumen del problema
 
-Lo hago en 4 pasos pequeños para evitar errores. Después de cada paso verifico que compile y que no haya errores en el preview antes de seguir.
+1. **Error RLS en Recepciones**: La tabla `receptions` solo tiene política `SELECT` para `public`. No existe política `INSERT`, y la sección `receptions.tsx` intenta insertar directamente con el cliente del navegador (anon). Las demás secciones de escritura del sistema (entregas, inventario, etc.) ya usan el patrón **server function + contraseña (passphrase) + service_role** vía `adminMutateFn`/`createSiteDeliveryFn`. Recepciones quedó fuera de ese patrón.
 
----
+2. **Selects sin búsqueda**: Varios selectores nativos (`<Select>`) muestran listas largas de materiales/vales/etapas sin permitir buscar, lo que dificulta seleccionar cuando hay 100+ opciones.
 
-## Paso 1 — Eliminar el menú "Sitios y Vales"
-
-- En `src/components/app-shell.tsx`: quitar la entrada `{ key: "sitios", ... }` del array `TABS` y quitar `"sitios"` del tipo `TabKey`.
-- En `src/routes/index.tsx`: cambiar el tab inicial de `"sitios"` a `"plano"` y eliminar la línea `{tab === "sitios" && <SitesSection />}` y su import.
-- **No borro** `src/sections/sites.tsx` ni `sites-queries.ts` ni `sites-compute.ts` porque el módulo de Plano y Entregas los siguen usando.
-
-Verifico que el preview cargue en "Plano" sin errores.
+3. **Menú Entregas**: Hay que revisarlo y confirmar que ambas pestañas (por vale y por grupo de casas) funcionan sin errores tras los cambios.
 
 ---
 
-## Paso 2 — Pintado del plano sólo bajo selección + Etapas en el listbox
+## Paso 1 — Arreglar el error de Recepciones (sin cambiar RLS)
 
-En `src/sections/plano.tsx`:
+Mantener la arquitectura existente: nunca abrir INSERT a anon. Migrar `receptions.tsx` al patrón con contraseña.
 
-- **Coloreado neutro por defecto**: cuando NO hay vale tipo seleccionado, todos los sitios se pintan con el color de tipo de casa (TIPO_FILL) — ya no se aplica `STATUS_FILL`. Así el plano no muestra estados hasta que el usuario filtre.
-- **Listbox combinado Vale + Etapa**: el selector "Vale tipo" pasa a ser un selector jerárquico con dos niveles:
-  - Opción "Todos"
-  - Por cada `ValeTypeV2`: una entrada `code · name` (vale completo, todas las etapas)
-  - Debajo, sub-opciones por cada `ValeStage` de ese vale: `   └ E{n} · {stage.name}` (sangradas)
-  - El estado de filtro pasa de `valeTypeId: string` a `valeFilter: { type: "all" } | { type: "vale"; valeTypeId } | { type: "stage"; valeTypeId, stageId }`.
-- **Cálculo del color por celda** cuando hay filtro:
-  - Si filtro = vale → usa `cellStatus(site, valeType, maps)` (ya existe).
-  - Si filtro = etapa → nueva función `stageCellStatus(site, stage, maps)` en `plano-compute.ts` que mira sólo esa etapa (complete/partial/empty/na según reqs vs delivered).
-- **Filtro "Estado"**: sólo tiene efecto cuando hay un vale/etapa seleccionado (que es cuando hay estados visibles). Si no, queda deshabilitado.
-- **Verificar todos los botones**: revisar que "Limpiar" reinicia todos los filtros incluido el nuevo `valeFilter`; que los selectores de Manzana, Tipo casa, Sitio, Estado funcionen; que el click en sitio y en manzana abra el Sheet correcto.
+- En `src/sections/receptions.tsx`, reemplazar el `supabase.from("receptions").insert(...)` directo por una llamada a `adminMutateFn` (acción `insert`, tabla `receptions`) usando el diálogo `requestAdminMutation` que ya usan las demás secciones.
+- El usuario verá el mismo diálogo de contraseña que ya conoce ("TheDoors").
+- No tocar políticas RLS ni migraciones.
 
----
+**Prueba**: registrar una recepción nueva en la UI y confirmar que se guarda sin el error rojo.
 
-## Paso 3 — Estadísticas generales del plano
+## Paso 2 — Añadir búsqueda a los selectores de materiales y vales
 
-Reemplazar el actual recuadro "Resumen" lateral por un **panel superior de estadísticas** (4–6 tarjetas compactas) que muestre:
+Ya existe el componente reutilizable `SearchableSelect` (usado en Entregas). Lo aplicaremos donde hay listas largas:
 
-- Total de sitios del plano
-- Sitios por tipo (A1/A2/B/C) — chips
-- **% Avance global** (promedio de `siteProgress.pct` sobre todos los sitios reales del plano)
-- Sitios terminados / en ejecución / sin iniciar (recuento)
-- Vales completos en total vs aplicables
-- Si hay un vale o etapa seleccionado: agregar tarjetas adicionales con stats de **ese vale/etapa** (cuántos sitios complete/partial/empty).
+| Archivo | Selector afectado |
+|---|---|
+| `src/sections/receptions.tsx` | Material |
+| `src/sections/vale-tipo.tsx` | Vale tipo, Etapa, y selector de Material al añadir requerimiento |
+| `src/components/edit-dialog.tsx` | Cuando un campo `select` tenga más de ~15 opciones, usar `SearchableSelect` automáticamente (cubre edición de recepciones, entregas, requerimientos, etc. de forma transversal) |
 
-Esto NO cambia el coloreado del plano, sólo agrega información arriba del SVG. La columna lateral se queda sólo para leyendas o se elimina para dar más ancho al plano.
+**Se mantiene** el `<Select>` nativo en filtros cortos (tipos de casa, manzanas, sentido L/R) donde la búsqueda no aporta valor.
 
----
+## Paso 3 — Verificar el menú Entregas
 
-## Paso 4 — Detalle de sitio mejorado
+Tras los cambios de selects, recorrer y probar:
 
-En el `SitePanel` de `src/sections/plano.tsx`:
-
-- Mostrar arriba el **% de avance general** del sitio (ya existe) + estado.
-- **Listar sólo los vales con entregas parciales o completas** (filtrar `v.status === "complete" || v.status === "partial"`). Ocultar los `empty` y `na`. Si no hay ninguno → mensaje "Aún sin entregas".
-- Cada vale del listado es **clickeable**. Al hacer click se expande/abre un sub-panel que muestra, por cada etapa del vale aplicable al `house_type` del sitio:
-  - Material (código + descripción + unidad)
-  - Requerido
-  - Entregado
-  - Falta (= max(0, req − entregado)); si falta = 0 → badge "Completo"
-- Para esto agrego en `plano-compute.ts` una función `valeBreakdown(site, valeType, maps)` que devuelva por etapa y por material `{material, req, delivered, missing}` usando los mismos mapas que ya tenemos.
-
----
+- **Pestaña "Por vale"**: seleccionar manzana → sitio → vale tipo → abrir panel → registrar entrega manual y auto-completar.
+- **Pestaña "Por grupo de casas"**: seleccionar manzana → tipo de casa → vale → etapa → marcar varios sitios → registrar entrega en lote.
+- Verificar build sin errores, console del navegador limpia y que las cantidades se guarden.
 
 ## Archivos a modificar
 
-- `src/components/app-shell.tsx` — quitar tab sitios
-- `src/routes/index.tsx` — quitar render de SitesSection y cambiar tab inicial
-- `src/lib/plano-compute.ts` — agregar `stageCellStatus` y `valeBreakdown`
-- `src/sections/plano.tsx` — todos los cambios visuales/lógicos (pasos 2, 3 y 4)
+- `src/sections/receptions.tsx` (arreglo RLS + búsqueda en material)
+- `src/sections/vale-tipo.tsx` (búsqueda en vale/etapa/material)
+- `src/components/edit-dialog.tsx` (búsqueda automática en selects largos)
 
-**No tocar**: `sites-compute.ts`, `sites-queries.ts`, `sites-types.ts`, `deliveries.tsx`, `vale-tipo.tsx`, `plano-layout.ts`, ni la base de datos.
+**No se tocará**: base de datos, políticas RLS, `admin.functions.ts`, `deliveries.tsx` (ya funciona con búsqueda), ni el resto de secciones.
 
----
+## Verificación final
 
-## Verificación al terminar cada paso
-
-Reviso build, runtime errors y abro el preview en `/` → tab Plano para confirmar:
-1. Carga sin errores
-2. Filtros funcionan
-3. Click en sitio y manzana abre el panel correcto
-4. Botón "Limpiar" resetea todo
-
-Si encuentras algo que prefieras distinto (ej. mantener un mini-resumen lateral, o que el detalle del vale se abra en otro Sheet en vez de expandirse), dímelo antes de implementar.
+1. Build limpio.
+2. Probar inserción de recepción real.
+3. Probar las dos pestañas del menú Entregas.
+4. Confirmar que los selects de materiales/vales/etapas ahora permiten escribir para filtrar.
