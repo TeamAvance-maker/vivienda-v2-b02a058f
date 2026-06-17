@@ -89,22 +89,20 @@ export function ReceptionsSection() {
           </div>
           <div className="md:col-span-2">
             <Label>Material</Label>
-            <Select
+            <SearchableSelect
               value={form.material_code}
-              onValueChange={(v) => {
+              onChange={(v) => {
                 const m = materials.data?.find((x) => x.code === v);
                 setForm({ ...form, material_code: v, handedness: m?.tracks_handedness ? "left" : "none" });
               }}
-            >
-              <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
-              <SelectContent>
-                {(materials.data ?? []).map((m) => (
-                  <SelectItem key={m.code} value={m.code}>
-                    {m.code} · {m.description}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Selecciona material"
+              searchPlaceholder="Buscar por código o descripción…"
+              options={(materials.data ?? []).map((m) => ({
+                value: m.code,
+                label: `${m.code} · ${m.description}`,
+                keywords: `${m.code} ${m.description}`,
+              }))}
+            />
           </div>
           <div>
             <Label>Sentido</Label>
