@@ -271,11 +271,11 @@ export function InventorySection() {
                           size="icon"
                           title="Eliminar"
                           onClick={() =>
-                            requestAdminMutation({
+                            requestCascadeDelete({
                               table: "inventory_counts",
-                              action: "delete",
-                              match: { id: r.id },
-                              description: `Eliminar conteo del ${fmtDate(r.date)} · ${r.material_code} · ${fmtNumber(r.counted_qty)}.`,
+                              id: r.id,
+                              label: `Conteo del ${fmtDate(r.date)} · ${r.material_code} · ${fmtNumber(r.counted_qty)}`,
+                              context: "Se elimina solo este conteo. Los ajustes ya aplicados (inventory_adjustments) no se pueden borrar.",
                             })
                           }
                         >
