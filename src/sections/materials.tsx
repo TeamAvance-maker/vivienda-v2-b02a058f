@@ -58,20 +58,20 @@ export function MaterialsSection() {
   const [editHand, setEditHand] = useState(false);
   const [editPass, setEditPass] = useState("");
 
-  const list = useMemo(() => {
-    const all = materials.data ?? [];
-    const f = filter.trim().toLowerCase();
-    const filtered = f
-      ? all.filter(
-          (m) =>
-            m.description.toLowerCase().includes(f) ||
-            m.code.toLowerCase().includes(f),
-        )
-      : all;
-    return [...filtered].sort((a, b) =>
-      a.description.localeCompare(b.description, "es"),
-    );
-  }, [materials.data, filter]);
+  const allMaterials = materials.data ?? [];
+
+  const ctrl = useTableControls<MaterialV2>({
+    data: allMaterials,
+    searchFields: (m) => [m.code, m.description, m.unit],
+    sortFns: {
+      code: (a, b) => a.code.localeCompare(b.code, "es", { numeric: true }),
+      description: (a, b) => a.description.localeCompare(b.description, "es"),
+      unit: (a, b) => a.unit.localeCompare(b.unit, "es"),
+      hand: (a, b) => Number(!!a.tracks_handedness) - Number(!!b.tracks_handedness),
+    },
+    defaultSort: { key: "description", dir: "asc" },
+    defaultPageSize: 25,
+  });
 
   async function add() {
     if (!form.description.trim()) {
