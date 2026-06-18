@@ -219,11 +219,12 @@ export function MaterialsSection() {
                     variant="ghost"
                     size="icon"
                     onClick={() =>
-                      requestAdminMutation({
+                      requestCascadeDelete({
                         table: "materials_v2",
-                        action: "delete",
-                        match: { id: m.id },
-                        description: `Eliminar material "${m.code} · ${m.description}". Esta acción no se puede deshacer.`,
+                        id: m.id,
+                        label: `Material "${m.code} · ${m.description}"`,
+                        context:
+                          "Se eliminarán también todas las apariciones de este material en requisitos de vales y entregas a sitios. Las recepciones que apuntaban a este material quedan huérfanas y deberán revisarse.",
                       })
                     }
                     title="Eliminar"
