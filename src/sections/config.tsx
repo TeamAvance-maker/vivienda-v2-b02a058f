@@ -56,74 +56,7 @@ export function ConfigSection() {
     });
   }
 
-  // ===== Respaldo / Restauración =====
-  const invalidate = useInvalidateAll();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [pendingRestore, setPendingRestore] = useState<Record<string, any[]> | null>(null);
-  const [restorePass, setRestorePass] = useState("");
-  const restoreServerFn = useServerFn(restoreBackupFn);
-
-  const backupMutation = useMutation({
-    mutationFn: async () => {
-      const payload: Record<string, any[]> = {};
-      for (const t of BACKUP_TABLES) {
-        const { data, error } = await supabase.from(t as never).select("*");
-        if (error) throw new Error(`${t}: ${error.message}`);
-        payload[t] = (data ?? []) as any[];
-      }
-      const blob = new Blob(
-        [JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data: payload }, null, 2)],
-        { type: "application/json" },
-      );
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-      a.download = `respaldo-obra-${stamp}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      const total = Object.values(payload).reduce((a, b) => a + b.length, 0);
-      return total;
-    },
-    onSuccess: (n) => toast.success(`Respaldo descargado (${n} registros).`),
-    onError: (e: any) => toast.error(e?.message ?? "Error al respaldar"),
-  });
-
-  function onFilePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const parsed = JSON.parse(String(reader.result));
-        const data = parsed?.data ?? parsed;
-        if (!data || typeof data !== "object") throw new Error("Archivo inválido");
-        setPendingRestore(data);
-        setRestorePass("");
-      } catch (err: any) {
-        toast.error(`No se pudo leer el archivo: ${err.message}`);
-      } finally {
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      }
-    };
-    reader.readAsText(f);
-  }
-
-  const restoreMutation = useMutation({
-    mutationFn: async () => {
-      if (!pendingRestore) return;
-      await restoreServerFn({ data: { passphrase: restorePass, payload: pendingRestore } });
-    },
-    onSuccess: () => {
-      toast.success("Respaldo restaurado correctamente.");
-      invalidate();
-      setPendingRestore(null);
-      setRestorePass("");
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Error al restaurar"),
-  });
-
-  // Override manual
+  // ===== Override manual =====
   const [ov, setOv] = useState({ house_type_code: "", delta: 0, reason: "" });
   function submitOverride() {
     if (!ov.house_type_code) return toast.error("Selecciona un tipo");
