@@ -1,6 +1,7 @@
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { EditDialog } from "@/components/edit-dialog";
+import { MaterialQuickCreate } from "@/components/material-quick-create";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
