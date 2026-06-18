@@ -370,27 +370,31 @@ export function PlanoSection() {
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             Vale tipo / Etapa
           </label>
-          <Select value={valeSelectValue} onValueChange={onChangeValeSelect}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {valeTypes.map((vt) => {
-                const stages = stagesByVale.get(vt.id) ?? [];
-                return [
-                  <SelectItem key={`v:${vt.id}`} value={`v:${vt.id}`}>
-                    <b>{vt.code}</b> · {vt.name}
-                  </SelectItem>,
-                  ...stages.map((st) => (
-                    <SelectItem key={`s:${st.id}`} value={`s:${st.id}`}>
-                      &nbsp;&nbsp;&nbsp;└ E{st.stage_number} · {st.name}
-                    </SelectItem>
-                  )),
-                ];
-              })}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={valeSelectValue}
+            onChange={onChangeValeSelect}
+            placeholder="Todos"
+            searchPlaceholder="Buscar vale o etapa…"
+            options={(() => {
+              const opts: SearchableOption[] = [{ value: "all", label: "Todos" }];
+              for (const vt of valeTypes) {
+                opts.push({
+                  value: `v:${vt.id}`,
+                  label: `${vt.code} · ${vt.name}`,
+                  keywords: `${vt.code} ${vt.name}`,
+                });
+                for (const st of stagesByVale.get(vt.id) ?? []) {
+                  opts.push({
+                    value: `s:${st.id}`,
+                    label: `   └ E${st.stage_number} · ${st.name}`,
+                    hint: `${vt.code} · ${vt.name}`,
+                    keywords: `${vt.code} ${vt.name} ${st.name} E${st.stage_number}`,
+                  });
+                }
+              }
+              return opts;
+            })()}
+          />
         </div>
         <div>
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
