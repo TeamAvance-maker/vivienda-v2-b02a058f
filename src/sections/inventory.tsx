@@ -14,6 +14,7 @@ import {
 import { SectionHeader } from "@/components/app-shell";
 import { EditDialog } from "@/components/edit-dialog";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
+import { requestCascadeDelete } from "@/components/cascade-delete-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import {
   useAdjustments,

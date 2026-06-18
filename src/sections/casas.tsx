@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { SectionHeader } from "@/components/app-shell";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
+import { requestCascadeDelete } from "@/components/cascade-delete-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useConfig, useHouseTypes, useInvalidateAll } from "@/lib/queries";
 import { useInvalidateSitesV2, useSites } from "@/lib/sites-queries";

@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { createSiteDeliveryFn, editSiteDeliveryFn } from "@/lib/admin.functions";
 import { getConversion, toCatalogQty, toValeQty, round2 } from "@/lib/unit-conversion";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
+import { requestCascadeDelete } from "@/components/cascade-delete-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
