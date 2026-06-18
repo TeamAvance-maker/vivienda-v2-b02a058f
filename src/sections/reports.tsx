@@ -69,80 +69,57 @@ export function ReportsSection() {
   const stock = useVStock();
   const materials = useMaterials();
 
-  function rows() {
-    return buildMasterRows({
-      required: required.data ?? [],
-      received: received.data ?? [],
-      delivered: delivered.data ?? [],
-      stock: stock.data ?? [],
-      materials: materials.data ?? [],
-    });
-  }
+type MasterRow = ReturnType<typeof buildMasterRows>[number];
 
-  // === Filtros y ordenamiento ===
-  type ColKey = "code" | "description" | "hand" | "required" | "received" | "delivered" | "saldo" | "pendienteRecep" | "pct";
-  type NumOp = "" | "=" | ">" | "<" | ">=" | "<=" | "<>";
-  const [sortKey, setSortKey] = useState<ColKey>("code");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [txtFilters, setTxtFilters] = useState<Record<string, string>>({ code: "", description: "", hand: "" });
-  const numCols: ColKey[] = ["required", "received", "delivered", "saldo", "pendienteRecep", "pct"];
-  const [numFilters, setNumFilters] = useState<Record<string, { op: NumOp; val: string }>>(
-    Object.fromEntries(numCols.map((k) => [k, { op: "", val: "" }])) as any,
+export function ReportsSection() {
+  const cfg = useConfig();
+  const required = useVRequired();
+  const received = useVReceived();
+  const delivered = useVDelivered();
+  const stock = useVStock();
+  const materials = useMaterials();
+
+  const allRows = useMemo<MasterRow[]>(
+    () =>
+      buildMasterRows({
+        required: required.data ?? [],
+        received: received.data ?? [],
+        delivered: delivered.data ?? [],
+        stock: stock.data ?? [],
+        materials: materials.data ?? [],
+      }),
+    [required.data, received.data, delivered.data, stock.data, materials.data],
   );
 
-  function toggleSort(k: ColKey) {
-    if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    else { setSortKey(k); setSortDir("asc"); }
-  }
-  function SortIcon({ k }: { k: ColKey }) {
-    if (sortKey !== k) return <ArrowUpDown className="ml-1 inline h-3 w-3 opacity-50" />;
-    return sortDir === "asc" ? <ArrowUp className="ml-1 inline h-3 w-3" /> : <ArrowDown className="ml-1 inline h-3 w-3" />;
-  }
-  function passNum(val: number, op: NumOp, target: string) {
-    if (!op || target === "") return true;
-    const t = Number(target);
-    if (isNaN(t)) return true;
-    switch (op) {
-      case "=": return val === t;
-      case ">": return val > t;
-      case "<": return val < t;
-      case ">=": return val >= t;
-      case "<=": return val <= t;
-      case "<>": return val !== t;
-    }
-  }
+  const ctrl = useTableControls<MasterRow>({
+    data: allRows,
+    searchFields: (r) => [r.code, r.description, HAND_SHORT[r.hand as keyof typeof HAND_SHORT]],
+    sortFns: {
+      code: (a, b) => a.code.localeCompare(b.code, "es", { numeric: true }),
+      description: (a, b) => a.description.localeCompare(b.description, "es"),
+      hand: (a, b) => String(a.hand).localeCompare(String(b.hand)),
+      required: (a, b) => a.required - b.required,
+      received: (a, b) => a.received - b.received,
+      delivered: (a, b) => a.delivered - b.delivered,
+      saldo: (a, b) => a.saldo - b.saldo,
+      pendienteRecep: (a, b) => a.pendienteRecep - b.pendienteRecep,
+      pct: (a, b) => a.pct - b.pct,
+    },
+    numericFilters: [
+      { key: "required", label: "Necesario", accessor: (r) => r.required },
+      { key: "received", label: "Recepcionado", accessor: (r) => r.received },
+      { key: "delivered", label: "Entregado", accessor: (r) => r.delivered },
+      { key: "saldo", label: "Saldo", accessor: (r) => r.saldo },
+      { key: "pendienteRecep", label: "Pend. comprar", accessor: (r) => r.pendienteRecep },
+      { key: "pct", label: "% Cumplimiento", accessor: (r) => r.pct },
+    ],
+    defaultSort: { key: "code", dir: "asc" },
+    defaultPageSize: 50,
+  });
 
-  const visibleRows = useMemo(() => {
-    const all = rows();
-    const filt = all.filter((r) => {
-      if (txtFilters.code && !r.code.toLowerCase().includes(txtFilters.code.toLowerCase())) return false;
-      if (txtFilters.description && !r.description.toLowerCase().includes(txtFilters.description.toLowerCase())) return false;
-      if (txtFilters.hand) {
-        const label = HAND_SHORT[r.hand as keyof typeof HAND_SHORT] ?? "";
-        if (!label.toLowerCase().includes(txtFilters.hand.toLowerCase())) return false;
-      }
-      for (const k of numCols) {
-        const f = numFilters[k];
-        if (!passNum((r as any)[k] as number, f.op, f.val)) return false;
-      }
-      return true;
-    });
-    filt.sort((a, b) => {
-      const av = (a as any)[sortKey];
-      const bv = (b as any)[sortKey];
-      let cmp: number;
-      if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
-      else cmp = String(av ?? "").localeCompare(String(bv ?? ""), "es", { numeric: true });
-      return sortDir === "asc" ? cmp : -cmp;
-    });
-    return filt;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [required.data, received.data, delivered.data, stock.data, materials.data, txtFilters, numFilters, sortKey, sortDir]);
+  // Filtrados (todos los registros que pasan filtros, ignorando paginación) — para exportar lo que ve
+  const visibleRows = ctrl.filtered;
 
-  function clearFilters() {
-    setTxtFilters({ code: "", description: "", hand: "" });
-    setNumFilters(Object.fromEntries(numCols.map((k) => [k, { op: "", val: "" }])) as any);
-  }
 
 
   function exportExcel() {
