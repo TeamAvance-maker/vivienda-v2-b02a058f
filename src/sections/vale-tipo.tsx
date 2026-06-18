@@ -40,6 +40,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { adminMutateFn } from "@/lib/admin.functions";
+import { MaterialQuickCreate } from "@/components/material-quick-create";
 import {
   useInvalidateSitesV2,
   useMaterialsV2,
