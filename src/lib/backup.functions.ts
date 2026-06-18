@@ -240,12 +240,10 @@ export const resetSystemFn = createServerFn({ method: "POST" })
 
     // Borrar de hijos a padres
     for (const t of [...tablesToWipe].reverse()) {
-      const { error } = await supabaseAdmin.from(t).delete().not("id", "is", null);
-      // materials/house_types/project_config no tienen id uuid — usamos fallback
+      const { error } = await (supabaseAdmin.from(t as never) as any).delete().not("id", "is", null);
       if (error) {
-        // Reintentar con código
         const colCheck = ["materials", "house_types"].includes(t) ? "code" : "id";
-        const { error: e2 } = await supabaseAdmin.from(t).delete().not(colCheck, "is", null);
+        const { error: e2 } = await (supabaseAdmin.from(t as never) as any).delete().not(colCheck, "is", null);
         if (e2) throw new Error(`Borrando ${t}: ${e2.message}`);
       }
     }
