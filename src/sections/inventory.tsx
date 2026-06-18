@@ -48,7 +48,7 @@ export function InventorySection() {
     counted_qty: 0,
     note: "",
   });
-  const [filter, setFilter] = useState("");
+  // (búsqueda y orden gestionados por useTableControls más abajo)
   const [editing, setEditing] = useState<InventoryCount | null>(null);
 
   const mat = materials.data?.find((m) => m.code === form.material_code);
