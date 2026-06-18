@@ -55,7 +55,7 @@ export const restoreBackupFn = createServerFn({ method: "POST" })
     // Borrar en orden inverso (hijos primero) solo las tablas seleccionadas.
     const reverse = [...selected].reverse();
     for (const t of reverse) {
-      const { error } = await supabaseAdmin.from(t).delete().not("id", "is", null);
+      const { error } = await (supabaseAdmin.from(t as never) as any).delete().not("id", "is", null);
       if (error) throw new Error(`Borrando ${t}: ${error.message}`);
     }
 
@@ -65,7 +65,7 @@ export const restoreBackupFn = createServerFn({ method: "POST" })
       if (!selected.includes(t)) continue;
       const rows = data.payload[t];
       if (!rows || rows.length === 0) { summary[t] = 0; continue; }
-      const { error } = await supabaseAdmin.from(t).insert(rows as any);
+      const { error } = await (supabaseAdmin.from(t as never) as any).insert(rows as any);
       if (error) throw new Error(`Restaurando ${t}: ${error.message}`);
       summary[t] = rows.length;
     }
@@ -130,14 +130,14 @@ async function collectCascade(
 ): Promise<CascadeRow[]> {
   const col = matchColFor(table);
   const idVal = String(id);
-  const { data: row, error } = await supabase.from(table).select("*").eq(col, idVal).maybeSingle();
+  const { data: row, error } = await (supabase.from(table as never) as any).select("*").eq(col, idVal).maybeSingle();
   if (error) throw new Error(`Leyendo ${table}: ${error.message}`);
   if (!row) return [];
 
   const list: CascadeRow[] = [{ table, record: row, parent_table: parentTable, parent_id: parentId }];
   const children = CASCADE_GRAPH[table] ?? [];
   for (const ch of children) {
-    const { data: kids, error: e2 } = await supabase.from(ch.table).select("*").eq(ch.fk, idVal);
+    const { data: kids, error: e2 } = await (supabase.from(ch.table as never) as any).select("*").eq(ch.fk, idVal);
     if (e2) throw new Error(`Leyendo hijos ${ch.table}: ${e2.message}`);
     for (const kid of kids ?? []) {
       const kidCol = matchColFor(ch.table);
@@ -216,7 +216,7 @@ export const resetSystemFn = createServerFn({ method: "POST" })
     const tablesToWipe = ALL_TABLES.filter((t) => t !== "project_config");
 
     for (const t of tablesToWipe) {
-      const { data: rows, error } = await supabaseAdmin.from(t).select("*");
+      const { data: rows, error } = await (supabaseAdmin.from(t as never) as any).select("*");
       if (error) throw new Error(`Leyendo ${t}: ${error.message}`);
       summary[t] = rows?.length ?? 0;
       if (rows && rows.length > 0) {
