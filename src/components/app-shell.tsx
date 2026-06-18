@@ -241,6 +241,7 @@ export function AppShell({
         onMouseEnter={onEnter}
         onMouseLeave={onLeave}
         projectName={projectName}
+        onOpenHelp={() => setHelpOpen(true)}
       />
 
       {/* Header móvil */}
