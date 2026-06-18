@@ -509,15 +509,12 @@ function ManzanasTab() {
                     variant="ghost"
                     size="icon"
                     onClick={() =>
-                      requestAdminMutation({
+                      requestCascadeDelete({
                         table: "sites",
-                        action: "delete",
-                        match: { id: s.id },
-                        description: `Eliminar sitio M${s.manzana}·${formatSitio(s.sitio)}. Esto también eliminará sus entregas registradas.`,
-                        onSuccess: () => {
-                          invalidate();
-                          invalidateAll();
-                        },
+                        id: s.id,
+                        label: `Sitio M${s.manzana}·${formatSitio(s.sitio)}`,
+                        context: "Se eliminarán también todas las entregas registradas a este sitio y sus ítems.",
+                        onSuccess: () => { invalidate(); invalidateAll(); },
                       })
                     }
                   >
