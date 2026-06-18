@@ -350,6 +350,9 @@ export function AppShell({
       >
         <div className="mx-auto max-w-7xl">{children}</div>
       </motion.main>
+
+      <HelpFab onClick={() => setHelpOpen(true)} />
+      <HelpPanel open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
   );
 }
