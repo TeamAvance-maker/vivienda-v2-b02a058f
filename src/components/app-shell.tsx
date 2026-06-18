@@ -141,6 +141,29 @@ function SidebarRail({
       </nav>
 
       <div className="border-t border-sidebar-border px-2 py-2">
+        <button
+          onClick={onOpenHelp}
+          title="Ayuda"
+          className={cn(
+            "group relative mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+            "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+          )}
+        >
+          <HelpCircle className="h-5 w-5 shrink-0" />
+          <AnimatePresence>
+            {expanded && (
+              <motion.span
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -6 }}
+                transition={{ duration: 0.15 }}
+                className="truncate"
+              >
+                Ayuda
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </button>
         {(() => {
           const t = CONFIG_TAB;
           const Icon = t.icon;
