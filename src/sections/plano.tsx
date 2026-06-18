@@ -78,6 +78,7 @@ export function PlanoSection() {
     tipo: "",
     sitio: "",
     estado: "",
+    overall: "",
   });
   const [selected, setSelected] = useState<
     { kind: "site"; lot: PlanoLot } | { kind: "manzana"; id: string } | null
