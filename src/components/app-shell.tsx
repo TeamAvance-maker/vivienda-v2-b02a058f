@@ -29,16 +29,22 @@ export type TabKey =
   | "config";
 
 export const TABS: { key: TabKey; label: string; icon: typeof Home }[] = [
-  { key: "plano", label: "Plano", icon: MapIcon },
   { key: "dashboard", label: "Inicio", icon: Home },
+  { key: "plano", label: "Plano", icon: MapIcon },
+  { key: "materiales", label: "Materiales", icon: Boxes },
   { key: "recepciones", label: "Recepciones", icon: PackagePlus },
   { key: "entregas", label: "Entregas", icon: Truck },
-  { key: "inventario", label: "Inventario", icon: ClipboardCheck },
   { key: "casas", label: "Casas", icon: HousePlus },
-  { key: "materiales", label: "Materiales", icon: Boxes },
+  { key: "inventario", label: "Inventario", icon: ClipboardCheck },
   { key: "reportes", label: "Reportes", icon: FileSpreadsheet },
-  { key: "config", label: "Configuración", icon: Settings2 },
 ];
+
+const CONFIG_TAB: { key: TabKey; label: string; icon: typeof Home } = {
+  key: "config", label: "Configuración", icon: Settings2,
+};
+
+const ALL_TABS = [...TABS, CONFIG_TAB];
+export { ALL_TABS };
 
 const COLLAPSED_W = 64;
 const EXPANDED_W = 232;
