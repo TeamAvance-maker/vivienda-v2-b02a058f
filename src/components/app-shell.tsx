@@ -136,6 +136,39 @@ function SidebarRail({
       </nav>
 
       <div className="border-t border-sidebar-border px-2 py-2">
+        {(() => {
+          const t = CONFIG_TAB;
+          const Icon = t.icon;
+          const isActive = active === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => onChange(t.key)}
+              title={t.label}
+              className={cn(
+                "group relative mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+              )}
+            >
+              <Icon className="h-5 w-5 shrink-0" />
+              <AnimatePresence>
+                {expanded && (
+                  <motion.span
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -6 }}
+                    transition={{ duration: 0.15 }}
+                    className="truncate"
+                  >
+                    {t.label}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </button>
+          );
+        })()}
         <ThemeToggle collapsed={!expanded} />
       </div>
     </motion.aside>
