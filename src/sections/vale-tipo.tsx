@@ -69,6 +69,7 @@ export function ValeTipoSection() {
   const [newQty, setNewQty] = useState<number>(1);
   const [addPass, setAddPass] = useState("");
   const [matOpen, setMatOpen] = useState(false);
+  const [quickCreate, setQuickCreate] = useState(false);
 
   // Edit dialog
   const [editing, setEditing] = useState<ValeReq | null>(null);
