@@ -144,7 +144,7 @@ export function ReportsSection() {
 
 
   function exportExcel() {
-    const data = rows().map((r) => ({
+    const data = visibleRows.map((r) => ({
       Código: r.code,
       Descripción: r.description,
       Sentido: HAND_SHORT[r.hand as keyof typeof HAND_SHORT],
@@ -162,11 +162,10 @@ export function ReportsSection() {
   }
 
   function exportCsv() {
-    const data = rows();
     const header = ["Código","Descripción","Sentido","Necesario","Recepcionado","Entregado","Saldo","Pend. comprar","% Cumpl."];
     const csv = [
       header.join(","),
-      ...data.map((r) =>
+      ...visibleRows.map((r) =>
         [r.code, `"${r.description.replace(/"/g, '""')}"`, HAND_SHORT[r.hand as keyof typeof HAND_SHORT], r.required, r.received, r.delivered, r.saldo, r.pendienteRecep, r.pct].join(","),
       ),
     ].join("\n");
@@ -194,7 +193,7 @@ export function ReportsSection() {
     autoTable(doc, {
       startY: 110,
       head: [["Código", "Descripción", "Sentido", "Necesario", "Recep.", "Entreg.", "Saldo", "Pend.", "%"]],
-      body: rows().map((r) => [
+      body: visibleRows.map((r) => [
         r.code,
         r.description,
         HAND_SHORT[r.hand as keyof typeof HAND_SHORT],
@@ -213,11 +212,37 @@ export function ReportsSection() {
     doc.save(`tabla-maestra-${new Date().toISOString().slice(0, 10)}.pdf`);
   }
 
+  function NumFilter({ k }: { k: ColKey }) {
+    const f = numFilters[k];
+    return (
+      <div className="flex items-center gap-1">
+        <Select value={f.op || "none"} onValueChange={(v) => setNumFilters((p) => ({ ...p, [k]: { ...p[k], op: (v === "none" ? "" : v) as NumOp } }))}>
+          <SelectTrigger className="h-7 w-14 px-2 text-xs"><SelectValue placeholder="op" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">—</SelectItem>
+            <SelectItem value="=">=</SelectItem>
+            <SelectItem value=">">&gt;</SelectItem>
+            <SelectItem value="<">&lt;</SelectItem>
+            <SelectItem value=">=">&gt;=</SelectItem>
+            <SelectItem value="<=">&lt;=</SelectItem>
+            <SelectItem value="<>">&lt;&gt;</SelectItem>
+          </SelectContent>
+        </Select>
+        <Input
+          type="number"
+          value={f.val}
+          onChange={(e) => setNumFilters((p) => ({ ...p, [k]: { ...p[k], val: e.target.value } }))}
+          className="h-7 w-16 px-2 text-right text-xs"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <SectionHeader
         title="Reportes"
-        description="Exporta la tabla maestra de control en distintos formatos o imprímela tal cual la ves."
+        description="Filtra y ordena la tabla como en Excel, luego exporta o imprime sólo lo que ves."
       />
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -244,24 +269,53 @@ export function ReportsSection() {
       </div>
 
       <div className="surface-card overflow-hidden">
-        <div className="border-b border-border/60 px-4 py-3 font-display text-base font-semibold">Vista previa</div>
-        <div className="overflow-x-auto">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
+          <div className="font-display text-base font-semibold">Vista previa</div>
+          <div className="flex items-center gap-2">
+            <span className="chip">{visibleRows.length} filas</span>
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              <RefreshCw className="mr-1 h-3.5 w-3.5" />
+              Limpiar filtros
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                required.refetch(); received.refetch(); delivered.refetch(); stock.refetch(); materials.refetch();
+              }}
+            >
+              Actualizar
+            </Button>
+          </div>
+        </div>
+        <div className="max-h-[65vh] overflow-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <thead className="sticky top-0 z-10 bg-secondary/80 text-left text-xs uppercase tracking-wider text-muted-foreground backdrop-blur">
               <tr>
-                <th className="px-4 py-2.5">Código</th>
-                <th className="px-4 py-2.5">Descripción</th>
-                <th className="px-4 py-2.5">Sentido</th>
-                <th className="px-4 py-2.5 text-right">Necesario</th>
-                <th className="px-4 py-2.5 text-right">Recep.</th>
-                <th className="px-4 py-2.5 text-right">Entreg.</th>
-                <th className="px-4 py-2.5 text-right">Saldo</th>
-                <th className="px-4 py-2.5 text-right">Pend.</th>
-                <th className="px-4 py-2.5 text-right">%</th>
+                <th className="cursor-pointer select-none px-4 py-2.5" onClick={() => toggleSort("code")}>Código<SortIcon k="code" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5" onClick={() => toggleSort("description")}>Descripción<SortIcon k="description" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5" onClick={() => toggleSort("hand")}>Sentido<SortIcon k="hand" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5 text-right" onClick={() => toggleSort("required")}>Necesario<SortIcon k="required" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5 text-right" onClick={() => toggleSort("received")}>Recep.<SortIcon k="received" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5 text-right" onClick={() => toggleSort("delivered")}>Entreg.<SortIcon k="delivered" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5 text-right" onClick={() => toggleSort("saldo")}>Saldo<SortIcon k="saldo" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5 text-right" onClick={() => toggleSort("pendienteRecep")}>Pend.<SortIcon k="pendienteRecep" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5 text-right" onClick={() => toggleSort("pct")}>%<SortIcon k="pct" /></th>
+              </tr>
+              <tr className="bg-secondary/40">
+                <th className="px-2 py-1.5"><Input value={txtFilters.code} onChange={(e) => setTxtFilters((p) => ({ ...p, code: e.target.value }))} className="h-7 text-xs" placeholder="filtrar…" /></th>
+                <th className="px-2 py-1.5"><Input value={txtFilters.description} onChange={(e) => setTxtFilters((p) => ({ ...p, description: e.target.value }))} className="h-7 text-xs" placeholder="filtrar…" /></th>
+                <th className="px-2 py-1.5"><Input value={txtFilters.hand} onChange={(e) => setTxtFilters((p) => ({ ...p, hand: e.target.value }))} className="h-7 text-xs" placeholder="filtrar…" /></th>
+                <th className="px-2 py-1.5 text-right"><NumFilter k="required" /></th>
+                <th className="px-2 py-1.5 text-right"><NumFilter k="received" /></th>
+                <th className="px-2 py-1.5 text-right"><NumFilter k="delivered" /></th>
+                <th className="px-2 py-1.5 text-right"><NumFilter k="saldo" /></th>
+                <th className="px-2 py-1.5 text-right"><NumFilter k="pendienteRecep" /></th>
+                <th className="px-2 py-1.5 text-right"><NumFilter k="pct" /></th>
               </tr>
             </thead>
             <tbody>
-              {rows().map((r) => (
+              {visibleRows.map((r) => (
                 <tr key={`${r.code}-${r.hand}`} className="border-t border-border/50">
                   <td className="px-4 py-2">{r.code}</td>
                   <td className="px-4 py-2">{r.description}</td>
@@ -274,6 +328,9 @@ export function ReportsSection() {
                   <td className="px-4 py-2 text-right num-display">{r.pct}%</td>
                 </tr>
               ))}
+              {visibleRows.length === 0 && (
+                <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">Sin filas que coincidan con los filtros.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
