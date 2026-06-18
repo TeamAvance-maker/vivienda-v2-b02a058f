@@ -314,6 +314,13 @@ export function AppShell({
               </nav>
               <div className="border-t border-sidebar-border px-2 py-2">
                 <button
+                  onClick={() => { setMobileOpen(false); setHelpOpen(true); }}
+                  className="mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+                >
+                  <HelpCircle className="h-5 w-5 shrink-0" />
+                  <span>Ayuda</span>
+                </button>
+                <button
                   onClick={() => { onChange(CONFIG_TAB.key); setMobileOpen(false); }}
                   className={cn(
                     "mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
