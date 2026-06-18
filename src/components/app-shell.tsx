@@ -29,16 +29,22 @@ export type TabKey =
   | "config";
 
 export const TABS: { key: TabKey; label: string; icon: typeof Home }[] = [
-  { key: "plano", label: "Plano", icon: MapIcon },
   { key: "dashboard", label: "Inicio", icon: Home },
+  { key: "plano", label: "Plano", icon: MapIcon },
+  { key: "materiales", label: "Materiales", icon: Boxes },
   { key: "recepciones", label: "Recepciones", icon: PackagePlus },
   { key: "entregas", label: "Entregas", icon: Truck },
-  { key: "inventario", label: "Inventario", icon: ClipboardCheck },
   { key: "casas", label: "Casas", icon: HousePlus },
-  { key: "materiales", label: "Materiales", icon: Boxes },
+  { key: "inventario", label: "Inventario", icon: ClipboardCheck },
   { key: "reportes", label: "Reportes", icon: FileSpreadsheet },
-  { key: "config", label: "Configuración", icon: Settings2 },
 ];
+
+const CONFIG_TAB: { key: TabKey; label: string; icon: typeof Home } = {
+  key: "config", label: "Configuración", icon: Settings2,
+};
+
+const ALL_TABS = [...TABS, CONFIG_TAB];
+export { ALL_TABS };
 
 const COLLAPSED_W = 64;
 const EXPANDED_W = 232;
@@ -130,6 +136,39 @@ function SidebarRail({
       </nav>
 
       <div className="border-t border-sidebar-border px-2 py-2">
+        {(() => {
+          const t = CONFIG_TAB;
+          const Icon = t.icon;
+          const isActive = active === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => onChange(t.key)}
+              title={t.label}
+              className={cn(
+                "group relative mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+              )}
+            >
+              <Icon className="h-5 w-5 shrink-0" />
+              <AnimatePresence>
+                {expanded && (
+                  <motion.span
+                    initial={{ opacity: 0, x: -6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -6 }}
+                    transition={{ duration: 0.15 }}
+                    className="truncate"
+                  >
+                    {t.label}
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </button>
+          );
+        })()}
         <ThemeToggle collapsed={!expanded} />
       </div>
     </motion.aside>
@@ -244,6 +283,18 @@ export function AppShell({
                 })}
               </nav>
               <div className="border-t border-sidebar-border px-2 py-2">
+                <button
+                  onClick={() => { onChange(CONFIG_TAB.key); setMobileOpen(false); }}
+                  className={cn(
+                    "mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                    active === CONFIG_TAB.key
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                  )}
+                >
+                  <CONFIG_TAB.icon className="h-5 w-5 shrink-0" />
+                  <span>{CONFIG_TAB.label}</span>
+                </button>
                 <ThemeToggle />
               </div>
             </motion.aside>

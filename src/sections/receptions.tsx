@@ -1,5 +1,5 @@
-import { Pencil, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { EditDialog } from "@/components/edit-dialog";
 import { MaterialQuickCreate } from "@/components/material-quick-create";
 import { toast } from "sonner";
@@ -61,16 +61,54 @@ export function ReceptionsSection() {
     });
   }
 
+  type SortKey = "date" | "guia" | "material_code" | "handedness" | "qty";
+  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [pageSize, setPageSize] = useState<number | "all">(50);
+  const [page, setPage] = useState(1);
+
   const filtered = useMemo(() => {
     const s = search.toLowerCase().trim();
-    if (!s) return list.data ?? [];
-    return (list.data ?? []).filter(
-      (r) =>
-        r.guia.toLowerCase().includes(s) ||
-        r.material_code.toLowerCase().includes(s) ||
-        r.date.includes(s),
-    );
-  }, [list.data, search]);
+    const base = !s
+      ? (list.data ?? [])
+      : (list.data ?? []).filter(
+          (r) =>
+            r.guia.toLowerCase().includes(s) ||
+            r.material_code.toLowerCase().includes(s) ||
+            r.date.includes(s),
+        );
+    const sorted = [...base].sort((a, b) => {
+      const av = a[sortKey] as any;
+      const bv = b[sortKey] as any;
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      let cmp: number;
+      if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
+      else cmp = String(av).localeCompare(String(bv), "es", { numeric: true });
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [list.data, search, sortKey, sortDir]);
+
+  useEffect(() => { setPage(1); }, [search, pageSize, sortKey, sortDir]);
+
+  const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paged = pageSize === "all"
+    ? filtered
+    : filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  function toggleSort(k: SortKey) {
+    if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(k); setSortDir("asc"); }
+  }
+  function SortIcon({ k }: { k: SortKey }) {
+    if (sortKey !== k) return <ArrowUpDown className="ml-1 inline h-3 w-3 opacity-50" />;
+    return sortDir === "asc"
+      ? <ArrowUp className="ml-1 inline h-3 w-3" />
+      : <ArrowDown className="ml-1 inline h-3 w-3" />;
+  }
 
   return (
     <div className="space-y-6">
@@ -151,29 +189,44 @@ export function ReceptionsSection() {
       </div>
 
       <div className="surface-card overflow-hidden">
-        <div className="flex items-center justify-between gap-2 border-b border-border/60 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 p-3">
           <Input
             placeholder="Buscar por guía, material, fecha…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-xs"
           />
-          <span className="chip">{filtered.length} registros</span>
+          <div className="flex items-center gap-2">
+            <span className="chip">{filtered.length} registros</span>
+            <Label className="text-xs text-muted-foreground">Mostrar</Label>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(v) => setPageSize(v === "all" ? "all" : Number(v))}
+            >
+              <SelectTrigger className="h-8 w-24"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="max-h-[60vh] overflow-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <thead className="sticky top-0 z-10 bg-secondary/80 text-left text-xs uppercase tracking-wider text-muted-foreground backdrop-blur">
               <tr>
-                <th className="px-4 py-2.5">Fecha</th>
-                <th className="px-4 py-2.5">Guía</th>
-                <th className="px-4 py-2.5">Material</th>
-                <th className="px-4 py-2.5">Sentido</th>
-                <th className="px-4 py-2.5 text-right">Cantidad</th>
+                <th className="cursor-pointer select-none px-4 py-2.5" onClick={() => toggleSort("date")}>Fecha<SortIcon k="date" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5" onClick={() => toggleSort("guia")}>Guía<SortIcon k="guia" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5" onClick={() => toggleSort("material_code")}>Material<SortIcon k="material_code" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5" onClick={() => toggleSort("handedness")}>Sentido<SortIcon k="handedness" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5 text-right" onClick={() => toggleSort("qty")}>Cantidad<SortIcon k="qty" /></th>
                 <th className="px-4 py-2.5 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => {
+              {paged.map((r) => {
                 const m = materials.data?.find((x) => x.code === r.material_code);
                 return (
                   <tr key={r.id} className="border-t border-border/50">
@@ -207,7 +260,7 @@ export function ReceptionsSection() {
                   </tr>
                 );
               })}
-              {filtered.length === 0 && (
+              {paged.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
                     Sin recepciones.
@@ -217,6 +270,21 @@ export function ReceptionsSection() {
             </tbody>
           </table>
         </div>
+        {pageSize !== "all" && totalPages > 1 && (
+          <div className="flex items-center justify-between gap-2 border-t border-border/60 p-3 text-sm">
+            <div className="text-xs text-muted-foreground">
+              Página {currentPage} de {totalPages} · {filtered.length} registros
+            </div>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {editing && (

@@ -46,6 +46,12 @@ export function DeliveriesSection() {
   const dh = useDeliveryHouses();
   const materials = useMaterials();
   const types = useHouseTypes();
+  const sitesQ = useSites();
+  const vtQ = useValeTypes();
+  const stagesQ = useValeStages();
+  const matsV2Q = useMaterialsV2();
+  const sdQ = useSiteDeliveries();
+  const sdiQ = useSiteDeliveryItems();
 
   return (
     <div className="space-y-6">
@@ -69,9 +75,18 @@ export function DeliveriesSection() {
         </Tabs>
       </div>
 
+      <SiteDeliveriesHistory
+        sites={sitesQ.data ?? []}
+        vales={vtQ.data ?? []}
+        stages={stagesQ.data ?? []}
+        materials={matsV2Q.data ?? []}
+        deliveries={sdQ.data ?? []}
+        items={sdiQ.data ?? []}
+      />
+
       <div className="surface-card overflow-hidden">
         <div className="border-b border-border/60 px-4 py-3 font-display text-base font-semibold">
-          Historial de entregas
+          Historial antiguo (entregas manuales)
         </div>
         <div className="divide-y divide-border/50">
           {(deliveries.data ?? []).map((d) => {
@@ -90,10 +105,145 @@ export function DeliveriesSection() {
           })}
           {(deliveries.data ?? []).length === 0 && (
             <div className="px-4 py-8 text-center text-muted-foreground">
-              Aún no hay entregas registradas.
+              Sin entregas en el sistema antiguo.
             </div>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function SiteDeliveriesHistory({
+  sites, vales, stages, materials, deliveries, items,
+}: {
+  sites: Site[];
+  vales: ValeTypeV2[];
+  stages: ValeStage[];
+  materials: { id: string; code: string; description: string; unit: string }[];
+  deliveries: { id: string; site_id: string; vale_stage_id: string; date: string; mode: string; note: string }[];
+  items: { id: string; delivery_id: string; material_id: string; qty: number }[];
+}) {
+  const [search, setSearch] = useState("");
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const rows = useMemo(() => {
+    const siteById = new Map(sites.map((s) => [s.id, s]));
+    const stageById = new Map(stages.map((s) => [s.id, s]));
+    const valeById = new Map(vales.map((v) => [v.id, v]));
+    const matById = new Map(materials.map((m) => [m.id, m]));
+    return deliveries
+      .map((d) => {
+        const site = siteById.get(d.site_id);
+        const stage = stageById.get(d.vale_stage_id);
+        const vale = stage ? valeById.get(stage.vale_type_id) : undefined;
+        const its = items.filter((x) => x.delivery_id === d.id).map((it) => {
+          const m = matById.get(it.material_id);
+          return { ...it, code: m?.code ?? "", desc: m?.description ?? "", unit: m?.unit ?? "" };
+        });
+        return { d, site, stage, vale, items: its };
+      })
+      .sort((a, b) => (a.d.date < b.d.date ? 1 : -1));
+  }, [sites, stages, vales, materials, deliveries, items]);
+
+  const filtered = useMemo(() => {
+    const s = search.toLowerCase().trim();
+    if (!s) return rows;
+    return rows.filter((r) =>
+      [
+        r.d.date,
+        r.d.note,
+        r.site ? `manzana ${r.site.manzana} sitio ${r.site.sitio} tipo ${r.site.house_type}` : "",
+        r.vale?.name ?? "",
+        r.stage ? `etapa ${r.stage.stage_number} ${r.stage.name ?? ""}` : "",
+        ...r.items.map((it) => `${it.code} ${it.desc}`),
+      ].join(" ").toLowerCase().includes(s),
+    );
+  }, [rows, search]);
+
+  return (
+    <div className="surface-card overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
+        <div className="font-display text-base font-semibold">Historial de entregas por sitio</div>
+        <div className="flex items-center gap-2">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar por sitio, vale, material, fecha…"
+            className="h-8 w-72"
+          />
+          <span className="chip">{filtered.length}</span>
+        </div>
+      </div>
+      <div className="max-h-[60vh] divide-y divide-border/50 overflow-auto">
+        {filtered.map((r) => {
+          const isOpen = openId === r.d.id;
+          return (
+            <div key={r.d.id} className="px-4 py-3">
+              <button
+                onClick={() => setOpenId(isOpen ? null : r.d.id)}
+                className="flex w-full items-center justify-between gap-3 text-left"
+              >
+                <div>
+                  <div className="text-sm font-medium">
+                    {fmtDate(r.d.date)}
+                    {r.site && <> · Manzana {r.site.manzana} · Sitio {r.site.sitio}</>}
+                    {r.vale && <> · {r.vale.name}</>}
+                    {r.stage && <> · Etapa {r.stage.stage_number}</>}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {r.d.mode === "auto" ? "Auto-completar" : "Manual"}
+                    {r.d.note && ` · ${r.d.note}`}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="chip">{r.items.length} ítems</span>
+                  <ChevronDown className={cn("h-4 w-4 transition-transform", isOpen && "rotate-180")} />
+                </div>
+              </button>
+              {isOpen && (
+                <div className="mt-3 rounded-lg border border-border bg-background/60 p-3 text-sm">
+                  <ul className="space-y-1">
+                    {r.items.map((it) => (
+                      <li key={it.id} className="flex items-center justify-between">
+                        <span>
+                          {it.code}{" "}
+                          <span className="text-xs text-muted-foreground">{it.desc}</span>
+                        </span>
+                        <span className="num-display">{it.qty} {it.unit}</span>
+                      </li>
+                    ))}
+                    {r.items.length === 0 && (
+                      <li className="text-xs text-muted-foreground">Sin ítems.</li>
+                    )}
+                  </ul>
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() =>
+                        requestCascadeDelete({
+                          table: "site_deliveries",
+                          id: r.d.id,
+                          label: `Entrega del ${fmtDate(r.d.date)}${r.site ? ` · M${r.site.manzana}-S${r.site.sitio}` : ""}`,
+                          context: "Se eliminarán los ítems de esta entrega. El estado del sitio se recalculará.",
+                        })
+                      }
+                    >
+                      <Trash2 className="mr-1 h-4 w-4 text-destructive" />
+                      Eliminar
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {filtered.length === 0 && (
+          <div className="px-4 py-8 text-center text-muted-foreground">
+            Aún no hay entregas por sitio.
+          </div>
+        )}
       </div>
     </div>
   );
