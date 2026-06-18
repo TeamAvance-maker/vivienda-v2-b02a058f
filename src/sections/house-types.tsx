@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SectionHeader } from "@/components/app-shell";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
+import { requestCascadeDelete } from "@/components/cascade-delete-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useConfig, useHouseTypes, useInvalidateAll } from "@/lib/queries";
 import { cn } from "@/lib/utils";
@@ -122,11 +123,12 @@ export function HouseTypesSection() {
                     variant="ghost"
                     size="icon"
                     onClick={() =>
-                      requestAdminMutation({
+                      requestCascadeDelete({
                         table: "house_types",
-                        action: "delete",
-                        match: { code: t.code },
-                        description: `Eliminar tipo "${t.code}". Esto eliminará también sus requerimientos.`,
+                        id: t.code,
+                        label: `Tipo de vivienda "${t.code}"`,
+                        context:
+                          "Se eliminarán también los requerimientos de material asociados a este tipo.",
                       })
                     }
                   >

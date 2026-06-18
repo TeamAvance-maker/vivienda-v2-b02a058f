@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Toaster } from "sonner";
 import { AppShell, type TabKey } from "@/components/app-shell";
 import { PassphraseProvider } from "@/components/passphrase-dialog";
+import { CascadeDeleteProvider } from "@/components/cascade-delete-dialog";
 import { CasasSection } from "@/sections/casas";
 import { ConfigSection } from "@/sections/config";
 import { DashboardSection } from "@/sections/dashboard";
@@ -46,6 +47,7 @@ function Index() {
         {tab === "config" && <ConfigSection />}
       </AppShell>
       <PassphraseProvider />
+      <CascadeDeleteProvider />
       <Toaster
         richColors
         position="top-center"

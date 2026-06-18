@@ -1,6 +1,7 @@
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { EditDialog } from "@/components/edit-dialog";
+import { MaterialQuickCreate } from "@/components/material-quick-create";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +16,7 @@ import {
 import { SearchableSelect } from "@/components/searchable-select";
 import { SectionHeader } from "@/components/app-shell";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
+import { requestCascadeDelete } from "@/components/cascade-delete-dialog";
 import { useMaterials, useReceptions } from "@/lib/queries";
 import type { Handedness } from "@/lib/types";
 import { HAND_LABEL } from "@/lib/types";
@@ -35,6 +37,7 @@ export function ReceptionsSection() {
     qty: 1,
   });
   const [search, setSearch] = useState("");
+  const [quickCreate, setQuickCreate] = useState(false);
 
   const mat = materials.data?.find((m) => m.code === form.material_code);
   const handOpts: Handedness[] = mat?.tracks_handedness ? ["left", "right"] : ["none"];
@@ -89,20 +92,33 @@ export function ReceptionsSection() {
           </div>
           <div className="md:col-span-2">
             <Label>Material</Label>
-            <SearchableSelect
-              value={form.material_code}
-              onChange={(v) => {
-                const m = materials.data?.find((x) => x.code === v);
-                setForm({ ...form, material_code: v, handedness: m?.tracks_handedness ? "left" : "none" });
-              }}
-              placeholder="Selecciona material"
-              searchPlaceholder="Buscar por código o descripción…"
-              options={(materials.data ?? []).map((m) => ({
-                value: m.code,
-                label: `${m.code} · ${m.description}`,
-                keywords: `${m.code} ${m.description}`,
-              }))}
-            />
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <SearchableSelect
+                  value={form.material_code}
+                  onChange={(v) => {
+                    const m = materials.data?.find((x) => x.code === v);
+                    setForm({ ...form, material_code: v, handedness: m?.tracks_handedness ? "left" : "none" });
+                  }}
+                  placeholder="Selecciona material"
+                  searchPlaceholder="Buscar por código o descripción…"
+                  options={(materials.data ?? []).map((m) => ({
+                    value: m.code,
+                    label: `${m.code} · ${m.description}`,
+                    keywords: `${m.code} ${m.description}`,
+                  }))}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title="Crear nuevo material"
+                onClick={() => setQuickCreate(true)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
           <div>
             <Label>Sentido</Label>
@@ -177,11 +193,11 @@ export function ReceptionsSection() {
                         variant="ghost"
                         size="icon"
                         onClick={() =>
-                          requestAdminMutation({
+                          requestCascadeDelete({
                             table: "receptions",
-                            action: "delete",
-                            match: { id: r.id },
-                            description: `Eliminar recepción del ${fmtDate(r.date)} · ${r.material_code} · ${r.qty} u.`,
+                            id: r.id,
+                            label: `Recepción del ${fmtDate(r.date)} · ${r.material_code} · ${r.qty} u.`,
+                            context: "Esta recepción se eliminará del registro. El stock recalculado lo reflejará.",
                           })
                         }
                       >
@@ -244,6 +260,15 @@ export function ReceptionsSection() {
           ]}
         />
       )}
+
+      <MaterialQuickCreate
+        open={quickCreate}
+        onOpenChange={setQuickCreate}
+        onCreated={(code) => {
+          const m = materials.data?.find((x) => x.code === code);
+          setForm((f) => ({ ...f, material_code: code, handedness: m?.tracks_handedness ? "left" : "none" }));
+        }}
+      />
     </div>
   );
 }

@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Download, Upload } from "lucide-react";
+import { Download, Upload, AlertTriangle, FileClock, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -26,9 +27,9 @@ import {
 import { SectionHeader } from "@/components/app-shell";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
 import { useConfig, useHouseTypes, useInvalidateAll, useOverrides } from "@/lib/queries";
-import { fmtDate } from "@/lib/compute";
+import { fmtDate, fmtDateTime } from "@/lib/compute";
 import { supabase } from "@/integrations/supabase/client";
-import { BACKUP_TABLES, restoreBackupFn } from "@/lib/backup.functions";
+import { ALL_TABLES, restoreBackupFn, resetSystemFn } from "@/lib/backup.functions";
 
 export function ConfigSection() {
   const cfg = useConfig();
@@ -56,74 +57,7 @@ export function ConfigSection() {
     });
   }
 
-  // ===== Respaldo / Restauración =====
-  const invalidate = useInvalidateAll();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [pendingRestore, setPendingRestore] = useState<Record<string, any[]> | null>(null);
-  const [restorePass, setRestorePass] = useState("");
-  const restoreServerFn = useServerFn(restoreBackupFn);
-
-  const backupMutation = useMutation({
-    mutationFn: async () => {
-      const payload: Record<string, any[]> = {};
-      for (const t of BACKUP_TABLES) {
-        const { data, error } = await supabase.from(t as never).select("*");
-        if (error) throw new Error(`${t}: ${error.message}`);
-        payload[t] = (data ?? []) as any[];
-      }
-      const blob = new Blob(
-        [JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), data: payload }, null, 2)],
-        { type: "application/json" },
-      );
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
-      a.download = `respaldo-obra-${stamp}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      const total = Object.values(payload).reduce((a, b) => a + b.length, 0);
-      return total;
-    },
-    onSuccess: (n) => toast.success(`Respaldo descargado (${n} registros).`),
-    onError: (e: any) => toast.error(e?.message ?? "Error al respaldar"),
-  });
-
-  function onFilePick(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const parsed = JSON.parse(String(reader.result));
-        const data = parsed?.data ?? parsed;
-        if (!data || typeof data !== "object") throw new Error("Archivo inválido");
-        setPendingRestore(data);
-        setRestorePass("");
-      } catch (err: any) {
-        toast.error(`No se pudo leer el archivo: ${err.message}`);
-      } finally {
-        if (fileInputRef.current) fileInputRef.current.value = "";
-      }
-    };
-    reader.readAsText(f);
-  }
-
-  const restoreMutation = useMutation({
-    mutationFn: async () => {
-      if (!pendingRestore) return;
-      await restoreServerFn({ data: { passphrase: restorePass, payload: pendingRestore } });
-    },
-    onSuccess: () => {
-      toast.success("Respaldo restaurado correctamente.");
-      invalidate();
-      setPendingRestore(null);
-      setRestorePass("");
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Error al restaurar"),
-  });
-
-  // Override manual
+  // ===== Override manual =====
   const [ov, setOv] = useState({ house_type_code: "", delta: 0, reason: "" });
   function submitOverride() {
     if (!ov.house_type_code) return toast.error("Selecciona un tipo");
@@ -218,93 +152,11 @@ export function ConfigSection() {
         </div>
       </div>
 
-      {/* Respaldo / restauración */}
-      <div className="surface-card p-5">
-        <h3 className="mb-1 font-display text-lg font-semibold">
-          Respaldo y restauración <span className="ml-2 rounded bg-yellow-500/15 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:text-yellow-300">Temporal · Pendiente de retirar</span>
-        </h3>
-        <p className="mb-3 text-xs text-muted-foreground">
-          Guarda un archivo <b>.json</b> con <b>entregas, materiales y recepciones</b> (incluye los detalles de cada entrega).
-          Sirve para no perder esos datos cuando migremos las entregas al sistema de <b>vales por casa</b>.
-          Cuando los vales estén listos, avísame y retiramos estos botones.
-          Para restaurar, sube el mismo archivo: se reemplazarán <b>todos</b> esos datos (pide contraseña).
-        </p>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={() => backupMutation.mutate()} disabled={backupMutation.isPending}>
-            <Download className="h-4 w-4" />
-            {backupMutation.isPending ? "Generando…" : "Descargar respaldo"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={restoreMutation.isPending}
-          >
-            <Upload className="h-4 w-4" />
-            Restaurar desde archivo…
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={onFilePick}
-          />
-        </div>
-      </div>
+      <BackupRestoreCard />
 
-      <AlertDialog
-        open={!!pendingRestore}
-        onOpenChange={(o) => {
-          if (!o) {
-            setPendingRestore(null);
-            setRestorePass("");
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar restauración</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esto <b>borra todos los datos actuales</b> y los reemplaza por los del archivo. Esta acción no se puede
-              deshacer. Ingresa la contraseña para continuar.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="rp">Contraseña de obra</Label>
-            <Input
-              id="rp"
-              type="password"
-              autoFocus
-              value={restorePass}
-              onChange={(e) => setRestorePass(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && restorePass) restoreMutation.mutate();
-              }}
-              placeholder="••••••••"
-            />
-            {pendingRestore && (
-              <p className="text-xs text-muted-foreground">
-                Se restaurarán{" "}
-                {Object.values(pendingRestore).reduce((a, b) => a + (Array.isArray(b) ? b.length : 0), 0)}{" "}
-                registros en {Object.keys(pendingRestore).length} tablas.
-              </p>
-            )}
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={restoreMutation.isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={!restorePass || restoreMutation.isPending}
-              onClick={(e) => {
-                e.preventDefault();
-                restoreMutation.mutate();
-              }}
-            >
-              {restoreMutation.isPending ? "Restaurando…" : "Restaurar ahora"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeletionLogCard />
 
+      <DangerZoneCard />
 
       <div className="surface-card border-dashed p-5 text-sm text-muted-foreground">
         <p>
@@ -313,6 +165,366 @@ export function ConfigSection() {
           Si más adelante necesitas seguridad real (con usuarios individuales y permisos), podemos migrar a login completo.
         </p>
       </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// RESPALDO Y RESTAURACIÓN — completo + por partes.
+// =====================================================================
+function BackupRestoreCard() {
+  const invalidate = useInvalidateAll();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [parsed, setParsed] = useState<Record<string, any[]> | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [restorePass, setRestorePass] = useState("");
+  const restoreServerFn = useServerFn(restoreBackupFn);
+
+  const backupMut = useMutation({
+    mutationFn: async () => {
+      const payload: Record<string, any[]> = {};
+      for (const t of ALL_TABLES) {
+        const { data, error } = await supabase.from(t as never).select("*");
+        if (error) throw new Error(`${t}: ${error.message}`);
+        payload[t] = (data ?? []) as any[];
+      }
+      const blob = new Blob(
+        [JSON.stringify({ version: 2, exportedAt: new Date().toISOString(), data: payload }, null, 2)],
+        { type: "application/json" },
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      a.download = `respaldo-obra-completo-${stamp}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      return Object.values(payload).reduce((a, b) => a + b.length, 0);
+    },
+    onSuccess: (n) => toast.success(`Respaldo descargado (${n} registros).`),
+    onError: (e: any) => toast.error(e?.message ?? "Error al respaldar"),
+  });
+
+  function onFilePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const obj = JSON.parse(String(reader.result));
+        const data = obj?.data ?? obj;
+        if (!data || typeof data !== "object") throw new Error("Archivo inválido");
+        setParsed(data);
+        const initial = new Set<string>();
+        for (const t of Object.keys(data)) if (Array.isArray(data[t]) && data[t].length > 0) initial.add(t);
+        setSelected(initial);
+        setRestorePass("");
+      } catch (err: any) {
+        toast.error(`No se pudo leer el archivo: ${err.message}`);
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsText(f);
+  }
+
+  const restoreMut = useMutation({
+    mutationFn: async () => {
+      if (!parsed) return;
+      await restoreServerFn({
+        data: {
+          passphrase: restorePass,
+          tables: Array.from(selected),
+          payload: parsed,
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Respaldo restaurado.");
+      invalidate();
+      setParsed(null);
+      setSelected(new Set());
+      setRestorePass("");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Error al restaurar"),
+  });
+
+  function toggle(t: string) {
+    const next = new Set(selected);
+    if (next.has(t)) next.delete(t); else next.add(t);
+    setSelected(next);
+  }
+
+  return (
+    <div className="surface-card p-5">
+      <h3 className="mb-1 font-display text-lg font-semibold">Respaldo y restauración</h3>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Descarga un archivo JSON con <b>todos los datos</b> del sistema. Al restaurar, puedes elegir <b>solo las
+        tablas que quieras reemplazar</b>: las demás quedan intactas.
+      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button onClick={() => backupMut.mutate()} disabled={backupMut.isPending}>
+          <Download className="h-4 w-4" /> {backupMut.isPending ? "Generando…" : "Descargar respaldo completo"}
+        </Button>
+        <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+          <Upload className="h-4 w-4" /> Restaurar desde archivo…
+        </Button>
+        <input ref={fileInputRef} type="file" accept="application/json,.json" className="hidden" onChange={onFilePick} />
+      </div>
+
+      <AlertDialog open={!!parsed} onOpenChange={(o) => { if (!o) { setParsed(null); setRestorePass(""); } }}>
+        <AlertDialogContent className="max-h-[80vh] max-w-2xl overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restaurar por partes</AlertDialogTitle>
+            <AlertDialogDescription>
+              Marca las tablas que quieres restaurar. Cada tabla seleccionada se <b>borra primero</b> y luego se reemplaza
+              con los datos del archivo. Las tablas no marcadas no se tocan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {parsed && (
+            <div className="space-y-1.5 rounded-lg border border-border p-3 text-sm">
+              <div className="flex justify-between gap-2 pb-2 text-xs font-semibold text-muted-foreground">
+                <button className="underline" onClick={() => setSelected(new Set(Object.keys(parsed)))}>Marcar todo</button>
+                <button className="underline" onClick={() => setSelected(new Set())}>Desmarcar todo</button>
+              </div>
+              {ALL_TABLES.map((t) => {
+                const rows = parsed[t] ?? [];
+                const present = Array.isArray(rows);
+                return (
+                  <label key={t} className="flex items-center justify-between gap-2 py-1">
+                    <span className="flex items-center gap-2">
+                      <Checkbox
+                        checked={selected.has(t)}
+                        onCheckedChange={() => toggle(t)}
+                        disabled={!present}
+                      />
+                      <span className={present ? "" : "text-muted-foreground line-through"}>{t}</span>
+                    </span>
+                    <span className="text-xs text-muted-foreground tabular-nums">
+                      {present ? `${rows.length} registros` : "no incluida"}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          <div className="space-y-2 pt-2">
+            <Label>Contraseña de obra</Label>
+            <Input
+              type="password"
+              value={restorePass}
+              onChange={(e) => setRestorePass(e.target.value)}
+              placeholder="••••••••"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={restoreMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!restorePass || selected.size === 0 || restoreMut.isPending}
+              onClick={(e) => { e.preventDefault(); restoreMut.mutate(); }}
+            >
+              {restoreMut.isPending ? "Restaurando…" : `Restaurar ${selected.size} tabla(s)`}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// =====================================================================
+// BITÁCORA DE ELIMINACIONES (solo lectura).
+// =====================================================================
+function DeletionLogCard() {
+  const [tableFilter, setTableFilter] = useState<string>("");
+  const [search, setSearch] = useState("");
+  const q = useQuery({
+    queryKey: ["deletion_log"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("deletion_log" as never)
+        .select("*")
+        .order("deleted_at", { ascending: false })
+        .limit(500);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as any[];
+    },
+  });
+
+  const filtered = useMemo(() => {
+    const s = search.toLowerCase().trim();
+    return (q.data ?? []).filter((r: any) => {
+      if (tableFilter && r.table_name !== tableFilter) return false;
+      if (!s) return true;
+      return (
+        r.table_name?.toLowerCase().includes(s) ||
+        r.record_id?.toLowerCase().includes(s) ||
+        r.reason?.toLowerCase().includes(s) ||
+        r.deleted_by?.toLowerCase().includes(s) ||
+        JSON.stringify(r.record_snapshot ?? {}).toLowerCase().includes(s)
+      );
+    });
+  }, [q.data, tableFilter, search]);
+
+  function exportCsv() {
+    const headers = ["deleted_at", "deleted_by", "table_name", "record_id", "parent_table", "parent_id", "reason", "batch_id", "snapshot"];
+    const lines = [headers.join(",")];
+    for (const r of filtered) {
+      const row = [
+        r.deleted_at, r.deleted_by, r.table_name, r.record_id,
+        r.parent_table ?? "", r.parent_id ?? "", (r.reason ?? "").replace(/,/g, ";"),
+        r.batch_id, JSON.stringify(r.record_snapshot ?? {}).replace(/"/g, '""'),
+      ];
+      lines.push(row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","));
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `bitacora-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const uniqueTables = useMemo(
+    () => Array.from(new Set((q.data ?? []).map((r: any) => r.table_name))).sort(),
+    [q.data],
+  );
+
+  return (
+    <div className="surface-card p-5">
+      <h3 className="mb-1 flex items-center gap-2 font-display text-lg font-semibold">
+        <FileClock className="h-5 w-5" /> Bitácora de eliminaciones
+      </h3>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Registro permanente y solo lectura de cada dato eliminado del sistema (incluyendo borrados en cascada).
+      </p>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Input
+          placeholder="Buscar…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="max-w-xs"
+        />
+        <Select value={tableFilter || "__all"} onValueChange={(v) => setTableFilter(v === "__all" ? "" : v)}>
+          <SelectTrigger className="w-48"><SelectValue placeholder="Tabla" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all">Todas las tablas</SelectItem>
+            {uniqueTables.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <span className="chip">{filtered.length} entradas</span>
+        <div className="ml-auto">
+          <Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
+            <Download className="h-3.5 w-3.5" /> Exportar CSV
+          </Button>
+        </div>
+      </div>
+      <div className="max-h-96 overflow-auto rounded-lg border border-border">
+        <table className="min-w-full text-xs">
+          <thead className="sticky top-0 bg-secondary/60 text-left uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <th className="px-3 py-2">Fecha y hora</th>
+              <th className="px-3 py-2">Usuario</th>
+              <th className="px-3 py-2">Tabla</th>
+              <th className="px-3 py-2">ID</th>
+              <th className="px-3 py-2">Padre</th>
+              <th className="px-3 py-2">Motivo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((r: any) => (
+              <tr key={r.id} className="border-t border-border/60">
+                <td className="px-3 py-1.5 tabular-nums">{fmtDateTime(r.deleted_at)}</td>
+                <td className="px-3 py-1.5">{r.deleted_by}</td>
+                <td className="px-3 py-1.5 font-mono">{r.table_name}</td>
+                <td className="px-3 py-1.5 font-mono">{r.record_id}</td>
+                <td className="px-3 py-1.5 font-mono text-muted-foreground">
+                  {r.parent_table ? `${r.parent_table}/${r.parent_id?.slice(0, 8)}…` : "—"}
+                </td>
+                <td className="px-3 py-1.5">{r.reason ?? "—"}</td>
+              </tr>
+            ))}
+            {filtered.length === 0 && (
+              <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">Sin entradas.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// ZONA PELIGROSA — Inicializar sistema.
+// =====================================================================
+function DangerZoneCard() {
+  const [open, setOpen] = useState(false);
+  const [pass, setPass] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const invalidate = useInvalidateAll();
+  const reset = useServerFn(resetSystemFn);
+
+  const m = useMutation({
+    mutationFn: async () => {
+      if (confirm !== "INICIALIZAR") throw new Error('Escribe exactamente "INICIALIZAR"');
+      await reset({ data: { passphrase: pass, confirm: "INICIALIZAR" } });
+    },
+    onSuccess: () => {
+      toast.success("Sistema inicializado. Todos los datos fueron borrados.");
+      invalidate();
+      setOpen(false); setPass(""); setConfirm("");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Error"),
+  });
+
+  return (
+    <div className="surface-card border-2 border-destructive/40 p-5">
+      <h3 className="mb-1 flex items-center gap-2 font-display text-lg font-semibold text-destructive">
+        <AlertTriangle className="h-5 w-5" /> Zona peligrosa
+      </h3>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Borra <b>TODOS los datos</b> del sistema: materiales, vales, sitios, entregas, recepciones, conteos, ajustes,
+        bitácora resumen. Mantiene únicamente la configuración del proyecto (nombre, totales, umbral).
+        Esta acción <b>no se puede deshacer</b>. Solo el superadmin debería usarla.
+      </p>
+      <Button variant="destructive" onClick={() => setOpen(true)}>
+        <RotateCcw className="h-4 w-4" /> Inicializar sistema (dejar todo en blanco)
+      </Button>
+
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" /> Inicializar sistema
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esto eliminará <b>TODOS los datos</b>. Es irreversible. Para continuar, escribe la palabra{" "}
+              <b className="font-mono">INICIALIZAR</b> y la contraseña de obra.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Escribe INICIALIZAR para confirmar</Label>
+              <Input value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="INICIALIZAR" />
+            </div>
+            <div>
+              <Label>Contraseña de obra</Label>
+              <Input type="password" value={pass} onChange={(e) => setPass(e.target.value)} />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={m.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!pass || confirm !== "INICIALIZAR" || m.isPending}
+              onClick={(e) => { e.preventDefault(); m.mutate(); }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              <Trash2 className="h-4 w-4" /> {m.isPending ? "Procesando…" : "Inicializar ahora"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

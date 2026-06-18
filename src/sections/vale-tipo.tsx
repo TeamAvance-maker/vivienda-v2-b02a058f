@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { SectionHeader } from "@/components/app-shell";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
+import { requestCascadeDelete } from "@/components/cascade-delete-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,6 +41,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { adminMutateFn } from "@/lib/admin.functions";
+import { MaterialQuickCreate } from "@/components/material-quick-create";
 import {
   useInvalidateSitesV2,
   useMaterialsV2,
@@ -68,6 +70,7 @@ export function ValeTipoSection() {
   const [newQty, setNewQty] = useState<number>(1);
   const [addPass, setAddPass] = useState("");
   const [matOpen, setMatOpen] = useState(false);
+  const [quickCreate, setQuickCreate] = useState(false);
 
   // Edit dialog
   const [editing, setEditing] = useState<ValeReq | null>(null);
@@ -264,60 +267,71 @@ export function ValeTipoSection() {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
               <div className="md:col-span-2">
                 <Label>Material</Label>
-                <Popover open={matOpen} onOpenChange={setMatOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      className={cn(
-                        "w-full justify-between font-normal",
-                        !newMatId && "text-muted-foreground",
-                      )}
-                    >
-                      {newMatId
-                        ? (() => {
-                            const m = materialsById.get(newMatId);
-                            return m ? `${m.code} · ${m.description}` : "Selecciona";
-                          })()
-                        : "Selecciona o busca…"}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <Command
-                      filter={(value, search) => {
-                        if (!search) return 1;
-                        return value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
-                      }}
-                    >
-                      <CommandInput placeholder="Buscar por código o descripción…" />
-                      <CommandList className="max-h-72">
-                        <CommandEmpty>Sin resultados.</CommandEmpty>
-                        <CommandGroup>
-                          {sortedMaterials.map((m) => (
-                            <CommandItem
-                              key={m.id}
-                              value={`${m.code} ${m.description}`}
-                              onSelect={() => {
-                                setNewMatId(m.id);
-                                setMatOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  newMatId === m.id ? "opacity-100" : "opacity-0",
-                                )}
-                              />
-                              <span className="font-mono text-xs mr-2">{m.code}</span>
-                              <span className="truncate">{m.description}</span>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
+                <div className="flex gap-2">
+                  <Popover open={matOpen} onOpenChange={setMatOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className={cn(
+                          "flex-1 justify-between font-normal",
+                          !newMatId && "text-muted-foreground",
+                        )}
+                      >
+                        {newMatId
+                          ? (() => {
+                              const m = materialsById.get(newMatId);
+                              return m ? `${m.code} · ${m.description}` : "Selecciona";
+                            })()
+                          : "Selecciona o busca…"}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                      <Command
+                        filter={(value, search) => {
+                          if (!search) return 1;
+                          return value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0;
+                        }}
+                      >
+                        <CommandInput placeholder="Buscar por código o descripción…" />
+                        <CommandList className="max-h-72">
+                          <CommandEmpty>Sin resultados.</CommandEmpty>
+                          <CommandGroup>
+                            {sortedMaterials.map((m) => (
+                              <CommandItem
+                                key={m.id}
+                                value={`${m.code} ${m.description}`}
+                                onSelect={() => {
+                                  setNewMatId(m.id);
+                                  setMatOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    newMatId === m.id ? "opacity-100" : "opacity-0",
+                                  )}
+                                />
+                                <span className="font-mono text-xs mr-2">{m.code}</span>
+                                <span className="truncate">{m.description}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    title="Crear nuevo material"
+                    onClick={() => { setMatOpen(false); setQuickCreate(true); }}
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
               <div>
                 <Label>Cantidad</Label>
@@ -385,11 +399,11 @@ export function ValeTipoSection() {
                           variant="ghost"
                           size="icon"
                           onClick={() =>
-                            requestAdminMutation({
+                            requestCascadeDelete({
                               table: "vale_reqs",
-                              action: "delete",
-                              match: { id: r.id },
-                              description: `Eliminar ${m?.code ?? "material"} de ${houseType} · ${selectedVT?.code} · Etapa ${selectedStage?.stage_number}.`,
+                              id: r.id,
+                              label: `${m?.code ?? "material"} en ${houseType} · ${selectedVT?.code} · Etapa ${selectedStage?.stage_number}`,
+                              context: "Solo se elimina este requisito puntual de la etapa.",
                               onSuccess: invalidate,
                             })
                           }
@@ -461,6 +475,15 @@ export function ValeTipoSection() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <MaterialQuickCreate
+        open={quickCreate}
+        onOpenChange={setQuickCreate}
+        onCreated={(code) => {
+          const m = (materials.data ?? []).find((x) => x.code === code);
+          if (m) setNewMatId(m.id);
+        }}
+      />
     </div>
   );
 }

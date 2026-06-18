@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { SectionHeader } from "@/components/app-shell";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
+import { requestCascadeDelete } from "@/components/cascade-delete-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useConfig, useHouseTypes, useInvalidateAll } from "@/lib/queries";
 import { useInvalidateSitesV2, useSites } from "@/lib/sites-queries";
@@ -232,11 +233,11 @@ function TiposTab() {
                       variant="ghost"
                       size="icon"
                       onClick={() =>
-                        requestAdminMutation({
+                        requestCascadeDelete({
                           table: "house_types",
-                          action: "delete",
-                          match: { code: t.code },
-                          description: `Eliminar tipo "${t.code}". Esto eliminará también sus requerimientos.`,
+                          id: t.code,
+                          label: `Tipo "${t.code}"`,
+                          context: "Se eliminarán también los requerimientos de material asociados.",
                         })
                       }
                     >
@@ -508,15 +509,12 @@ function ManzanasTab() {
                     variant="ghost"
                     size="icon"
                     onClick={() =>
-                      requestAdminMutation({
+                      requestCascadeDelete({
                         table: "sites",
-                        action: "delete",
-                        match: { id: s.id },
-                        description: `Eliminar sitio M${s.manzana}·${formatSitio(s.sitio)}. Esto también eliminará sus entregas registradas.`,
-                        onSuccess: () => {
-                          invalidate();
-                          invalidateAll();
-                        },
+                        id: s.id,
+                        label: `Sitio M${s.manzana}·${formatSitio(s.sitio)}`,
+                        context: "Se eliminarán también todas las entregas registradas a este sitio y sus ítems.",
+                        onSuccess: () => { invalidate(); invalidateAll(); },
                       })
                     }
                   >

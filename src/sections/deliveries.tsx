@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { SectionHeader } from "@/components/app-shell";
 import { SearchableSelect } from "@/components/searchable-select";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
+import { requestCascadeDelete } from "@/components/cascade-delete-dialog";
 import {
   useDeliveries,
   useDeliveryHouses,
@@ -180,11 +181,11 @@ function DeliveryRow({
               variant="ghost"
               size="sm"
               onClick={() =>
-                requestAdminMutation({
+                requestCascadeDelete({
                   table: "deliveries",
-                  action: "delete",
-                  match: { id: d.id },
-                  description: `Eliminar entrega del ${fmtDate(d.date)}. Devolverá el material al stock y revertirá las viviendas ejecutadas.`,
+                  id: d.id,
+                  label: `Entrega del ${fmtDate(d.date)}`,
+                  context: "Se eliminarán los ítems de la entrega y las casas asociadas. El stock se recalculará automáticamente.",
                 })
               }
             >

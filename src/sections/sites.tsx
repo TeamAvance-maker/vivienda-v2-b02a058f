@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { createSiteDeliveryFn, editSiteDeliveryFn } from "@/lib/admin.functions";
 import { getConversion, toCatalogQty, toValeQty, round2 } from "@/lib/unit-conversion";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
+import { requestCascadeDelete } from "@/components/cascade-delete-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -616,11 +617,11 @@ function DeliveryHistoryList({
                     variant="outline"
                     className="h-7 px-2 text-destructive"
                     onClick={() =>
-                      requestAdminMutation({
+                      requestCascadeDelete({
                         table: "site_deliveries",
-                        action: "delete",
-                        match: { id: d.id },
-                        description: `Vas a eliminar esta entrega (${d.items.length} materiales) del ${new Date(d.created_at ?? "").toLocaleString("es-CL")}. Los ítems entregados también se borrarán.`,
+                        id: d.id,
+                        label: `Entrega del ${new Date(d.created_at ?? "").toLocaleString("es-CL")} (${d.items.length} materiales)`,
+                        context: "Se eliminarán los ítems entregados de esta entrega.",
                       })
                     }
                   >

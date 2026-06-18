@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      deletion_log: {
+        Row: {
+          batch_id: string
+          created_at: string
+          deleted_at: string
+          deleted_by: string
+          id: string
+          parent_id: string | null
+          parent_table: string | null
+          reason: string | null
+          record_id: string
+          record_snapshot: Json
+          table_name: string
+        }
+        Insert: {
+          batch_id: string
+          created_at?: string
+          deleted_at?: string
+          deleted_by?: string
+          id?: string
+          parent_id?: string | null
+          parent_table?: string | null
+          reason?: string | null
+          record_id: string
+          record_snapshot: Json
+          table_name: string
+        }
+        Update: {
+          batch_id?: string
+          created_at?: string
+          deleted_at?: string
+          deleted_by?: string
+          id?: string
+          parent_id?: string | null
+          parent_table?: string | null
+          reason?: string | null
+          record_id?: string
+          record_snapshot?: Json
+          table_name?: string
+        }
+        Relationships: []
+      }
       deliveries: {
         Row: {
           created_at: string
