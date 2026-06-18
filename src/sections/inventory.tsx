@@ -89,19 +89,49 @@ export function InventorySection() {
     return m;
   }, [materials.data]);
 
-  const rows = useMemo(() => {
-    const all = list.data ?? [];
-    const f = filter.trim().toLowerCase();
-    if (!f) return all;
-    return all.filter((r) => {
-      const desc = (matMap.get(r.material_code) ?? "").toLowerCase();
-      return (
-        r.material_code.toLowerCase().includes(f) ||
-        desc.includes(f) ||
-        (r.note ?? "").toLowerCase().includes(f)
-      );
-    });
-  }, [list.data, filter, matMap]);
+  const allCounts = list.data ?? [];
+  const allAdjustments = adjustments.data ?? [];
+
+  type CountRow = (typeof allCounts)[number];
+  type AdjRow = (typeof allAdjustments)[number];
+
+  const ctrl = useTableControls<CountRow>({
+    data: allCounts,
+    searchFields: (r) => [
+      r.material_code,
+      matMap.get(r.material_code) ?? "",
+      r.note ?? "",
+      HAND_LABEL[r.handedness],
+    ],
+    sortFns: {
+      date: (a, b) => a.date.localeCompare(b.date),
+      material: (a, b) => a.material_code.localeCompare(b.material_code, "es", { numeric: true }),
+      hand: (a, b) => String(a.handedness).localeCompare(String(b.handedness)),
+      sys: (a, b) => get(sm, a.material_code, a.handedness) - get(sm, b.material_code, b.handedness),
+      counted: (a, b) => a.counted_qty - b.counted_qty,
+      diff: (a, b) =>
+        (a.counted_qty - get(sm, a.material_code, a.handedness)) -
+        (b.counted_qty - get(sm, b.material_code, b.handedness)),
+    },
+    defaultSort: { key: "date", dir: "desc" },
+    defaultPageSize: 25,
+  });
+
+  const adjCtrl = useTableControls<AdjRow>({
+    data: allAdjustments,
+    searchFields: (r) => [r.material_code, matMap.get(r.material_code) ?? "", r.note ?? ""],
+    sortFns: {
+      date: (a, b) => a.date.localeCompare(b.date),
+      material: (a, b) => a.material_code.localeCompare(b.material_code, "es", { numeric: true }),
+      hand: (a, b) => String(a.handedness).localeCompare(String(b.handedness)),
+      prev: (a, b) => a.prev_system_qty - b.prev_system_qty,
+      counted: (a, b) => a.counted_qty - b.counted_qty,
+      delta: (a, b) => a.delta - b.delta,
+    },
+    defaultSort: { key: "date", dir: "desc" },
+    defaultPageSize: 25,
+  });
+
 
   return (
     <div className="space-y-6">
