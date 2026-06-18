@@ -189,29 +189,44 @@ export function ReceptionsSection() {
       </div>
 
       <div className="surface-card overflow-hidden">
-        <div className="flex items-center justify-between gap-2 border-b border-border/60 p-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 p-3">
           <Input
             placeholder="Buscar por guía, material, fecha…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-xs"
           />
-          <span className="chip">{filtered.length} registros</span>
+          <div className="flex items-center gap-2">
+            <span className="chip">{filtered.length} registros</span>
+            <Label className="text-xs text-muted-foreground">Mostrar</Label>
+            <Select
+              value={String(pageSize)}
+              onValueChange={(v) => setPageSize(v === "all" ? "all" : Number(v))}
+            >
+              <SelectTrigger className="h-8 w-24"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div className="overflow-x-auto">
+        <div className="max-h-[60vh] overflow-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <thead className="sticky top-0 z-10 bg-secondary/80 text-left text-xs uppercase tracking-wider text-muted-foreground backdrop-blur">
               <tr>
-                <th className="px-4 py-2.5">Fecha</th>
-                <th className="px-4 py-2.5">Guía</th>
-                <th className="px-4 py-2.5">Material</th>
-                <th className="px-4 py-2.5">Sentido</th>
-                <th className="px-4 py-2.5 text-right">Cantidad</th>
+                <th className="cursor-pointer select-none px-4 py-2.5" onClick={() => toggleSort("date")}>Fecha<SortIcon k="date" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5" onClick={() => toggleSort("guia")}>Guía<SortIcon k="guia" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5" onClick={() => toggleSort("material_code")}>Material<SortIcon k="material_code" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5" onClick={() => toggleSort("handedness")}>Sentido<SortIcon k="handedness" /></th>
+                <th className="cursor-pointer select-none px-4 py-2.5 text-right" onClick={() => toggleSort("qty")}>Cantidad<SortIcon k="qty" /></th>
                 <th className="px-4 py-2.5 text-right">Acciones</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => {
+              {paged.map((r) => {
                 const m = materials.data?.find((x) => x.code === r.material_code);
                 return (
                   <tr key={r.id} className="border-t border-border/50">
@@ -245,7 +260,7 @@ export function ReceptionsSection() {
                   </tr>
                 );
               })}
-              {filtered.length === 0 && (
+              {paged.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
                     Sin recepciones.
@@ -255,6 +270,21 @@ export function ReceptionsSection() {
             </tbody>
           </table>
         </div>
+        {pageSize !== "all" && totalPages > 1 && (
+          <div className="flex items-center justify-between gap-2 border-t border-border/60 p-3 text-sm">
+            <div className="text-xs text-muted-foreground">
+              Página {currentPage} de {totalPages} · {filtered.length} registros
+            </div>
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button variant="outline" size="icon" disabled={currentPage >= totalPages} onClick={() => setPage(currentPage + 1)}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {editing && (
