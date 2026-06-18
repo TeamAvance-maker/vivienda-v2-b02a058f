@@ -61,15 +61,9 @@ function buildMasterRows(opts: {
     .sort((a, b) => a.code.localeCompare(b.code));
 }
 
-export function ReportsSection() {
-  const cfg = useConfig();
-  const required = useVRequired();
-  const received = useVReceived();
-  const delivered = useVDelivered();
-  const stock = useVStock();
-  const materials = useMaterials();
-
 type MasterRow = ReturnType<typeof buildMasterRows>[number];
+
+
 
 export function ReportsSection() {
   const cfg = useConfig();
