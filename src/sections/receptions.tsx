@@ -16,6 +16,7 @@ import {
 import { SearchableSelect } from "@/components/searchable-select";
 import { SectionHeader } from "@/components/app-shell";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
+import { requestCascadeDelete } from "@/components/cascade-delete-dialog";
 import { useMaterials, useReceptions } from "@/lib/queries";
 import type { Handedness } from "@/lib/types";
 import { HAND_LABEL } from "@/lib/types";
