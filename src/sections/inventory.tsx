@@ -12,6 +12,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SectionHeader } from "@/components/app-shell";
+import {
+  SortableTh,
+  TablePagination,
+  TableToolbar,
+  useTableControls,
+} from "@/components/data-table";
 import { EditDialog } from "@/components/edit-dialog";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
 import { requestCascadeDelete } from "@/components/cascade-delete-dialog";
