@@ -259,6 +259,15 @@ export function ReceptionsSection() {
           ]}
         />
       )}
+
+      <MaterialQuickCreate
+        open={quickCreate}
+        onOpenChange={setQuickCreate}
+        onCreated={(code) => {
+          const m = materials.data?.find((x) => x.code === code);
+          setForm((f) => ({ ...f, material_code: code, handedness: m?.tracks_handedness ? "left" : "none" }));
+        }}
+      />
     </div>
   );
 }
