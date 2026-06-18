@@ -218,93 +218,11 @@ export function ConfigSection() {
         </div>
       </div>
 
-      {/* Respaldo / restauración */}
-      <div className="surface-card p-5">
-        <h3 className="mb-1 font-display text-lg font-semibold">
-          Respaldo y restauración <span className="ml-2 rounded bg-yellow-500/15 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:text-yellow-300">Temporal · Pendiente de retirar</span>
-        </h3>
-        <p className="mb-3 text-xs text-muted-foreground">
-          Guarda un archivo <b>.json</b> con <b>entregas, materiales y recepciones</b> (incluye los detalles de cada entrega).
-          Sirve para no perder esos datos cuando migremos las entregas al sistema de <b>vales por casa</b>.
-          Cuando los vales estén listos, avísame y retiramos estos botones.
-          Para restaurar, sube el mismo archivo: se reemplazarán <b>todos</b> esos datos (pide contraseña).
-        </p>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button onClick={() => backupMutation.mutate()} disabled={backupMutation.isPending}>
-            <Download className="h-4 w-4" />
-            {backupMutation.isPending ? "Generando…" : "Descargar respaldo"}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={restoreMutation.isPending}
-          >
-            <Upload className="h-4 w-4" />
-            Restaurar desde archivo…
-          </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={onFilePick}
-          />
-        </div>
-      </div>
+      <BackupRestoreCard />
 
-      <AlertDialog
-        open={!!pendingRestore}
-        onOpenChange={(o) => {
-          if (!o) {
-            setPendingRestore(null);
-            setRestorePass("");
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar restauración</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esto <b>borra todos los datos actuales</b> y los reemplaza por los del archivo. Esta acción no se puede
-              deshacer. Ingresa la contraseña para continuar.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="rp">Contraseña de obra</Label>
-            <Input
-              id="rp"
-              type="password"
-              autoFocus
-              value={restorePass}
-              onChange={(e) => setRestorePass(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && restorePass) restoreMutation.mutate();
-              }}
-              placeholder="••••••••"
-            />
-            {pendingRestore && (
-              <p className="text-xs text-muted-foreground">
-                Se restaurarán{" "}
-                {Object.values(pendingRestore).reduce((a, b) => a + (Array.isArray(b) ? b.length : 0), 0)}{" "}
-                registros en {Object.keys(pendingRestore).length} tablas.
-              </p>
-            )}
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={restoreMutation.isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={!restorePass || restoreMutation.isPending}
-              onClick={(e) => {
-                e.preventDefault();
-                restoreMutation.mutate();
-              }}
-            >
-              {restoreMutation.isPending ? "Restaurando…" : "Restaurar ahora"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeletionLogCard />
 
+      <DangerZoneCard />
 
       <div className="surface-card border-dashed p-5 text-sm text-muted-foreground">
         <p>
