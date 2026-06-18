@@ -4,6 +4,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect, type SearchableOption } from "@/components/searchable-select";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -38,6 +39,7 @@ type Filters = {
   tipo: string;
   sitio: string;
   estado: string;
+  overall: "" | SiteOverallStatus;
 };
 
 const TIPO_FILL: Record<string, string> = {
@@ -76,6 +78,7 @@ export function PlanoSection() {
     tipo: "",
     sitio: "",
     estado: "",
+    overall: "",
   });
   const [selected, setSelected] = useState<
     { kind: "site"; lot: PlanoLot } | { kind: "manzana"; id: string } | null
@@ -167,8 +170,12 @@ export function PlanoSection() {
     if (filters.sitio && lot.sitio !== filters.sitio.trim()) return false;
     if (filters.manzana && lot.manzana !== filters.manzana) return false;
     if (filters.tipo && lot.tipo !== filters.tipo) return false;
+    const info = lotInfo.get(lot.id);
+    if (filters.overall) {
+      if (!info?.site) return false;
+      if (info.status !== filters.overall) return false;
+    }
     if (filters.estado && hasValeFilter) {
-      const info = lotInfo.get(lot.id);
       const st = info?.cellForFilter ? STATUS_FROM_CELL[info.cellForFilter] : "na";
       if (st !== filters.estado) return false;
     }
@@ -176,7 +183,7 @@ export function PlanoSection() {
   };
 
   const limpiar = () =>
-    setFilters({ vale: { type: "all" }, manzana: "", tipo: "", sitio: "", estado: "" });
+    setFilters({ vale: { type: "all" }, manzana: "", tipo: "", sitio: "", estado: "", overall: "" });
 
   // Stats globales del plano (sobre sitios reales, todos los vales)
   const stats = useMemo(() => {
@@ -291,9 +298,39 @@ export function PlanoSection() {
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6">
         <StatCard label="Total sitios" value={stats.total} />
         <StatCard label="Avance global" value={`${stats.avancePct}%`} accent="#2563eb" />
-        <StatCard label="Terminados" value={stats.term} accent="#16a34a" />
-        <StatCard label="En ejecución" value={stats.exe} accent="#d97706" />
-        <StatCard label="Sin iniciar" value={stats.sin} accent="#64748b" />
+        <StatCard
+          label="Terminados"
+          value={stats.term}
+          accent="#16a34a"
+          active={filters.overall === "terminado"}
+          onClick={() =>
+            setFilters((f) => ({ ...f, overall: f.overall === "terminado" ? "" : "terminado" }))
+          }
+        />
+        <StatCard
+          label="En ejecución"
+          value={stats.exe}
+          accent="#d97706"
+          active={filters.overall === "en-ejecucion"}
+          onClick={() =>
+            setFilters((f) => ({
+              ...f,
+              overall: f.overall === "en-ejecucion" ? "" : "en-ejecucion",
+            }))
+          }
+        />
+        <StatCard
+          label="Sin iniciar"
+          value={stats.sin}
+          accent="#64748b"
+          active={filters.overall === "sin-iniciar"}
+          onClick={() =>
+            setFilters((f) => ({
+              ...f,
+              overall: f.overall === "sin-iniciar" ? "" : "sin-iniciar",
+            }))
+          }
+        />
         <StatCard
           label="Vales completos"
           value={`${stats.valesComp}/${stats.valesAppl}`}
@@ -333,27 +370,31 @@ export function PlanoSection() {
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             Vale tipo / Etapa
           </label>
-          <Select value={valeSelectValue} onValueChange={onChangeValeSelect}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              {valeTypes.map((vt) => {
-                const stages = stagesByVale.get(vt.id) ?? [];
-                return [
-                  <SelectItem key={`v:${vt.id}`} value={`v:${vt.id}`}>
-                    <b>{vt.code}</b> · {vt.name}
-                  </SelectItem>,
-                  ...stages.map((st) => (
-                    <SelectItem key={`s:${st.id}`} value={`s:${st.id}`}>
-                      &nbsp;&nbsp;&nbsp;└ E{st.stage_number} · {st.name}
-                    </SelectItem>
-                  )),
-                ];
-              })}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={valeSelectValue}
+            onChange={onChangeValeSelect}
+            placeholder="Todos"
+            searchPlaceholder="Buscar vale o etapa…"
+            options={(() => {
+              const opts: SearchableOption[] = [{ value: "all", label: "Todos" }];
+              for (const vt of valeTypes) {
+                opts.push({
+                  value: `v:${vt.id}`,
+                  label: `${vt.code} · ${vt.name}`,
+                  keywords: `${vt.code} ${vt.name}`,
+                });
+                for (const st of stagesByVale.get(vt.id) ?? []) {
+                  opts.push({
+                    value: `s:${st.id}`,
+                    label: `   └ E${st.stage_number} · ${st.name}`,
+                    hint: `${vt.code} · ${vt.name}`,
+                    keywords: `${vt.code} ${vt.name} ${st.name} E${st.stage_number}`,
+                  });
+                }
+              }
+              return opts;
+            })()}
+          />
         </div>
         <div>
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
@@ -536,13 +577,23 @@ function StatCard({
   label,
   value,
   accent,
+  active,
+  onClick,
 }: {
   label: string;
   value: string | number;
   accent?: string;
+  active?: boolean;
+  onClick?: () => void;
 }) {
+  const clickable = !!onClick;
   return (
-    <div className="rounded-xl border bg-card p-3 shadow-sm">
+    <div
+      onClick={onClick}
+      className={`rounded-xl border bg-card p-3 shadow-sm transition ${
+        clickable ? "cursor-pointer hover:bg-muted/40" : ""
+      } ${active ? "ring-2 ring-primary border-primary" : ""}`}
+    >
       <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
         {label}
       </div>
