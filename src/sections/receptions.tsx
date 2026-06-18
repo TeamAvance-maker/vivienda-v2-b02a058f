@@ -192,11 +192,11 @@ export function ReceptionsSection() {
                         variant="ghost"
                         size="icon"
                         onClick={() =>
-                          requestAdminMutation({
+                          requestCascadeDelete({
                             table: "receptions",
-                            action: "delete",
-                            match: { id: r.id },
-                            description: `Eliminar recepción del ${fmtDate(r.date)} · ${r.material_code} · ${r.qty} u.`,
+                            id: r.id,
+                            label: `Recepción del ${fmtDate(r.date)} · ${r.material_code} · ${r.qty} u.`,
+                            context: "Esta recepción se eliminará del registro. El stock recalculado lo reflejará.",
                           })
                         }
                       >
