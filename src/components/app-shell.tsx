@@ -59,6 +59,7 @@ function SidebarRail({
   onMouseEnter,
   onMouseLeave,
   projectName,
+  onOpenHelp,
 }: {
   active: TabKey;
   onChange: (k: TabKey) => void;
@@ -66,6 +67,7 @@ function SidebarRail({
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   projectName: string;
+  onOpenHelp: () => void;
 }) {
   return (
     <motion.aside
