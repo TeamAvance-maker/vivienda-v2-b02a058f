@@ -77,6 +77,72 @@ export function ReportsSection() {
     });
   }
 
+  // === Filtros y ordenamiento ===
+  type ColKey = "code" | "description" | "hand" | "required" | "received" | "delivered" | "saldo" | "pendienteRecep" | "pct";
+  type NumOp = "" | "=" | ">" | "<" | ">=" | "<=" | "<>";
+  const [sortKey, setSortKey] = useState<ColKey>("code");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [txtFilters, setTxtFilters] = useState<Record<string, string>>({ code: "", description: "", hand: "" });
+  const numCols: ColKey[] = ["required", "received", "delivered", "saldo", "pendienteRecep", "pct"];
+  const [numFilters, setNumFilters] = useState<Record<string, { op: NumOp; val: string }>>(
+    Object.fromEntries(numCols.map((k) => [k, { op: "", val: "" }])) as any,
+  );
+
+  function toggleSort(k: ColKey) {
+    if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(k); setSortDir("asc"); }
+  }
+  function SortIcon({ k }: { k: ColKey }) {
+    if (sortKey !== k) return <ArrowUpDown className="ml-1 inline h-3 w-3 opacity-50" />;
+    return sortDir === "asc" ? <ArrowUp className="ml-1 inline h-3 w-3" /> : <ArrowDown className="ml-1 inline h-3 w-3" />;
+  }
+  function passNum(val: number, op: NumOp, target: string) {
+    if (!op || target === "") return true;
+    const t = Number(target);
+    if (isNaN(t)) return true;
+    switch (op) {
+      case "=": return val === t;
+      case ">": return val > t;
+      case "<": return val < t;
+      case ">=": return val >= t;
+      case "<=": return val <= t;
+      case "<>": return val !== t;
+    }
+  }
+
+  const visibleRows = useMemo(() => {
+    const all = rows();
+    const filt = all.filter((r) => {
+      if (txtFilters.code && !r.code.toLowerCase().includes(txtFilters.code.toLowerCase())) return false;
+      if (txtFilters.description && !r.description.toLowerCase().includes(txtFilters.description.toLowerCase())) return false;
+      if (txtFilters.hand) {
+        const label = HAND_SHORT[r.hand as keyof typeof HAND_SHORT] ?? "";
+        if (!label.toLowerCase().includes(txtFilters.hand.toLowerCase())) return false;
+      }
+      for (const k of numCols) {
+        const f = numFilters[k];
+        if (!passNum((r as any)[k] as number, f.op, f.val)) return false;
+      }
+      return true;
+    });
+    filt.sort((a, b) => {
+      const av = (a as any)[sortKey];
+      const bv = (b as any)[sortKey];
+      let cmp: number;
+      if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
+      else cmp = String(av ?? "").localeCompare(String(bv ?? ""), "es", { numeric: true });
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return filt;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [required.data, received.data, delivered.data, stock.data, materials.data, txtFilters, numFilters, sortKey, sortDir]);
+
+  function clearFilters() {
+    setTxtFilters({ code: "", description: "", hand: "" });
+    setNumFilters(Object.fromEntries(numCols.map((k) => [k, { op: "", val: "" }])) as any);
+  }
+
+
   function exportExcel() {
     const data = rows().map((r) => ({
       Código: r.code,
