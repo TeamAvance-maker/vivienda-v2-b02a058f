@@ -198,7 +198,7 @@ function SiteDeliveriesHistory({
             {ctrl.visible.map((r) => {
               const isOpen = openId === r.d.id;
               return (
-                <FragmentWithKey key={r.d.id}>
+                <Fragment key={r.d.id}>
                   <tr
                     className="cursor-pointer border-t border-border/50 hover:bg-secondary/40"
                     onClick={() => setOpenId(isOpen ? null : r.d.id)}
