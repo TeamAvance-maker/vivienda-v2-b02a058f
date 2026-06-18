@@ -61,16 +61,54 @@ export function ReceptionsSection() {
     });
   }
 
+  type SortKey = "date" | "guia" | "material_code" | "handedness" | "qty";
+  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [pageSize, setPageSize] = useState<number | "all">(50);
+  const [page, setPage] = useState(1);
+
   const filtered = useMemo(() => {
     const s = search.toLowerCase().trim();
-    if (!s) return list.data ?? [];
-    return (list.data ?? []).filter(
-      (r) =>
-        r.guia.toLowerCase().includes(s) ||
-        r.material_code.toLowerCase().includes(s) ||
-        r.date.includes(s),
-    );
-  }, [list.data, search]);
+    const base = !s
+      ? (list.data ?? [])
+      : (list.data ?? []).filter(
+          (r) =>
+            r.guia.toLowerCase().includes(s) ||
+            r.material_code.toLowerCase().includes(s) ||
+            r.date.includes(s),
+        );
+    const sorted = [...base].sort((a, b) => {
+      const av = a[sortKey] as any;
+      const bv = b[sortKey] as any;
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      let cmp: number;
+      if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
+      else cmp = String(av).localeCompare(String(bv), "es", { numeric: true });
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [list.data, search, sortKey, sortDir]);
+
+  useEffect(() => { setPage(1); }, [search, pageSize, sortKey, sortDir]);
+
+  const totalPages = pageSize === "all" ? 1 : Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const paged = pageSize === "all"
+    ? filtered
+    : filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  function toggleSort(k: SortKey) {
+    if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else { setSortKey(k); setSortDir("asc"); }
+  }
+  function SortIcon({ k }: { k: SortKey }) {
+    if (sortKey !== k) return <ArrowUpDown className="ml-1 inline h-3 w-3 opacity-50" />;
+    return sortDir === "asc"
+      ? <ArrowUp className="ml-1 inline h-3 w-3" />
+      : <ArrowDown className="ml-1 inline h-3 w-3" />;
+  }
 
   return (
     <div className="space-y-6">
