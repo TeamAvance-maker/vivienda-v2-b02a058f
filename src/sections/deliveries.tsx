@@ -260,7 +260,7 @@ function SiteDeliveriesHistory({
                       </td>
                     </tr>
                   )}
-                </>
+                </Fragment>
               );
             })}
             {ctrl.visible.length === 0 && (
