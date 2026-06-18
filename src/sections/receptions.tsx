@@ -91,20 +91,33 @@ export function ReceptionsSection() {
           </div>
           <div className="md:col-span-2">
             <Label>Material</Label>
-            <SearchableSelect
-              value={form.material_code}
-              onChange={(v) => {
-                const m = materials.data?.find((x) => x.code === v);
-                setForm({ ...form, material_code: v, handedness: m?.tracks_handedness ? "left" : "none" });
-              }}
-              placeholder="Selecciona material"
-              searchPlaceholder="Buscar por código o descripción…"
-              options={(materials.data ?? []).map((m) => ({
-                value: m.code,
-                label: `${m.code} · ${m.description}`,
-                keywords: `${m.code} ${m.description}`,
-              }))}
-            />
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <SearchableSelect
+                  value={form.material_code}
+                  onChange={(v) => {
+                    const m = materials.data?.find((x) => x.code === v);
+                    setForm({ ...form, material_code: v, handedness: m?.tracks_handedness ? "left" : "none" });
+                  }}
+                  placeholder="Selecciona material"
+                  searchPlaceholder="Buscar por código o descripción…"
+                  options={(materials.data ?? []).map((m) => ({
+                    value: m.code,
+                    label: `${m.code} · ${m.description}`,
+                    keywords: `${m.code} ${m.description}`,
+                  }))}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                title="Crear nuevo material"
+                onClick={() => setQuickCreate(true)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
           <div>
             <Label>Sentido</Label>
