@@ -210,128 +210,127 @@ export function InventorySection() {
         </div>
       </div>
 
-      <div className="surface-card p-3">
-        <Input
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder="Buscar por material, código o nota…"
+      <div className="surface-card overflow-hidden">
+        <TableToolbar
+          ctrl={ctrl}
+          title="Conteos registrados"
+          searchPlaceholder="Buscar por material, código o nota…"
         />
-      </div>
-
-      <div className="surface-card overflow-x-auto">
-        <table className="min-w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2.5">Fecha</th>
-              <th className="px-4 py-2.5">Material</th>
-              <th className="px-4 py-2.5">Sentido</th>
-              <th className="px-4 py-2.5 text-right">Sistema</th>
-              <th className="px-4 py-2.5 text-right">Contado</th>
-              <th className="px-4 py-2.5 text-right">Diferencia</th>
-              <th className="px-4 py-2.5">Nota</th>
-              <th className="px-4 py-2.5 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => {
-              const sys = get(sm, r.material_code, r.handedness);
-              const diff = r.counted_qty - sys;
-              const desc = matMap.get(r.material_code);
-              return (
-                <tr key={r.id} className="border-t border-border/50">
-                  <td className="px-4 py-2.5">{fmtDate(r.date)}</td>
-                  <td className="px-4 py-2.5">
-                    <span className="font-mono text-xs">{r.material_code}</span>
-                    {desc && <span className="ml-2 text-muted-foreground">{desc}</span>}
-                  </td>
-                  <td className="px-4 py-2.5">{HAND_LABEL[r.handedness]}</td>
-                  <td className="px-4 py-2.5 text-right num-display">{fmtNumber(sys)}</td>
-                  <td className="px-4 py-2.5 text-right num-display">{fmtNumber(r.counted_qty)}</td>
-                  <td
-                    className={cn(
-                      "px-4 py-2.5 text-right num-display",
-                      diff !== 0 && (diff < 0 ? "text-destructive" : "text-[oklch(0.4_0.08_115)]"),
-                    )}
-                  >
-                    {diff > 0 ? "+" : ""}
-                    {fmtNumber(diff)}
-                  </td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{r.note || "—"}</td>
-                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                    {r.adjustment_applied ? (
-                      <span className="chip" title="Este conteo ya generó un ajuste de stock">
-                        <CheckCircle2 className="h-3.5 w-3.5" /> Ajustado
-                      </span>
-                    ) : (
-                      <>
-                        {diff !== 0 && (
+        <div className="max-h-[60vh] overflow-auto">
+          <table className="min-w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-secondary/80 text-left text-xs uppercase tracking-wider text-muted-foreground backdrop-blur">
+              <tr>
+                <SortableTh ctrl={ctrl} sortKey="date">Fecha</SortableTh>
+                <SortableTh ctrl={ctrl} sortKey="material">Material</SortableTh>
+                <SortableTh ctrl={ctrl} sortKey="hand">Sentido</SortableTh>
+                <SortableTh ctrl={ctrl} sortKey="sys" align="right">Sistema</SortableTh>
+                <SortableTh ctrl={ctrl} sortKey="counted" align="right">Contado</SortableTh>
+                <SortableTh ctrl={ctrl} sortKey="diff" align="right">Diferencia</SortableTh>
+                <th className="px-4 py-2.5">Nota</th>
+                <th className="px-4 py-2.5 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ctrl.visible.map((r) => {
+                const sys = get(sm, r.material_code, r.handedness);
+                const diff = r.counted_qty - sys;
+                const desc = matMap.get(r.material_code);
+                return (
+                  <tr key={r.id} className="border-t border-border/50">
+                    <td className="px-4 py-2.5">{fmtDate(r.date)}</td>
+                    <td className="px-4 py-2.5">
+                      <span className="font-mono text-xs">{r.material_code}</span>
+                      {desc && <span className="ml-2 text-muted-foreground">{desc}</span>}
+                    </td>
+                    <td className="px-4 py-2.5">{HAND_LABEL[r.handedness as Handedness]}</td>
+                    <td className="px-4 py-2.5 text-right num-display">{fmtNumber(sys)}</td>
+                    <td className="px-4 py-2.5 text-right num-display">{fmtNumber(r.counted_qty)}</td>
+                    <td
+                      className={cn(
+                        "px-4 py-2.5 text-right num-display",
+                        diff !== 0 && (diff < 0 ? "text-destructive" : "text-[oklch(0.4_0.08_115)]"),
+                      )}
+                    >
+                      {diff > 0 ? "+" : ""}
+                      {fmtNumber(diff)}
+                    </td>
+                    <td className="px-4 py-2.5 text-muted-foreground">{r.note || "—"}</td>
+                    <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                      {r.adjustment_applied ? (
+                        <span className="chip" title="Este conteo ya generó un ajuste de stock">
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Ajustado
+                        </span>
+                      ) : (
+                        <>
+                          {diff !== 0 && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="mr-1"
+                              title="Aplicar ajuste al stock teórico"
+                              onClick={() =>
+                                requestAdminMutation({
+                                  table: "inventory_adjustments",
+                                  action: "insert",
+                                  values: {
+                                    count_id: r.id,
+                                    date: r.date,
+                                    material_code: r.material_code,
+                                    handedness: r.handedness,
+                                    prev_system_qty: sys,
+                                    counted_qty: r.counted_qty,
+                                    delta: diff,
+                                    note: r.note || null,
+                                  },
+                                  description: `Aplicar ajuste de stock para ${r.material_code} (${HAND_LABEL[r.handedness as Handedness]}): el sistema dice ${fmtNumber(sys)} y contaste ${fmtNumber(r.counted_qty)}. Se registrará un ajuste de ${diff > 0 ? "+" : ""}${fmtNumber(diff)}. No se puede deshacer.`,
+                                  onSuccess: () => {
+                                    (supabase.from("inventory_counts" as never) as any)
+                                      .update({ adjustment_applied: true })
+                                      .eq("id", r.id)
+                                      .then(() => invalidate());
+                                  },
+                                })
+                              }
+                            >
+                              <ShieldCheck className="mr-1 h-4 w-4" />
+                              Aplicar ajuste
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" onClick={() => setEditing(r)} title="Editar">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                           <Button
-                            variant="outline"
-                            size="sm"
-                            className="mr-1"
-                            title="Aplicar ajuste al stock teórico"
+                            variant="ghost"
+                            size="icon"
+                            title="Eliminar"
                             onClick={() =>
-                              requestAdminMutation({
-                                table: "inventory_adjustments",
-                                action: "insert",
-                                values: {
-                                  count_id: r.id,
-                                  date: r.date,
-                                  material_code: r.material_code,
-                                  handedness: r.handedness,
-                                  prev_system_qty: sys,
-                                  counted_qty: r.counted_qty,
-                                  delta: diff,
-                                  note: r.note || null,
-                                },
-                                description: `Aplicar ajuste de stock para ${r.material_code} (${HAND_LABEL[r.handedness]}): el sistema dice ${fmtNumber(sys)} y contaste ${fmtNumber(r.counted_qty)}. Se registrará un ajuste de ${diff > 0 ? "+" : ""}${fmtNumber(diff)}. No se puede deshacer.`,
-                                onSuccess: () => {
-                                  // Marcar el conteo como ajustado
-                                  (supabase.from("inventory_counts" as never) as any)
-                                    .update({ adjustment_applied: true })
-                                    .eq("id", r.id)
-                                    .then(() => invalidate());
-                                },
+                              requestCascadeDelete({
+                                table: "inventory_counts",
+                                id: r.id,
+                                label: `Conteo del ${fmtDate(r.date)} · ${r.material_code} · ${fmtNumber(r.counted_qty)}`,
+                                context: "Se elimina solo este conteo. Los ajustes ya aplicados (inventory_adjustments) no se pueden borrar.",
                               })
                             }
                           >
-                            <ShieldCheck className="mr-1 h-4 w-4" />
-                            Aplicar ajuste
+                            <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
-                        )}
-                        <Button variant="ghost" size="icon" onClick={() => setEditing(r)} title="Editar">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          title="Eliminar"
-                          onClick={() =>
-                            requestCascadeDelete({
-                              table: "inventory_counts",
-                              id: r.id,
-                              label: `Conteo del ${fmtDate(r.date)} · ${r.material_code} · ${fmtNumber(r.counted_qty)}`,
-                              context: "Se elimina solo este conteo. Los ajustes ya aplicados (inventory_adjustments) no se pueden borrar.",
-                            })
-                          }
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </>
-                    )}
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+              {ctrl.visible.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
+                    {allCounts.length === 0 ? "Sin conteos registrados." : "Sin resultados para esos filtros."}
                   </td>
                 </tr>
-              );
-            })}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
-                  {(list.data ?? []).length === 0 ? "Sin conteos registrados." : "Sin resultados para ese filtro."}
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <TablePagination ctrl={ctrl} />
       </div>
 
       {editing && (() => {
