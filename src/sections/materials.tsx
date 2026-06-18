@@ -49,7 +49,7 @@ export function MaterialsSection() {
     tracks_handedness: false,
   });
   const [saving, setSaving] = useState(false);
-  const [filter, setFilter] = useState("");
+  // Filtro/orden/paginación gestionados por useTableControls (más abajo)
 
   // Edit dialog
   const [editing, setEditing] = useState<MaterialV2 | null>(null);
