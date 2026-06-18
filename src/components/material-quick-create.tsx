@@ -31,7 +31,7 @@ export function MaterialQuickCreate({ open, onOpenChange, onCreated, defaultCode
   const [tracksHand, setTracksHand] = useState(false);
   const [pass, setPass] = useState("");
   const adminMutate = useServerFn(adminMutateFn);
-  const invalidate = useInvalidateAll();
+  const qc = useQueryClient();
 
   const m = useMutation({
     mutationFn: async () => {
@@ -50,11 +50,14 @@ export function MaterialQuickCreate({ open, onOpenChange, onCreated, defaultCode
           },
         },
       });
+      // Asegura que la lista esté fresca ANTES de notificar al padre.
+      await qc.invalidateQueries();
+      await qc.refetchQueries({ queryKey: ["materials"] });
+      await qc.refetchQueries({ queryKey: ["materials_v2"] });
       return code.trim();
     },
     onSuccess: (createdCode) => {
       toast.success(`Material "${createdCode}" creado`);
-      invalidate();
       onCreated(createdCode);
       // Reset
       setCode(""); setDescription(""); setUnit("u"); setTracksHand(false); setPass("");
