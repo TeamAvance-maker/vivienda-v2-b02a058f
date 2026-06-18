@@ -181,11 +181,11 @@ function DeliveryRow({
               variant="ghost"
               size="sm"
               onClick={() =>
-                requestAdminMutation({
+                requestCascadeDelete({
                   table: "deliveries",
-                  action: "delete",
-                  match: { id: d.id },
-                  description: `Eliminar entrega del ${fmtDate(d.date)}. Devolverá el material al stock y revertirá las viviendas ejecutadas.`,
+                  id: d.id,
+                  label: `Entrega del ${fmtDate(d.date)}`,
+                  context: "Se eliminarán los ítems de la entrega y las casas asociadas. El stock se recalculará automáticamente.",
                 })
               }
             >
