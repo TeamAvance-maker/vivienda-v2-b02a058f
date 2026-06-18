@@ -474,6 +474,15 @@ export function ValeTipoSection() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <MaterialQuickCreate
+        open={quickCreate}
+        onOpenChange={setQuickCreate}
+        onCreated={(code) => {
+          const m = (materials.data ?? []).find((x) => x.code === code);
+          if (m) setNewMatId(m.id);
+        }}
+      />
     </div>
   );
 }
