@@ -189,7 +189,15 @@
 
 @utility hero-card {
   background: linear-gradient(140deg, var(--espresso) 0%, var(--roast) 100%);
-  color: var(--primary-foreground);
+  color: var(--cream);
+  border-radius: var(--radius-2xl);
+  box-shadow: 0 20px 40px -20px oklch(0.3 0.05 45 / 0.45);
+}
+
+.dark .hero-card {
+  background: linear-gradient(140deg, oklch(0.24 0.02 50) 0%, oklch(0.3 0.04 60) 100%);
+  color: var(--foreground);
+}
   border-radius: var(--radius-2xl);
   box-shadow: 0 20px 40px -20px oklch(0.3 0.05 45 / 0.45);
 }
