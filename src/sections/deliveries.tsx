@@ -1,6 +1,6 @@
 import { ChevronDown, Pencil, Trash2 } from "lucide-react";
 import { EditDialog } from "@/components/edit-dialog";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -11,6 +11,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { SectionHeader } from "@/components/app-shell";
 import { SearchableSelect } from "@/components/searchable-select";
+import {
+  SortableTh,
+  TablePagination,
+  TableToolbar,
+  useTableControls,
+} from "@/components/data-table";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
 import { requestCascadeDelete } from "@/components/cascade-delete-dialog";
 import {
@@ -124,7 +130,6 @@ function SiteDeliveriesHistory({
   deliveries: { id: string; site_id: string; vale_stage_id: string; date: string; mode: string; note: string }[];
   items: { id: string; delivery_id: string; material_id: string; qty: number }[];
 }) {
-  const [search, setSearch] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
 
   const rows = useMemo(() => {
@@ -132,119 +137,143 @@ function SiteDeliveriesHistory({
     const stageById = new Map(stages.map((s) => [s.id, s]));
     const valeById = new Map(vales.map((v) => [v.id, v]));
     const matById = new Map(materials.map((m) => [m.id, m]));
-    return deliveries
-      .map((d) => {
-        const site = siteById.get(d.site_id);
-        const stage = stageById.get(d.vale_stage_id);
-        const vale = stage ? valeById.get(stage.vale_type_id) : undefined;
-        const its = items.filter((x) => x.delivery_id === d.id).map((it) => {
-          const m = matById.get(it.material_id);
-          return { ...it, code: m?.code ?? "", desc: m?.description ?? "", unit: m?.unit ?? "" };
-        });
-        return { d, site, stage, vale, items: its };
-      })
-      .sort((a, b) => (a.d.date < b.d.date ? 1 : -1));
+    return deliveries.map((d) => {
+      const site = siteById.get(d.site_id);
+      const stage = stageById.get(d.vale_stage_id);
+      const vale = stage ? valeById.get(stage.vale_type_id) : undefined;
+      const its = items.filter((x) => x.delivery_id === d.id).map((it) => {
+        const m = matById.get(it.material_id);
+        return { ...it, code: m?.code ?? "", desc: m?.description ?? "", unit: m?.unit ?? "" };
+      });
+      return { d, site, stage, vale, items: its };
+    });
   }, [sites, stages, vales, materials, deliveries, items]);
 
-  const filtered = useMemo(() => {
-    const s = search.toLowerCase().trim();
-    if (!s) return rows;
-    return rows.filter((r) =>
-      [
-        r.d.date,
-        r.d.note,
-        r.site ? `manzana ${r.site.manzana} sitio ${r.site.sitio} tipo ${r.site.house_type}` : "",
-        r.vale?.name ?? "",
-        r.stage ? `etapa ${r.stage.stage_number} ${r.stage.name ?? ""}` : "",
-        ...r.items.map((it) => `${it.code} ${it.desc}`),
-      ].join(" ").toLowerCase().includes(s),
-    );
-  }, [rows, search]);
+  type Row = (typeof rows)[number];
+
+  const ctrl = useTableControls<Row>({
+    data: rows,
+    searchFields: (r) => [
+      r.d.date,
+      r.d.note,
+      r.site ? `manzana ${r.site.manzana} sitio ${r.site.sitio} tipo ${r.site.house_type}` : "",
+      r.vale?.name ?? "",
+      r.stage ? `etapa ${r.stage.stage_number} ${r.stage.name ?? ""}` : "",
+      ...r.items.map((it) => `${it.code} ${it.desc}`),
+    ],
+    sortFns: {
+      date: (a, b) => a.d.date.localeCompare(b.d.date),
+      site: (a, b) => {
+        const A = a.site ? a.site.manzana * 10000 + parseInt(String(a.site.sitio).replace(/\D/g, "") || "0") : 0;
+        const B = b.site ? b.site.manzana * 10000 + parseInt(String(b.site.sitio).replace(/\D/g, "") || "0") : 0;
+        return A - B;
+      },
+      vale: (a, b) => (a.vale?.name ?? "").localeCompare(b.vale?.name ?? "", "es"),
+      items: (a, b) => a.items.length - b.items.length,
+    },
+    defaultSort: { key: "date", dir: "desc" },
+    defaultPageSize: 25,
+  });
 
   return (
     <div className="surface-card overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 px-4 py-3">
-        <div className="font-display text-base font-semibold">Historial de entregas por sitio</div>
-        <div className="flex items-center gap-2">
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por sitio, vale, material, fecha…"
-            className="h-8 w-72"
-          />
-          <span className="chip">{filtered.length}</span>
-        </div>
+      <TableToolbar
+        ctrl={ctrl}
+        title="Historial de entregas por sitio"
+        searchPlaceholder="Buscar por sitio, vale, material, fecha…"
+      />
+      <div className="max-h-[60vh] overflow-auto">
+        <table className="min-w-full text-sm">
+          <thead className="sticky top-0 z-10 bg-secondary/80 text-left text-xs uppercase tracking-wider text-muted-foreground backdrop-blur">
+            <tr>
+              <SortableTh ctrl={ctrl} sortKey="date">Fecha</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="site">Sitio</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="vale">Vale / etapa</SortableTh>
+              <th className="px-4 py-2.5">Nota</th>
+              <SortableTh ctrl={ctrl} sortKey="items" align="right">Ítems</SortableTh>
+              <th className="px-4 py-2.5"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {ctrl.visible.map((r) => {
+              const isOpen = openId === r.d.id;
+              return (
+                <Fragment key={r.d.id}>
+                  <tr
+                    className="cursor-pointer border-t border-border/50 hover:bg-secondary/40"
+                    onClick={() => setOpenId(isOpen ? null : r.d.id)}
+                  >
+                    <td className="px-4 py-2.5 whitespace-nowrap">{fmtDate(r.d.date)}</td>
+                    <td className="px-4 py-2.5">
+                      {r.site ? (
+                        <>M{r.site.manzana} · S{r.site.sitio}<span className="ml-2 text-xs text-muted-foreground">Tipo {r.site.house_type}</span></>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {r.vale ? r.vale.name : <span className="text-muted-foreground">—</span>}
+                      {r.stage && <span className="ml-2 text-xs text-muted-foreground">Etapa {r.stage.stage_number}</span>}
+                    </td>
+                    <td className="px-4 py-2.5 text-muted-foreground">
+                      <span className="line-clamp-1">{r.d.note || "—"}</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right num-display">{r.items.length}</td>
+                    <td className="px-2 py-2.5 text-right">
+                      <ChevronDown className={cn("inline h-4 w-4 transition-transform", isOpen && "rotate-180")} />
+                    </td>
+                  </tr>
+                  {isOpen && (
+                    <tr className="border-t border-border/30 bg-background/40">
+                      <td colSpan={6} className="px-4 py-3">
+                        <ul className="space-y-1 text-sm">
+                          {r.items.map((it) => (
+                            <li key={it.id} className="flex items-center justify-between">
+                              <span>
+                                <span className="font-mono text-xs">{it.code}</span>
+                                <span className="ml-2 text-muted-foreground">{it.desc}</span>
+                              </span>
+                              <span className="num-display">{it.qty} {it.unit}</span>
+                            </li>
+                          ))}
+                          {r.items.length === 0 && (
+                            <li className="text-xs text-muted-foreground">Sin ítems.</li>
+                          )}
+                        </ul>
+                        <div className="mt-3 flex justify-end">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              requestCascadeDelete({
+                                table: "site_deliveries",
+                                id: r.d.id,
+                                label: `Entrega del ${fmtDate(r.d.date)}${r.site ? ` · M${r.site.manzana}-S${r.site.sitio}` : ""}`,
+                                context: "Se eliminarán los ítems de esta entrega. El estado del sitio se recalculará.",
+                              })
+                            }
+                          >
+                            <Trash2 className="mr-1 h-4 w-4 text-destructive" />
+                            Eliminar
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+            {ctrl.visible.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                  {rows.length === 0 ? "Aún no hay entregas por sitio." : "Sin resultados para esos filtros."}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
-      <div className="max-h-[60vh] divide-y divide-border/50 overflow-auto">
-        {filtered.map((r) => {
-          const isOpen = openId === r.d.id;
-          return (
-            <div key={r.d.id} className="px-4 py-3">
-              <button
-                onClick={() => setOpenId(isOpen ? null : r.d.id)}
-                className="flex w-full items-center justify-between gap-3 text-left"
-              >
-                <div>
-                  <div className="text-sm font-medium">
-                    {fmtDate(r.d.date)}
-                    {r.site && <> · Manzana {r.site.manzana} · Sitio {r.site.sitio}</>}
-                    {r.vale && <> · {r.vale.name}</>}
-                    {r.stage && <> · Etapa {r.stage.stage_number}</>}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {r.d.mode === "auto" ? "Auto-completar" : "Manual"}
-                    {r.d.note && ` · ${r.d.note}`}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="chip">{r.items.length} ítems</span>
-                  <ChevronDown className={cn("h-4 w-4 transition-transform", isOpen && "rotate-180")} />
-                </div>
-              </button>
-              {isOpen && (
-                <div className="mt-3 rounded-lg border border-border bg-background/60 p-3 text-sm">
-                  <ul className="space-y-1">
-                    {r.items.map((it) => (
-                      <li key={it.id} className="flex items-center justify-between">
-                        <span>
-                          {it.code}{" "}
-                          <span className="text-xs text-muted-foreground">{it.desc}</span>
-                        </span>
-                        <span className="num-display">{it.qty} {it.unit}</span>
-                      </li>
-                    ))}
-                    {r.items.length === 0 && (
-                      <li className="text-xs text-muted-foreground">Sin ítems.</li>
-                    )}
-                  </ul>
-                  <div className="mt-3 flex justify-end">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() =>
-                        requestCascadeDelete({
-                          table: "site_deliveries",
-                          id: r.d.id,
-                          label: `Entrega del ${fmtDate(r.d.date)}${r.site ? ` · M${r.site.manzana}-S${r.site.sitio}` : ""}`,
-                          context: "Se eliminarán los ítems de esta entrega. El estado del sitio se recalculará.",
-                        })
-                      }
-                    >
-                      <Trash2 className="mr-1 h-4 w-4 text-destructive" />
-                      Eliminar
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-        {filtered.length === 0 && (
-          <div className="px-4 py-8 text-center text-muted-foreground">
-            Aún no hay entregas por sitio.
-          </div>
-        )}
-      </div>
+      <TablePagination ctrl={ctrl} />
     </div>
   );
 }

@@ -1,13 +1,19 @@
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Pencil, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SectionHeader } from "@/components/app-shell";
+import {
+  SortableTh,
+  TablePagination,
+  TableToolbar,
+  useTableControls,
+} from "@/components/data-table";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
 import { requestCascadeDelete } from "@/components/cascade-delete-dialog";
 import {
@@ -43,7 +49,7 @@ export function MaterialsSection() {
     tracks_handedness: false,
   });
   const [saving, setSaving] = useState(false);
-  const [filter, setFilter] = useState("");
+  // Filtro/orden/paginación gestionados por useTableControls (más abajo)
 
   // Edit dialog
   const [editing, setEditing] = useState<MaterialV2 | null>(null);
@@ -52,20 +58,20 @@ export function MaterialsSection() {
   const [editHand, setEditHand] = useState(false);
   const [editPass, setEditPass] = useState("");
 
-  const list = useMemo(() => {
-    const all = materials.data ?? [];
-    const f = filter.trim().toLowerCase();
-    const filtered = f
-      ? all.filter(
-          (m) =>
-            m.description.toLowerCase().includes(f) ||
-            m.code.toLowerCase().includes(f),
-        )
-      : all;
-    return [...filtered].sort((a, b) =>
-      a.description.localeCompare(b.description, "es"),
-    );
-  }, [materials.data, filter]);
+  const allMaterials = materials.data ?? [];
+
+  const ctrl = useTableControls<MaterialV2>({
+    data: allMaterials,
+    searchFields: (m) => [m.code, m.description, m.unit],
+    sortFns: {
+      code: (a, b) => a.code.localeCompare(b.code, "es", { numeric: true }),
+      description: (a, b) => a.description.localeCompare(b.description, "es"),
+      unit: (a, b) => a.unit.localeCompare(b.unit, "es"),
+      hand: (a, b) => Number(!!a.tracks_handedness) - Number(!!b.tracks_handedness),
+    },
+    defaultSort: { key: "description", dir: "asc" },
+    defaultPageSize: 25,
+  });
 
   async function add() {
     if (!form.description.trim()) {
@@ -175,75 +181,75 @@ export function MaterialsSection() {
         </div>
       </div>
 
-      <div className="surface-card p-3">
-        <Input
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          placeholder="Buscar por descripción o código…"
-        />
-      </div>
-
       <div className="surface-card overflow-hidden">
-        <table className="min-w-full text-sm">
-          <thead className="bg-secondary/50 text-left text-xs uppercase tracking-wider text-muted-foreground">
-            <tr>
-              <th className="px-4 py-2.5">Código</th>
-              <th className="px-4 py-2.5">Descripción</th>
-              <th className="px-4 py-2.5">Unidad</th>
-              <th className="px-4 py-2.5">Izq/Der</th>
-              <th className="px-4 py-2.5 text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {list.map((m) => (
-              <tr key={m.id} className="border-t border-border/60">
-                <td className="px-4 py-2.5 font-mono text-xs">{m.code}</td>
-                <td className="px-4 py-2.5">{m.description}</td>
-                <td className="px-4 py-2.5">{m.unit}</td>
-                <td className="px-4 py-2.5">
-                  {m.tracks_handedness ? (
-                    <span className="rounded bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">Sí</span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-2.5 text-right">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => openEdit(m)}
-                    title="Editar"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() =>
-                      requestCascadeDelete({
-                        table: "materials_v2",
-                        id: m.id,
-                        label: `Material "${m.code} · ${m.description}"`,
-                        context:
-                          "Se eliminarán también todas las apariciones de este material en requisitos de vales y entregas a sitios. Las recepciones que apuntaban a este material quedan huérfanas y deberán revisarse.",
-                      })
-                    }
-                    title="Eliminar"
-                  >
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </td>
-              </tr>
-            ))}
-            {list.length === 0 && (
+        <TableToolbar
+          ctrl={ctrl}
+          title="Listado"
+          searchPlaceholder="Buscar por descripción, código o unidad…"
+        />
+        <div className="max-h-[60vh] overflow-auto">
+          <table className="min-w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-secondary/80 text-left text-xs uppercase tracking-wider text-muted-foreground backdrop-blur">
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
-                  {(materials.data ?? []).length === 0 ? "Aún no hay materiales." : "Sin resultados para ese filtro."}
-                </td>
+                <SortableTh ctrl={ctrl} sortKey="code">Código</SortableTh>
+                <SortableTh ctrl={ctrl} sortKey="description">Descripción</SortableTh>
+                <SortableTh ctrl={ctrl} sortKey="unit">Unidad</SortableTh>
+                <SortableTh ctrl={ctrl} sortKey="hand">Izq/Der</SortableTh>
+                <th className="px-4 py-2.5 text-right">Acciones</th>
               </tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {ctrl.visible.map((m) => (
+                <tr key={m.id} className="border-t border-border/60">
+                  <td className="px-4 py-2.5 font-mono text-xs">{m.code}</td>
+                  <td className="px-4 py-2.5">{m.description}</td>
+                  <td className="px-4 py-2.5">{m.unit}</td>
+                  <td className="px-4 py-2.5">
+                    {m.tracks_handedness ? (
+                      <span className="rounded bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">Sí</span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => openEdit(m)}
+                      title="Editar"
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() =>
+                        requestCascadeDelete({
+                          table: "materials_v2",
+                          id: m.id,
+                          label: `Material "${m.code} · ${m.description}"`,
+                          context:
+                            "Se eliminarán también todas las apariciones de este material en requisitos de vales y entregas a sitios. Las recepciones que apuntaban a este material quedan huérfanas y deberán revisarse.",
+                        })
+                      }
+                      title="Eliminar"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+              {ctrl.visible.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                    {allMaterials.length === 0 ? "Aún no hay materiales." : "Sin resultados para esos filtros."}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <TablePagination ctrl={ctrl} />
       </div>
 
       {/* Edit dialog */}
