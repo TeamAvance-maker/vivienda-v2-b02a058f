@@ -298,9 +298,39 @@ export function PlanoSection() {
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4 lg:grid-cols-6">
         <StatCard label="Total sitios" value={stats.total} />
         <StatCard label="Avance global" value={`${stats.avancePct}%`} accent="#2563eb" />
-        <StatCard label="Terminados" value={stats.term} accent="#16a34a" />
-        <StatCard label="En ejecución" value={stats.exe} accent="#d97706" />
-        <StatCard label="Sin iniciar" value={stats.sin} accent="#64748b" />
+        <StatCard
+          label="Terminados"
+          value={stats.term}
+          accent="#16a34a"
+          active={filters.overall === "terminado"}
+          onClick={() =>
+            setFilters((f) => ({ ...f, overall: f.overall === "terminado" ? "" : "terminado" }))
+          }
+        />
+        <StatCard
+          label="En ejecución"
+          value={stats.exe}
+          accent="#d97706"
+          active={filters.overall === "en-ejecucion"}
+          onClick={() =>
+            setFilters((f) => ({
+              ...f,
+              overall: f.overall === "en-ejecucion" ? "" : "en-ejecucion",
+            }))
+          }
+        />
+        <StatCard
+          label="Sin iniciar"
+          value={stats.sin}
+          accent="#64748b"
+          active={filters.overall === "sin-iniciar"}
+          onClick={() =>
+            setFilters((f) => ({
+              ...f,
+              overall: f.overall === "sin-iniciar" ? "" : "sin-iniciar",
+            }))
+          }
+        />
         <StatCard
           label="Vales completos"
           value={`${stats.valesComp}/${stats.valesAppl}`}
