@@ -283,6 +283,18 @@ export function AppShell({
                 })}
               </nav>
               <div className="border-t border-sidebar-border px-2 py-2">
+                <button
+                  onClick={() => { onChange(CONFIG_TAB.key); setMobileOpen(false); }}
+                  className={cn(
+                    "mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                    active === CONFIG_TAB.key
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                  )}
+                >
+                  <CONFIG_TAB.icon className="h-5 w-5 shrink-0" />
+                  <span>{CONFIG_TAB.label}</span>
+                </button>
                 <ThemeToggle />
               </div>
             </motion.aside>
