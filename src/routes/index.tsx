@@ -47,6 +47,7 @@ function Index() {
         {tab === "config" && <ConfigSection />}
       </AppShell>
       <PassphraseProvider />
+      <CascadeDeleteProvider />
       <Toaster
         richColors
         position="top-center"
