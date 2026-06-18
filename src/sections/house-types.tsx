@@ -123,11 +123,12 @@ export function HouseTypesSection() {
                     variant="ghost"
                     size="icon"
                     onClick={() =>
-                      requestAdminMutation({
+                      requestCascadeDelete({
                         table: "house_types",
-                        action: "delete",
-                        match: { code: t.code },
-                        description: `Eliminar tipo "${t.code}". Esto eliminará también sus requerimientos.`,
+                        id: t.code,
+                        label: `Tipo de vivienda "${t.code}"`,
+                        context:
+                          "Se eliminarán también los requerimientos de material asociados a este tipo.",
                       })
                     }
                   >
