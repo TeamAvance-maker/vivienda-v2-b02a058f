@@ -399,11 +399,11 @@ export function ValeTipoSection() {
                           variant="ghost"
                           size="icon"
                           onClick={() =>
-                            requestAdminMutation({
+                            requestCascadeDelete({
                               table: "vale_reqs",
-                              action: "delete",
-                              match: { id: r.id },
-                              description: `Eliminar ${m?.code ?? "material"} de ${houseType} · ${selectedVT?.code} · Etapa ${selectedStage?.stage_number}.`,
+                              id: r.id,
+                              label: `${m?.code ?? "material"} en ${houseType} · ${selectedVT?.code} · Etapa ${selectedStage?.stage_number}`,
+                              context: "Solo se elimina este requisito puntual de la etapa.",
                               onSuccess: invalidate,
                             })
                           }
