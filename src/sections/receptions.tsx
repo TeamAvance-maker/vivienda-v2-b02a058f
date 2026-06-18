@@ -36,6 +36,7 @@ export function ReceptionsSection() {
     qty: 1,
   });
   const [search, setSearch] = useState("");
+  const [quickCreate, setQuickCreate] = useState(false);
 
   const mat = materials.data?.find((m) => m.code === form.material_code);
   const handOpts: Handedness[] = mat?.tracks_handedness ? ["left", "right"] : ["none"];
