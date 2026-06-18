@@ -179,7 +179,7 @@ export function PlanoSection() {
   };
 
   const limpiar = () =>
-    setFilters({ vale: { type: "all" }, manzana: "", tipo: "", sitio: "", estado: "" });
+    setFilters({ vale: { type: "all" }, manzana: "", tipo: "", sitio: "", estado: "", overall: "" });
 
   // Stats globales del plano (sobre sitios reales, todos los vales)
   const stats = useMemo(() => {
