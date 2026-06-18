@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Download, Upload } from "lucide-react";
+import { Download, Upload, AlertTriangle, FileClock, RotateCcw, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -26,9 +27,9 @@ import {
 import { SectionHeader } from "@/components/app-shell";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
 import { useConfig, useHouseTypes, useInvalidateAll, useOverrides } from "@/lib/queries";
-import { fmtDate } from "@/lib/compute";
+import { fmtDate, fmtDateTime } from "@/lib/compute";
 import { supabase } from "@/integrations/supabase/client";
-import { BACKUP_TABLES, restoreBackupFn } from "@/lib/backup.functions";
+import { ALL_TABLES, restoreBackupFn, resetSystemFn } from "@/lib/backup.functions";
 
 export function ConfigSection() {
   const cfg = useConfig();
