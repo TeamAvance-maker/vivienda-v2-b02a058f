@@ -170,8 +170,12 @@ export function PlanoSection() {
     if (filters.sitio && lot.sitio !== filters.sitio.trim()) return false;
     if (filters.manzana && lot.manzana !== filters.manzana) return false;
     if (filters.tipo && lot.tipo !== filters.tipo) return false;
+    const info = lotInfo.get(lot.id);
+    if (filters.overall) {
+      if (!info?.site) return false;
+      if (info.status !== filters.overall) return false;
+    }
     if (filters.estado && hasValeFilter) {
-      const info = lotInfo.get(lot.id);
       const st = info?.cellForFilter ? STATUS_FROM_CELL[info.cellForFilter] : "na";
       if (st !== filters.estado) return false;
     }
