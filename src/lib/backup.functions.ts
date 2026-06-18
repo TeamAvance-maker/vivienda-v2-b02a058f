@@ -186,7 +186,7 @@ export const cascadeDeleteFn = createServerFn({ method: "POST" })
     for (const r of [...rows].reverse()) {
       const col = matchColFor(r.table);
       const idVal = String(r.record[col]);
-      const { error } = await supabaseAdmin.from(r.table).delete().eq(col, idVal);
+      const { error } = await (supabaseAdmin.from(r.table as never) as any).delete().eq(col, idVal);
       if (error) throw new Error(`Borrando ${r.table}: ${error.message}`);
     }
 
