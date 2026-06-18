@@ -573,13 +573,23 @@ function StatCard({
   label,
   value,
   accent,
+  active,
+  onClick,
 }: {
   label: string;
   value: string | number;
   accent?: string;
+  active?: boolean;
+  onClick?: () => void;
 }) {
+  const clickable = !!onClick;
   return (
-    <div className="rounded-xl border bg-card p-3 shadow-sm">
+    <div
+      onClick={onClick}
+      className={`rounded-xl border bg-card p-3 shadow-sm transition ${
+        clickable ? "cursor-pointer hover:bg-muted/40" : ""
+      } ${active ? "ring-2 ring-primary border-primary" : ""}`}
+    >
       <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
         {label}
       </div>
