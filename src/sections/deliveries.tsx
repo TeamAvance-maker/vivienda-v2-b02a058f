@@ -11,6 +11,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { SectionHeader } from "@/components/app-shell";
 import { SearchableSelect } from "@/components/searchable-select";
+import {
+  SortableTh,
+  TablePagination,
+  TableToolbar,
+  useTableControls,
+} from "@/components/data-table";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
 import { requestCascadeDelete } from "@/components/cascade-delete-dialog";
 import {
