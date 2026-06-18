@@ -3,6 +3,7 @@ import {
   Boxes,
   ClipboardCheck,
   FileSpreadsheet,
+  HelpCircle,
   Home,
   HousePlus,
   Map as MapIcon,
@@ -15,6 +16,8 @@ import {
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
+import { HelpPanel } from "./help-panel";
+import { HelpFab } from "./help-fab";
 import { cn } from "@/lib/utils";
 
 export type TabKey =
@@ -56,6 +59,7 @@ function SidebarRail({
   onMouseEnter,
   onMouseLeave,
   projectName,
+  onOpenHelp,
 }: {
   active: TabKey;
   onChange: (k: TabKey) => void;
@@ -63,6 +67,7 @@ function SidebarRail({
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   projectName: string;
+  onOpenHelp: () => void;
 }) {
   return (
     <motion.aside
@@ -136,6 +141,29 @@ function SidebarRail({
       </nav>
 
       <div className="border-t border-sidebar-border px-2 py-2">
+        <button
+          onClick={onOpenHelp}
+          title="Ayuda"
+          className={cn(
+            "group relative mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+            "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+          )}
+        >
+          <HelpCircle className="h-5 w-5 shrink-0" />
+          <AnimatePresence>
+            {expanded && (
+              <motion.span
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -6 }}
+                transition={{ duration: 0.15 }}
+                className="truncate"
+              >
+                Ayuda
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </button>
         {(() => {
           const t = CONFIG_TAB;
           const Icon = t.icon;
@@ -188,6 +216,7 @@ export function AppShell({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function onEnter() {
@@ -212,6 +241,7 @@ export function AppShell({
         onMouseEnter={onEnter}
         onMouseLeave={onLeave}
         projectName={projectName}
+        onOpenHelp={() => setHelpOpen(true)}
       />
 
       {/* Header móvil */}
@@ -284,6 +314,13 @@ export function AppShell({
               </nav>
               <div className="border-t border-sidebar-border px-2 py-2">
                 <button
+                  onClick={() => { setMobileOpen(false); setHelpOpen(true); }}
+                  className="mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
+                >
+                  <HelpCircle className="h-5 w-5 shrink-0" />
+                  <span>Ayuda</span>
+                </button>
+                <button
                   onClick={() => { onChange(CONFIG_TAB.key); setMobileOpen(false); }}
                   className={cn(
                     "mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
@@ -313,6 +350,9 @@ export function AppShell({
       >
         <div className="mx-auto max-w-7xl">{children}</div>
       </motion.main>
+
+      <HelpFab onClick={() => setHelpOpen(true)} />
+      <HelpPanel open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
   );
 }
