@@ -1,14 +1,16 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { ArrowDown, ArrowUp, ArrowUpDown, FileDown, FileText, Printer, RefreshCw, Table2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { FileDown, FileText, Printer, Table2 } from "lucide-react";
+import { useMemo } from "react";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
 import { SectionHeader } from "@/components/app-shell";
+import {
+  SortableTh,
+  TablePagination,
+  TableToolbar,
+  useTableControls,
+} from "@/components/data-table";
 import {
   useConfig,
   useMaterials,
