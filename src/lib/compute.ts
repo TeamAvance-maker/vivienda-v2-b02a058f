@@ -111,9 +111,32 @@ export function fmtNumber(n: number | null | undefined) {
 }
 
 export function fmtDate(d: string) {
+  if (!d) return "—";
   try {
+    // Parse YYYY-MM-DD como fecha LOCAL (sin corrimiento por zona horaria UTC).
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d);
+    if (m) {
+      const date = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      return date.toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" });
+    }
     const date = new Date(d);
     return date.toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" });
+  } catch {
+    return d;
+  }
+}
+
+export function fmtDateTime(d: string) {
+  if (!d) return "—";
+  try {
+    const date = new Date(d);
+    return date.toLocaleString("es-CL", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   } catch {
     return d;
   }
