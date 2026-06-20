@@ -1,55 +1,32 @@
-# 🔒 Regla de Candado Global
+## Desbloqueo: Menú Casas → Pestaña "Vales tipo"
 
-## Qué voy a hacer
+Vamos a agregar un buscador de material dentro del tab **Vales tipo** (en Casas). El resto del menú Casas sigue bloqueado: no se tocará Tipos ni Manzanas/Sitios, y en Vales tipo solo se **suma** una sección nueva (no se cambia lo existente).
 
-**No voy a tocar código.** Esto es solo una regla que guardo en mi memoria permanente para que se aplique en TODAS nuestras conversaciones, ahora y en el futuro.
+### ¿Qué verás en pantalla?
 
-## La regla, en palabras simples
+Dentro de Casas → pestaña "Vales tipo", aparecerá una caja nueva arriba del flujo actual con el título **"Buscar material en vales"**:
 
-### Estado actual: 🔒 TODO BLOQUEADO
+1. Un cuadro tipo lista desplegable con buscador (igual al que ya usas para elegir material) — escribes y filtra por código o descripción.
+2. Apenas eliges un material, debajo aparece un listado con todas las apariciones de ese material:
+   - Columnas: Tipo casa · Vale (código + nombre) · Etapa · Cantidad · Unidad · Acciones (Editar, Eliminar).
+   - Buscador de texto, ordenamiento por columna, paginación (10/25/50/100 por página) y barra de desplazamiento vertical — usando el mismo `useTableControls` que ya tienes en Materiales.
+3. Al hacer **clic en una fila** (o en un botón "Ir al vale"), la vista de Vales tipo se **posiciona automáticamente** en ese Tipo casa + Vale + Etapa exactos. Allí ya tienes el CRUD completo (agregar, editar cantidad con contraseña, eliminar con cascada) que ya existe — no se duplica.
+4. Los botones de Editar/Eliminar **directos** desde la tabla de resultados también funcionan con el mismo diálogo de contraseña que usas hoy, sin salir del buscador.
 
-Desde este momento, **todo el sitio web está bajo candado**. Esto incluye absolutamente todo:
+### Detalles técnicos (para mí)
 
-- Todos los menús del slider lateral (Inicio, Plano, Dashboard, Casas, Tipos de vivienda, Materiales, Recepciones, Entregas, Inventario, Reportes, Vale tipo, Sitios, Configuración)
-- Todo lo que contienen esos menús (tablas, formularios, botones, métricas, pop-ups, diálogos)
-- Elementos globales (tema claro/oscuro, botón de ayuda flotante, diálogo de contraseña, logo, barra superior)
-- Estructura, diseño, código, base de datos, textos
+- Archivo nuevo: `src/sections/vale-material-search.tsx` con el componente `<ValeMaterialSearch />`.
+- Se inserta dentro de `ValeTipoSection` (arriba de los selectores actuales) o como sub-bloque del tab "Vales tipo" en `casas.tsx`. Voto por **dentro de `vale-tipo.tsx`** para reutilizar `useValeReqs`, `useValeStages`, `useValeTypes`, `useMaterialsV2` y `materialsById`.
+- Para que "Ir al vale" funcione, convertimos `houseType` / `valeTypeId` / `stageId` de `useState` locales a estado elevado (props o un pequeño contexto en el archivo). El click llama `setHouseType`, `setValeTypeId`, `setStageId` y hace scroll suave a la sección de materiales.
+- Resultados se calculan con `useMemo` cruzando `vale_reqs` × `vale_stages` × `vale_types_v2` filtrados por `material_id`. No se toca la base de datos ni las RLS.
+- Editar/Eliminar reutilizan `adminMutateFn` + `requestCascadeDelete` que ya existen.
+- Tabla con `useTableControls` + `TableToolbar` + `SortableTh` + `TablePagination` (mismo patrón que `materials.tsx`).
 
-### Cómo se desbloquea
+### Lo que NO se toca
 
-| Lo que tú escribes | Lo que yo hago |
-|---|---|
-| `bloquea menú [X]` | Pongo candado a ese menú (no toco nada ahí) |
-| `desbloquea menú [X]` | Quito el candado, ya puedo hacer cambios ahí |
-| `candado a todo el sitio` | Bloqueo TODO |
-| `desbloquea todo el sitio` | Quito todos los candados |
+- Base de datos, RLS, migraciones — nada.
+- Pestañas "Tipos" y "Manzanas/Sitios" del menú Casas — siguen bloqueadas.
+- El CRUD existente de Vales tipo — intacto, solo se reutiliza.
+- Diseño global, tema, navbar, candado de los demás menús — intacto.
 
-### Qué pasa si necesito tocar algo bloqueado
-
-Si tú me pides un cambio que requiere modificar una parte bloqueada (aunque sea de paso, aunque sea un detalle pequeño, aunque sea un pop-up que aparece en otro menú), **paro y te pido permiso explícito antes de tocar nada**. Por ejemplo:
-
-> "Para hacer eso necesito modificar el botón de ayuda, pero está bloqueado. ¿Me autorizas a desbloquearlo solo para este cambio?"
-
-Espero tu autorización. No avanzo hasta que digas "sí, desbloquea X".
-
-### Excepción única: bugs graves
-
-Si el sitio se cae o no se puede entrar, **te aviso primero** y espero tu permiso antes de tocar nada, incluso si es urgente.
-
-## Dónde se guarda esto
-
-Guardo dos cosas en mi memoria permanente del proyecto (`mem://`):
-
-1. **En la regla central (Core):** una línea corta que diga "Todo el sitio bajo candado por defecto. Pedir autorización antes de tocar cualquier cosa bloqueada."
-2. **Un archivo de detalle** (`mem://rules/lock-system`) con la tabla completa de comandos y la lista de menús, para consultarlo cuando haga falta.
-
-Así, aunque empecemos una conversación nueva mañana o en un mes, la regla seguirá activa.
-
-## Lo que NO va a cambiar
-
-- Cero archivos de código modificados
-- Cero cambios en la base de datos
-- Cero cambios visuales en el sitio
-- El sitio se ve y funciona exactamente igual que ahora
-
-Solo cambia **cómo yo me comporto** cuando me pidas cosas.
+¿Le doy "Implementar"?

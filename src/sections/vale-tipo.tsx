@@ -1,7 +1,13 @@
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, ChevronsUpDown, Pencil, Plus, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ArrowRight, Check, ChevronsUpDown, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import {
+  SortableTh,
+  TablePagination,
+  TableToolbar,
+  useTableControls,
+} from "@/components/data-table";
 import { toast } from "sonner";
 import { SectionHeader } from "@/components/app-shell";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
@@ -49,7 +55,7 @@ import {
   useValeStages,
   useValeTypes,
 } from "@/lib/sites-queries";
-import type { HouseTypeV2, MaterialV2, ValeReq } from "@/lib/sites-types";
+import type { HouseTypeV2, MaterialV2, ValeReq, ValeStage, ValeTypeV2 } from "@/lib/sites-types";
 
 const HOUSE_TYPES: HouseTypeV2[] = ["A1", "A2", "B", "C"];
 
@@ -185,6 +191,18 @@ export function ValeTipoSection() {
   const selectedVT = sortedValeTypes.find((v) => v.id === valeTypeId);
   const selectedStage = stagesForType.find((s) => s.id === stageId);
 
+  const selectorsRef = useRef<HTMLDivElement | null>(null);
+  function goToReq(r: ValeReq) {
+    const stage = (valeStages.data ?? []).find((s) => s.id === r.vale_stage_id);
+    if (!stage) return;
+    setHouseType(r.house_type);
+    setValeTypeId(stage.vale_type_id);
+    setStageId(stage.id);
+    setTimeout(() => {
+      selectorsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
   return (
     <div className="space-y-6">
       <SectionHeader
@@ -192,8 +210,11 @@ export function ValeTipoSection() {
         description="Selecciona tipo de vivienda → vale tipo → etapa. Verás los materiales requeridos y podrás crear, editar o eliminar (contraseña obligatoria)."
       />
 
+      <MaterialSearchPanel onGo={goToReq} />
+
+
       {/* Selectores */}
-      <div className="surface-card grid grid-cols-1 gap-3 p-5 md:grid-cols-3">
+      <div ref={selectorsRef} className="surface-card grid grid-cols-1 gap-3 p-5 md:grid-cols-3">
         <div>
           <Label>Tipo de vivienda</Label>
           <Select
@@ -487,3 +508,299 @@ export function ValeTipoSection() {
     </div>
   );
 }
+
+// ============================================================
+// Buscador de material en vales (tabla de apariciones)
+// ============================================================
+
+type SearchRow = {
+  req: ValeReq;
+  houseType: HouseTypeV2;
+  valeCode: string;
+  valeName: string;
+  stageNumber: number;
+  stageName: string;
+  qty: number;
+  unit: string;
+};
+
+function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
+  const materials = useMaterialsV2();
+  const valeTypes = useValeTypes();
+  const valeStages = useValeStages();
+  const reqs = useValeReqs();
+  const invalidate = useInvalidateSitesV2();
+  const adminMutate = useServerFn(adminMutateFn);
+
+  const [materialId, setMaterialId] = useState<string>("");
+
+  // Edit dialog
+  const [editing, setEditing] = useState<SearchRow | null>(null);
+  const [editQty, setEditQty] = useState<number>(0);
+  const [editPass, setEditPass] = useState("");
+
+  const sortedMaterials = useMemo(
+    () =>
+      [...(materials.data ?? [])].sort(
+        (a, b) =>
+          (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
+          a.code.localeCompare(b.code),
+      ),
+    [materials.data],
+  );
+
+  const stagesById = useMemo(() => {
+    const m = new Map<string, ValeStage>();
+    for (const s of valeStages.data ?? []) m.set(s.id, s);
+    return m;
+  }, [valeStages.data]);
+
+  const valeTypesById = useMemo(() => {
+    const m = new Map<string, ValeTypeV2>();
+    for (const v of valeTypes.data ?? []) m.set(v.id, v);
+    return m;
+  }, [valeTypes.data]);
+
+  const selectedMat = (materials.data ?? []).find((m) => m.id === materialId) ?? null;
+
+  const rows: SearchRow[] = useMemo(() => {
+    if (!materialId) return [];
+    const out: SearchRow[] = [];
+    for (const r of reqs.data ?? []) {
+      if (r.material_id !== materialId) continue;
+      const stage = stagesById.get(r.vale_stage_id);
+      if (!stage) continue;
+      const vt = valeTypesById.get(stage.vale_type_id);
+      if (!vt) continue;
+      out.push({
+        req: r,
+        houseType: r.house_type,
+        valeCode: vt.code,
+        valeName: vt.name,
+        stageNumber: stage.stage_number,
+        stageName: stage.name ?? "",
+        qty: r.qty,
+        unit: selectedMat?.unit ?? "",
+      });
+    }
+    return out;
+  }, [reqs.data, materialId, stagesById, valeTypesById, selectedMat]);
+
+  const ctrl = useTableControls<SearchRow>({
+    data: rows,
+    searchFields: (r) => [
+      r.houseType,
+      r.valeCode,
+      r.valeName,
+      `Etapa ${r.stageNumber}`,
+      r.stageName,
+      String(r.qty),
+    ],
+    sortFns: {
+      house: (a, b) => a.houseType.localeCompare(b.houseType, "es"),
+      vale: (a, b) => a.valeCode.localeCompare(b.valeCode, "es", { numeric: true }),
+      stage: (a, b) => a.stageNumber - b.stageNumber,
+      qty: (a, b) => a.qty - b.qty,
+    },
+    defaultSort: { key: "house", dir: "asc" },
+    defaultPageSize: 25,
+  });
+
+  const editMut = useMutation({
+    mutationFn: async () => {
+      if (!editing) return;
+      if (!editPass) throw new Error("Contraseña requerida");
+      if (!editQty || editQty <= 0) throw new Error("Cantidad inválida");
+      await adminMutate({
+        data: {
+          passphrase: editPass,
+          table: "vale_reqs",
+          action: "update",
+          match: { id: editing.req.id },
+          values: { qty: editQty },
+        },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Actualizado");
+      setEditing(null);
+      setEditPass("");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Error"),
+  });
+
+  return (
+    <div className="surface-card overflow-hidden">
+      <div className="border-b border-border/60 p-5">
+        <h3 className="mb-1 flex items-center gap-2 font-display text-base font-semibold">
+          <Search className="h-4 w-4" />
+          Buscar material en vales
+        </h3>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Elige un material y verás en qué vales y etapas aparece. Haz clic en una fila para ir a ese vale.
+        </p>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto]">
+          <SearchableSelect
+            value={materialId}
+            onChange={setMaterialId}
+            placeholder="Selecciona o busca material…"
+            searchPlaceholder="Buscar por código o descripción…"
+            options={sortedMaterials.map((m) => ({
+              value: m.id,
+              label: `${m.code} · ${m.description}`,
+              hint: m.unit,
+              keywords: `${m.code} ${m.description} ${m.unit}`,
+            }))}
+          />
+          {materialId && (
+            <Button variant="ghost" onClick={() => setMaterialId("")}>Limpiar</Button>
+          )}
+        </div>
+      </div>
+
+      {materialId ? (
+        <>
+          <TableToolbar
+            ctrl={ctrl}
+            searchPlaceholder="Buscar en resultados (tipo, vale, etapa)…"
+          />
+          <div className="max-h-[60vh] overflow-auto">
+            <table className="min-w-full text-sm">
+              <thead className="sticky top-0 z-10 bg-secondary/80 text-left text-xs uppercase tracking-wider text-muted-foreground backdrop-blur">
+                <tr>
+                  <SortableTh ctrl={ctrl} sortKey="house">Tipo casa</SortableTh>
+                  <SortableTh ctrl={ctrl} sortKey="vale">Vale</SortableTh>
+                  <SortableTh ctrl={ctrl} sortKey="stage">Etapa</SortableTh>
+                  <SortableTh ctrl={ctrl} sortKey="qty" align="right">Cantidad</SortableTh>
+                  <th className="px-4 py-2.5">Unidad</th>
+                  <th className="px-4 py-2.5 text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ctrl.visible.map((r) => {
+                  const stageLabel =
+                    r.stageName && r.stageName.trim() && r.stageName.trim() !== `Etapa ${r.stageNumber}`
+                      ? `Etapa ${r.stageNumber} · ${r.stageName}`
+                      : `Etapa ${r.stageNumber}`;
+                  return (
+                    <tr
+                      key={r.req.id}
+                      className="cursor-pointer border-t border-border/60 hover:bg-secondary/40"
+                      onClick={() => onGo(r.req)}
+                    >
+                      <td className="px-4 py-2.5 font-medium">{r.houseType}</td>
+                      <td className="px-4 py-2.5">
+                        <span className="font-mono text-xs mr-2">{r.valeCode}</span>
+                        <span className="text-muted-foreground">{r.valeName}</span>
+                      </td>
+                      <td className="px-4 py-2.5">{stageLabel}</td>
+                      <td className="px-4 py-2.5 text-right num-display">{r.qty}</td>
+                      <td className="px-4 py-2.5 text-muted-foreground">{r.unit}</td>
+                      <td className="px-4 py-2.5 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Ir al vale"
+                          onClick={() => onGo(r.req)}
+                        >
+                          <ArrowRight className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Editar cantidad"
+                          onClick={() => {
+                            setEditing(r);
+                            setEditQty(r.qty);
+                            setEditPass("");
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          title="Eliminar"
+                          onClick={() =>
+                            requestCascadeDelete({
+                              table: "vale_reqs",
+                              id: r.req.id,
+                              label: `${selectedMat?.code ?? "material"} en ${r.houseType} · ${r.valeCode} · ${stageLabel}`,
+                              context: "Solo se elimina este requisito puntual de la etapa.",
+                              onSuccess: invalidate,
+                            })
+                          }
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {ctrl.visible.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                      {rows.length === 0
+                        ? "Este material no aparece en ningún vale."
+                        : "Sin resultados para esos filtros."}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+          <TablePagination ctrl={ctrl} />
+        </>
+      ) : (
+        <div className="p-8 text-center text-sm text-muted-foreground">
+          Selecciona un material para ver dónde se usa.
+        </div>
+      )}
+
+      <AlertDialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Editar cantidad</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              {selectedMat?.code} · {selectedMat?.description} — {editing?.houseType} · {editing?.valeCode} · Etapa {editing?.stageNumber}
+            </div>
+            <div>
+              <Label>Cantidad</Label>
+              <Input
+                type="number"
+                min={1}
+                value={editQty}
+                onChange={(e) => setEditQty(Number(e.target.value))}
+              />
+            </div>
+            <div>
+              <Label>Contraseña</Label>
+              <Input
+                type="password"
+                value={editPass}
+                onChange={(e) => setEditPass(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={editMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!editPass || editMut.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                editMut.mutate();
+              }}
+            >
+              {editMut.isPending ? "Guardando…" : "Guardar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
