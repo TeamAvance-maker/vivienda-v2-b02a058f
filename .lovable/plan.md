@@ -1,30 +1,55 @@
-No hay nada que planificar ni ejecutar de mi lado: en Lovable la sincronización con GitHub es **automática y en tiempo real**. Yo no manejo `git` directamente (commit/push/pull están bloqueados por seguridad).
+# 🔒 Regla de Candado Global
 
-## Cómo funciona
+## Qué voy a hacer
 
-Cada vez que yo edito un archivo en este proyecto, Lovable hace por detrás:
-1. Guarda el cambio.
-2. Crea un commit en tu repositorio de GitHub.
-3. Lo sube (push) a la rama principal.
+**No voy a tocar código.** Esto es solo una regla que guardo en mi memoria permanente para que se aplique en TODAS nuestras conversaciones, ahora y en el futuro.
 
-Y al revés: si tú haces un commit en GitHub, Lovable lo trae solo.
+## La regla, en palabras simples
 
-## Cómo confirmar que ya está sincronizado (paso a paso)
+### Estado actual: 🔒 TODO BLOQUEADO
 
-1. Abre tu cuenta de GitHub en otra pestaña.
-2. Entra al repositorio que conectaste a este proyecto.
-3. Mira la lista de archivos: arriba dice "hace X minutos" en cada uno.
-4. Haz clic en **Commits** (arriba a la derecha de la lista de archivos). Verás todos los commits hechos en nuestras últimas conversaciones (mejoras de tablas, panel de ayuda, etc.) con autor tipo `lovable-dev[bot]` o tu usuario.
+Desde este momento, **todo el sitio web está bajo candado**. Esto incluye absolutamente todo:
 
-## Si NO ves los commits ahí
+- Todos los menús del slider lateral (Inicio, Plano, Dashboard, Casas, Tipos de vivienda, Materiales, Recepciones, Entregas, Inventario, Reportes, Vale tipo, Sitios, Configuración)
+- Todo lo que contienen esos menús (tablas, formularios, botones, métricas, pop-ups, diálogos)
+- Elementos globales (tema claro/oscuro, botón de ayuda flotante, diálogo de contraseña, logo, barra superior)
+- Estructura, diseño, código, base de datos, textos
 
-Significa que la conexión se perdió o apunta a otro repositorio. En ese caso:
-1. En Lovable, abajo a la izquierda, haz clic en el botón **+** del chat.
-2. Elige **GitHub**.
-3. Verifica el repositorio conectado, o vuelve a conectar.
+### Cómo se desbloquea
 
-## Sobre "un commit creado por ti"
+| Lo que tú escribes | Lo que yo hago |
+|---|---|
+| `bloquea menú [X]` | Pongo candado a ese menú (no toco nada ahí) |
+| `desbloquea menú [X]` | Quito el candado, ya puedo hacer cambios ahí |
+| `candado a todo el sitio` | Bloqueo TODO |
+| `desbloquea todo el sitio` | Quito todos los candados |
 
-No puedo crear un commit "manual" con un mensaje personalizado sin tocar código — los commits se generan solos cuando hay cambios en archivos. Si quieres que aparezca un commit nuevo a propósito, dime un cambio pequeño que quieras (por ejemplo: "actualiza el título de la pestaña" o "agrega un comentario en tal archivo") y al hacerlo se generará automáticamente un commit nuevo en tu GitHub.
+### Qué pasa si necesito tocar algo bloqueado
 
-¿Quieres que haga un cambio pequeño para forzar un commit nuevo, o prefieres seguir con las mejoras pendientes (seguridad, etc.)?
+Si tú me pides un cambio que requiere modificar una parte bloqueada (aunque sea de paso, aunque sea un detalle pequeño, aunque sea un pop-up que aparece en otro menú), **paro y te pido permiso explícito antes de tocar nada**. Por ejemplo:
+
+> "Para hacer eso necesito modificar el botón de ayuda, pero está bloqueado. ¿Me autorizas a desbloquearlo solo para este cambio?"
+
+Espero tu autorización. No avanzo hasta que digas "sí, desbloquea X".
+
+### Excepción única: bugs graves
+
+Si el sitio se cae o no se puede entrar, **te aviso primero** y espero tu permiso antes de tocar nada, incluso si es urgente.
+
+## Dónde se guarda esto
+
+Guardo dos cosas en mi memoria permanente del proyecto (`mem://`):
+
+1. **En la regla central (Core):** una línea corta que diga "Todo el sitio bajo candado por defecto. Pedir autorización antes de tocar cualquier cosa bloqueada."
+2. **Un archivo de detalle** (`mem://rules/lock-system`) con la tabla completa de comandos y la lista de menús, para consultarlo cuando haga falta.
+
+Así, aunque empecemos una conversación nueva mañana o en un mes, la regla seguirá activa.
+
+## Lo que NO va a cambiar
+
+- Cero archivos de código modificados
+- Cero cambios en la base de datos
+- Cero cambios visuales en el sitio
+- El sitio se ve y funciona exactamente igual que ahora
+
+Solo cambia **cómo yo me comporto** cuando me pidas cosas.
