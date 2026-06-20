@@ -685,7 +685,8 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
           <TableToolbar
             ctrl={ctrl}
             searchPlaceholder="Buscar en resultados (tipo, vale, etapa)…"
-            extraActions={
+            extraActions={undefined as any}
+            rightSlot={
               <Button
                 variant="outline"
                 size="sm"
@@ -697,6 +698,7 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
                 Reemplazar por otro material…
               </Button>
             }
+
           />
           {selectedIds.size > 0 && (
             <div className="border-b border-border/60 bg-secondary/40 px-4 py-2 text-xs text-muted-foreground">
