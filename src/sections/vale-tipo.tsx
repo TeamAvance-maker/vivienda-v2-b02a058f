@@ -55,7 +55,7 @@ import {
   useValeStages,
   useValeTypes,
 } from "@/lib/sites-queries";
-import type { HouseTypeV2, MaterialV2, ValeReq } from "@/lib/sites-types";
+import type { HouseTypeV2, MaterialV2, ValeReq, ValeStage, ValeTypeV2 } from "@/lib/sites-types";
 
 const HOUSE_TYPES: HouseTypeV2[] = ["A1", "A2", "B", "C"];
 
