@@ -57,14 +57,19 @@ export function SearchableSelect({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn("w-full justify-between font-normal", !current && "text-muted-foreground", className)}
+          className={cn(
+            "h-auto min-h-10 w-full justify-between whitespace-normal py-2 text-left font-normal",
+            !current && "text-muted-foreground",
+            className,
+          )}
         >
-          <span className="truncate text-left">
+          <span className="line-clamp-2 min-w-0 flex-1 text-left leading-snug break-words">
             {current ? current.label : placeholder}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
+
       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
         <Command
           filter={(itemValue, search) => {

@@ -47,9 +47,10 @@ export function ReceptionsSection() {
     if (!form.qty || form.qty <= 0) return toast.error("Cantidad inválida");
     const guia = form.guia.trim().toUpperCase();
     if (!guia) return toast.error("Ingresa guía o factura (obligatorio)");
-    if (!/^[GF]-\d{8}$/.test(guia)) {
-      return toast.error("Formato inválido. Usa G-XXXXXXXX (guía) o F-XXXXXXXX (factura), 8 dígitos.");
+    if (!/^[GF]-\d{1,8}$/.test(guia)) {
+      return toast.error("Formato inválido. Usa G-… (guía) o F-… (factura), de 1 a 8 dígitos.");
     }
+
     const handed = handOpts.includes(form.handedness) ? form.handedness : handOpts[0];
     requestAdminMutation({
       table: "receptions",
@@ -154,14 +155,15 @@ export function ReceptionsSection() {
               id="rec-guia"
               value={form.guia}
               onChange={(e) => setForm({ ...form, guia: e.target.value.toUpperCase() })}
-              placeholder="G-12345678 o F-12345678"
+              placeholder="G-1234 o F-12345678"
               required
-              pattern="^[GFgf]-\d{8}$"
-              title="G-XXXXXXXX para guía o F-XXXXXXXX para factura (8 dígitos)"
+              pattern="^[GFgf]-\d{1,8}$"
+              title="G-… para guía o F-… para factura (1 a 8 dígitos)"
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); document.getElementById("rec-material")?.focus(); } }}
             />
           </div>
-          <div className="md:col-span-2">
+          <div className="min-w-0 md:col-span-2">
+
             <Label htmlFor="rec-material">Material</Label>
             <div className="flex gap-2">
               <div className="flex-1">
