@@ -30,6 +30,7 @@ import { useConfig, useHouseTypes, useInvalidateAll, useOverrides } from "@/lib/
 import { fmtDate, fmtDateTime } from "@/lib/compute";
 import { supabase } from "@/integrations/supabase/client";
 import { ALL_TABLES, restoreBackupFn, resetSystemFn } from "@/lib/backup.functions";
+import { listHistoryFn, listHistoryBatchFn } from "@/lib/history.functions";
 
 export function ConfigSection() {
   const cfg = useConfig();
@@ -384,15 +385,13 @@ function DeletionLogCard() {
   const [dateTo, setDateTo] = useState("");
   const [detail, setDetail] = useState<any | null>(null);
 
+  const listHistory = useServerFn(listHistoryFn);
+  const listHistoryBatch = useServerFn(listHistoryBatchFn);
+
   const q = useQuery({
     queryKey: ["history_log"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("deletion_log" as never)
-        .select("*")
-        .order("deleted_at", { ascending: false })
-        .limit(1000);
-      if (error) throw new Error(error.message);
+      const data = await listHistory({ data: { limit: 1000 } });
       return (data ?? []) as any[];
     },
   });
@@ -402,12 +401,7 @@ function DeletionLogCard() {
     queryKey: ["history_batch", detail?.batch_id],
     enabled: !!detail?.batch_id && detail?.action === "cascade_delete",
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("deletion_log" as never)
-        .select("*")
-        .eq("batch_id", detail.batch_id)
-        .order("deleted_at", { ascending: true });
-      if (error) throw new Error(error.message);
+      const data = await listHistoryBatch({ data: { batch_id: detail.batch_id } });
       return (data ?? []) as any[];
     },
   });
