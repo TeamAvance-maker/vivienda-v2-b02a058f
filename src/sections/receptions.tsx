@@ -69,14 +69,22 @@ export function ReceptionsSection() {
 
   const filtered = useMemo(() => {
     const s = search.toLowerCase().trim();
-    const base = !s
+    const tokens = s.split(/\s+/).filter(Boolean);
+    const base = tokens.length === 0
       ? (list.data ?? [])
-      : (list.data ?? []).filter(
-          (r) =>
-            r.guia.toLowerCase().includes(s) ||
-            r.material_code.toLowerCase().includes(s) ||
-            r.date.includes(s),
-        );
+      : (list.data ?? []).filter((r) => {
+          const m = materials.data?.find((x) => x.code === r.material_code);
+          const hay = [
+            r.guia,
+            r.material_code,
+            r.date,
+            fmtDate(r.date),
+            m?.description ?? "",
+            HAND_LABEL[r.handedness],
+            String(r.qty),
+          ].join(" ").toLowerCase();
+          return tokens.every((t) => hay.includes(t));
+        });
     const sorted = [...base].sort((a, b) => {
       const av = a[sortKey] as any;
       const bv = b[sortKey] as any;
@@ -89,7 +97,8 @@ export function ReceptionsSection() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return sorted;
-  }, [list.data, search, sortKey, sortDir]);
+  }, [list.data, materials.data, search, sortKey, sortDir]);
+
 
   useEffect(() => { setPage(1); }, [search, pageSize, sortKey, sortDir]);
 
