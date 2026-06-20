@@ -161,16 +161,20 @@ export const cascadeDeleteFn = createServerFn({ method: "POST" })
 
     // Bitácora: insertar TODO antes de borrar, en un batch_id común.
     const batchId = crypto.randomUUID();
-    const logRows = rows.map((r) => ({
+    const { humanLabel } = await import("./history.server");
+    const isCascade = rows.length > 1;
+    const logRows = await Promise.all(rows.map(async (r) => ({
       batch_id: batchId,
+      action: isCascade ? "cascade_delete" : "delete",
       table_name: r.table,
       record_id: String(r.record[matchColFor(r.table)]),
       record_snapshot: r.record,
+      record_label: await humanLabel(r.table, r.record),
       parent_table: r.parent_table ?? null,
       parent_id: r.parent_id ?? null,
       reason: data.reason ?? null,
       deleted_by: "superadmin",
-    }));
+    })));
     const { error: logErr } = await supabaseAdmin.from("deletion_log").insert(logRows as any);
     if (logErr) throw new Error(`Bitácora: ${logErr.message}`);
 
@@ -206,20 +210,23 @@ export const resetSystemFn = createServerFn({ method: "POST" })
     const batchId = crypto.randomUUID();
     const summary: Record<string, number> = {};
     const tablesToWipe = ALL_TABLES.filter((t) => t !== "project_config");
+    const { humanLabel } = await import("./history.server");
 
     for (const t of tablesToWipe) {
       const { data: rows, error } = await (supabaseAdmin.from(t as never) as any).select("*");
       if (error) throw new Error(`Leyendo ${t}: ${error.message}`);
       summary[t] = rows?.length ?? 0;
       if (rows && rows.length > 0) {
-        const logRows = rows.map((row: any) => ({
+        const logRows = await Promise.all(rows.map(async (row: any) => ({
           batch_id: batchId,
+          action: "cascade_delete",
           table_name: t,
           record_id: String(row.id ?? row.code ?? ""),
           record_snapshot: row,
+          record_label: await humanLabel(t, row),
           reason: "Inicialización del sistema",
           deleted_by: "superadmin",
-        }));
+        })));
         // Insertar bitácora en bloques para no exceder límite
         const CHUNK = 500;
         for (let i = 0; i < logRows.length; i += CHUNK) {
