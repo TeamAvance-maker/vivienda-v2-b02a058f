@@ -45,18 +45,23 @@ export function ReceptionsSection() {
   function add() {
     if (!form.material_code) return toast.error("Selecciona material");
     if (!form.qty || form.qty <= 0) return toast.error("Cantidad inválida");
+    const guia = form.guia.trim().toUpperCase();
+    if (!guia) return toast.error("Ingresa guía o factura (obligatorio)");
+    if (!/^[GF]-\d{8}$/.test(guia)) {
+      return toast.error("Formato inválido. Usa G-XXXXXXXX (guía) o F-XXXXXXXX (factura), 8 dígitos.");
+    }
     const handed = handOpts.includes(form.handedness) ? form.handedness : handOpts[0];
     requestAdminMutation({
       table: "receptions",
       action: "insert",
       values: {
         date: form.date,
-        guia: form.guia.trim(),
+        guia,
         material_code: form.material_code,
         handedness: handed,
         qty: form.qty,
       },
-      description: `Registrar recepción del ${form.date} · ${form.material_code} · ${form.qty} u.`,
+      description: `Registrar ${guia.startsWith("F-") ? "factura" : "guía"} ${guia} del ${form.date} · ${form.material_code} · ${form.qty} u.`,
       onSuccess: () => setForm({ ...form, guia: "", qty: 1 }),
     });
   }
@@ -144,12 +149,15 @@ export function ReceptionsSection() {
             />
           </div>
           <div>
-            <Label htmlFor="rec-guia">Guía</Label>
+            <Label htmlFor="rec-guia">Guía o Factura</Label>
             <Input
               id="rec-guia"
               value={form.guia}
-              onChange={(e) => setForm({ ...form, guia: e.target.value })}
-              placeholder="G-1234"
+              onChange={(e) => setForm({ ...form, guia: e.target.value.toUpperCase() })}
+              placeholder="G-12345678 o F-12345678"
+              required
+              pattern="^[GFgf]-\d{8}$"
+              title="G-XXXXXXXX para guía o F-XXXXXXXX para factura (8 dígitos)"
               onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); document.getElementById("rec-material")?.focus(); } }}
             />
           </div>
@@ -214,6 +222,7 @@ export function ReceptionsSection() {
               min={1}
               value={form.qty}
               onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })}
+              className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
           </div>
           <div className="md:col-span-6 mt-1 flex justify-end">
