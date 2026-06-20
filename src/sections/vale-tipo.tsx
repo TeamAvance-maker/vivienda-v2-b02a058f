@@ -191,12 +191,27 @@ export function ValeTipoSection() {
   const selectedVT = sortedValeTypes.find((v) => v.id === valeTypeId);
   const selectedStage = stagesForType.find((s) => s.id === stageId);
 
+  const selectorsRef = useRef<HTMLDivElement | null>(null);
+  function goToReq(r: ValeReq) {
+    const stage = (valeStages.data ?? []).find((s) => s.id === r.vale_stage_id);
+    if (!stage) return;
+    setHouseType(r.house_type);
+    setValeTypeId(stage.vale_type_id);
+    setStageId(stage.id);
+    setTimeout(() => {
+      selectorsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
   return (
     <div className="space-y-6">
       <SectionHeader
         title="Vale Tipo"
         description="Selecciona tipo de vivienda → vale tipo → etapa. Verás los materiales requeridos y podrás crear, editar o eliminar (contraseña obligatoria)."
       />
+
+      <MaterialSearchPanel onGo={goToReq} />
+
 
       {/* Selectores */}
       <div className="surface-card grid grid-cols-1 gap-3 p-5 md:grid-cols-3">
