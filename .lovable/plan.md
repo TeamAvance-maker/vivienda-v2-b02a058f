@@ -1,32 +1,56 @@
-## Desbloqueo: Menú Casas → Pestaña "Vales tipo"
+## Reemplazar un material por otro en los vales
 
-Vamos a agregar un buscador de material dentro del tab **Vales tipo** (en Casas). El resto del menú Casas sigue bloqueado: no se tocará Tipos ni Manzanas/Sitios, y en Vales tipo solo se **suma** una sección nueva (no se cambia lo existente).
+### Qué se agrega (dentro del panel "Buscar material en vales" del menú Casas → Vales tipo)
 
-### ¿Qué verás en pantalla?
+Un botón nuevo **"Reemplazar este material por otro"** que aparece justo al lado del buscador, **solo cuando ya seleccionaste un material** y la tabla muestra resultados. Así queda claro: primero buscas, ves dónde está usado, y recién entonces puedes decidir reemplazarlo.
 
-Dentro de Casas → pestaña "Vales tipo", aparecerá una caja nueva arriba del flujo actual con el título **"Buscar material en vales"**:
+### Cómo se ve y cómo se usa (paso a paso, sin tecnicismos)
 
-1. Un cuadro tipo lista desplegable con buscador (igual al que ya usas para elegir material) — escribes y filtra por código o descripción.
-2. Apenas eliges un material, debajo aparece un listado con todas las apariciones de ese material:
-   - Columnas: Tipo casa · Vale (código + nombre) · Etapa · Cantidad · Unidad · Acciones (Editar, Eliminar).
-   - Buscador de texto, ordenamiento por columna, paginación (10/25/50/100 por página) y barra de desplazamiento vertical — usando el mismo `useTableControls` que ya tienes en Materiales.
-3. Al hacer **clic en una fila** (o en un botón "Ir al vale"), la vista de Vales tipo se **posiciona automáticamente** en ese Tipo casa + Vale + Etapa exactos. Allí ya tienes el CRUD completo (agregar, editar cantidad con contraseña, eliminar con cascada) que ya existe — no se duplica.
-4. Los botones de Editar/Eliminar **directos** desde la tabla de resultados también funcionan con el mismo diálogo de contraseña que usas hoy, sin salir del buscador.
+1. Eliges un material en el buscador (ej: "Tornillo 3 pulgadas").
+2. La tabla te muestra todos los vales que lo usan.
+3. Aparece el botón **"Reemplazar por otro material…"** arriba de la tabla.
+4. Al hacer clic se abre una ventana con:
+  - **Material actual** (solo lectura): el que ya elegiste.
+  - **Reemplazar por**: un segundo buscador para elegir el material nuevo.
+  - **Aplicar en**: dos opciones con botones de radio:
+    - ⚪ **Solo en las filas que yo marque** (checkbox por fila en la tabla)
+    - ⚪ **En todos los vales que aparecen ahora mismo en la búsqueda** (todos los resultados visibles, no solo la página actual)
+  - **Texto de ayuda visible** explicando cuándo usar cada opción (ver abajo).
+  - **Contraseña de obra** (igual que en el resto del sitio).
+  - Botones: **Cancelar** / **Reemplazar**.
+5. Antes de ejecutar, muestra un **resumen de confirmación**: "Vas a reemplazar X por Y en N registros de M vales. ¿Confirmar?"
+6. Al confirmar, se actualizan los registros y la tabla se refresca sola mostrando ahora el material nuevo (o vacía si ya no queda nada del viejo).
 
-### Detalles técnicos (para mí)
+### Texto de ayuda dentro del diálogo (para que no sea confuso)
 
-- Archivo nuevo: `src/sections/vale-material-search.tsx` con el componente `<ValeMaterialSearch />`.
-- Se inserta dentro de `ValeTipoSection` (arriba de los selectores actuales) o como sub-bloque del tab "Vales tipo" en `casas.tsx`. Voto por **dentro de `vale-tipo.tsx`** para reutilizar `useValeReqs`, `useValeStages`, `useValeTypes`, `useMaterialsV2` y `materialsById`.
-- Para que "Ir al vale" funcione, convertimos `houseType` / `valeTypeId` / `stageId` de `useState` locales a estado elevado (props o un pequeño contexto en el archivo). El click llama `setHouseType`, `setValeTypeId`, `setStageId` y hace scroll suave a la sección de materiales.
-- Resultados se calculan con `useMemo` cruzando `vale_reqs` × `vale_stages` × `vale_types_v2` filtrados por `material_id`. No se toca la base de datos ni las RLS.
-- Editar/Eliminar reutilizan `adminMutateFn` + `requestCascadeDelete` que ya existen.
-- Tabla con `useTableControls` + `TableToolbar` + `SortableTh` + `TablePagination` (mismo patrón que `materials.tsx`).
+> **¿Cuándo usar esto?**
+>
+> - Cuando un material fue mal cargado en los vales y el correcto es otro (ej: se puso "Tornillo 2½" y debía ser "Tornillo 3").
+> - Cuando un material se renombró o se unificó con otro y quieres dejar todos los vales apuntando al nuevo.
+>
+> **¿Cuándo NO usar esto?**
+>
+> - Si solo necesitas corregir la **cantidad** de un material → usa el botón "Editar" de la fila.
+> - Si quieres **quitar** el material de un vale → usa "Eliminar".
+> - Si el material nuevo lleva **otra unidad** (ej: pasar de "unidad" a "metros"), revisa primero las cantidades; el reemplazo **no convierte unidades** automáticamente.
 
-### Lo que NO se toca
+### Reglas de seguridad
 
-- Base de datos, RLS, migraciones — nada.
-- Pestañas "Tipos" y "Manzanas/Sitios" del menú Casas — siguen bloqueadas.
-- El CRUD existente de Vales tipo — intacto, solo se reutiliza.
-- Diseño global, tema, navbar, candado de los demás menús — intacto.
+- Requiere **contraseña de obra** (mismo flujo que editar/eliminar).
+- Si en algún vale ya existe una fila con el material nuevo y la misma etapa, **no se duplica**: se avisa y se omiten esas filas listándolas en el resumen (para que el usuario decida sumar cantidades manualmente o no).
+- Si el material actual y el nuevo son iguales, el botón Reemplazar queda deshabilitado.
+- Solo afecta a la pestaña "Vales tipo". El resto del sitio sigue bloqueado.  
 
-¿Le doy "Implementar"?
+
+### Detalles técnicos (interno)
+
+- Nuevo componente `ReplaceMaterialDialog` dentro de `src/sections/vale-tipo.tsx`.
+- Reutiliza `adminMutateFn` con `table: "vale_reqs"`, `action: "update"`, una llamada por `id` de fila (o un nuevo server fn `replaceMaterialInValeReqsFn` con una sola contraseña — recomendado para no pedirla muchas veces).
+- Detección de duplicados: query previa a `vale_reqs` filtrando por `vale_stage_id` y `material_id = nuevo`.
+- Sin cambios de base de datos, RLS, ni diseño global.
+
+### Permiso que necesito  
+  
+*****ANTES DE APROBAR TU PLAN: una vez reemplazado el material "antiguo" se debe preguntar si desea eliminar el material "antiguo" de la tabla materiales, opción SI: muestra todo lo que está implicado ese material "antiguo" en las recepciones o en otra tabla y que los movimientos de ese material "antiguo" se traspasarán al material "nuevo", vendría una confirmacion y se eliminaría el material "antiguo" de la tabla materiales y los movimientos (recepciones, etc) se agregarían a los movmientos del material "nuevo". SI NECESITAS PREGUNTAR, HAZMELAS*****
+
+Esto toca **solo la pestaña "Vales tipo"** que ya está desbloqueada. ¿Lo implemento?
