@@ -16,7 +16,9 @@ export type Database = {
     Tables: {
       deletion_log: {
         Row: {
+          action: string
           batch_id: string
+          changes: Json | null
           created_at: string
           deleted_at: string
           deleted_by: string
@@ -25,11 +27,14 @@ export type Database = {
           parent_table: string | null
           reason: string | null
           record_id: string
+          record_label: string | null
           record_snapshot: Json
           table_name: string
         }
         Insert: {
+          action?: string
           batch_id: string
+          changes?: Json | null
           created_at?: string
           deleted_at?: string
           deleted_by?: string
@@ -38,11 +43,14 @@ export type Database = {
           parent_table?: string | null
           reason?: string | null
           record_id: string
+          record_label?: string | null
           record_snapshot: Json
           table_name: string
         }
         Update: {
+          action?: string
           batch_id?: string
+          changes?: Json | null
           created_at?: string
           deleted_at?: string
           deleted_by?: string
@@ -51,6 +59,7 @@ export type Database = {
           parent_table?: string | null
           reason?: string | null
           record_id?: string
+          record_label?: string | null
           record_snapshot?: Json
           table_name?: string
         }
