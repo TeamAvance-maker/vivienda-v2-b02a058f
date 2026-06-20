@@ -550,13 +550,15 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
   const [editQty, setEditQty] = useState<number>(0);
   const [editPass, setEditPass] = useState("");
 
-  const sortedMaterials = useMemo(
-    () =>
-      [...(materials.data ?? [])].sort(
-        (a, b) =>
-          (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
-          a.code.localeCompare(b.code),
-      ),
+  // Replace dialog
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  // Selección por fila (req.id)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Limpiar selección si cambia el material buscado
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [materialId]);
+
     [materials.data],
   );
 
