@@ -1,13 +1,24 @@
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowRight, Check, ChevronsUpDown, Pencil, Plus, Search, Trash2 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { ArrowRight, Check, ChevronsUpDown, Pencil, Plus, Repeat2, Search, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   SortableTh,
   TablePagination,
   TableToolbar,
   useTableControls,
 } from "@/components/data-table";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@/components/ui/radio-group";
+import {
+  deleteMaterialWithTransferFn,
+  getMaterialImpactFn,
+  replaceMaterialInValesFn,
+} from "@/lib/material-replace.functions";
+
 import { toast } from "sonner";
 import { SectionHeader } from "@/components/app-shell";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
@@ -539,6 +550,15 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
   const [editQty, setEditQty] = useState<number>(0);
   const [editPass, setEditPass] = useState("");
 
+  // Replace dialog
+  const [replaceOpen, setReplaceOpen] = useState(false);
+  // Selección por fila (req.id)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Limpiar selección si cambia el material buscado
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [materialId]);
+
   const sortedMaterials = useMemo(
     () =>
       [...(materials.data ?? [])].sort(
@@ -548,6 +568,7 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
       ),
     [materials.data],
   );
+
 
   const stagesById = useMemo(() => {
     const m = new Map<string, ValeStage>();
@@ -664,11 +685,52 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
           <TableToolbar
             ctrl={ctrl}
             searchPlaceholder="Buscar en resultados (tipo, vale, etapa)…"
+            
+            rightSlot={
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={rows.length === 0}
+                onClick={() => setReplaceOpen(true)}
+                title="Reemplazar este material por otro en los vales"
+              >
+                <Repeat2 className="mr-2 h-4 w-4" />
+                Reemplazar por otro material…
+              </Button>
+            }
+
           />
+          {selectedIds.size > 0 && (
+            <div className="border-b border-border/60 bg-secondary/40 px-4 py-2 text-xs text-muted-foreground">
+              {selectedIds.size} fila(s) marcadas para reemplazo selectivo.
+              <button
+                type="button"
+                className="ml-2 underline"
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Quitar selección
+              </button>
+            </div>
+          )}
           <div className="max-h-[60vh] overflow-auto">
             <table className="min-w-full text-sm">
               <thead className="sticky top-0 z-10 bg-secondary/80 text-left text-xs uppercase tracking-wider text-muted-foreground backdrop-blur">
                 <tr>
+                  <th className="px-3 py-2.5 w-8">
+                    <Checkbox
+                      checked={
+                        ctrl.visible.length > 0 &&
+                        ctrl.visible.every((r) => selectedIds.has(r.req.id))
+                      }
+                      onCheckedChange={(v) => {
+                        const next = new Set(selectedIds);
+                        if (v) ctrl.visible.forEach((r) => next.add(r.req.id));
+                        else ctrl.visible.forEach((r) => next.delete(r.req.id));
+                        setSelectedIds(next);
+                      }}
+                      aria-label="Marcar página visible"
+                    />
+                  </th>
                   <SortableTh ctrl={ctrl} sortKey="house">Tipo casa</SortableTh>
                   <SortableTh ctrl={ctrl} sortKey="vale">Vale</SortableTh>
                   <SortableTh ctrl={ctrl} sortKey="stage">Etapa</SortableTh>
@@ -683,12 +745,28 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
                     r.stageName && r.stageName.trim() && r.stageName.trim() !== `Etapa ${r.stageNumber}`
                       ? `Etapa ${r.stageNumber} · ${r.stageName}`
                       : `Etapa ${r.stageNumber}`;
+                  const checked = selectedIds.has(r.req.id);
                   return (
                     <tr
                       key={r.req.id}
                       className="cursor-pointer border-t border-border/60 hover:bg-secondary/40"
                       onClick={() => onGo(r.req)}
                     >
+                      <td
+                        className="px-3 py-2.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(v) => {
+                            const next = new Set(selectedIds);
+                            if (v) next.add(r.req.id);
+                            else next.delete(r.req.id);
+                            setSelectedIds(next);
+                          }}
+                          aria-label="Marcar fila"
+                        />
+                      </td>
                       <td className="px-4 py-2.5 font-medium">{r.houseType}</td>
                       <td className="px-4 py-2.5">
                         <span className="font-mono text-xs mr-2">{r.valeCode}</span>
@@ -740,7 +818,7 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
                 })}
                 {ctrl.visible.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                       {rows.length === 0
                         ? "Este material no aparece en ningún vale."
                         : "Sin resultados para esos filtros."}
@@ -757,6 +835,7 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
           Selecciona un material para ver dónde se usa.
         </div>
       )}
+
 
       <AlertDialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <AlertDialogContent>
@@ -800,7 +879,338 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ReplaceMaterialDialog
+        open={replaceOpen}
+        onOpenChange={setReplaceOpen}
+        oldMaterial={selectedMat}
+        allMaterials={sortedMaterials}
+        selectedIds={Array.from(selectedIds)}
+        totalMatches={rows.length}
+        onDone={() => {
+          setSelectedIds(new Set());
+          invalidate();
+        }}
+      />
     </div>
   );
 }
+
+// ============================================================
+// Diálogo: reemplazar material por otro en vale_reqs (+ traspasar y eliminar opcional)
+// ============================================================
+
+function ReplaceMaterialDialog({
+  open,
+  onOpenChange,
+  oldMaterial,
+  allMaterials,
+  selectedIds,
+  totalMatches,
+  onDone,
+}: {
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+  oldMaterial: MaterialV2 | null;
+  allMaterials: MaterialV2[];
+  selectedIds: string[];
+  totalMatches: number;
+  onDone: () => void;
+}) {
+  const replaceFn = useServerFn(replaceMaterialInValesFn);
+  const impactFn = useServerFn(getMaterialImpactFn);
+  const deleteFn = useServerFn(deleteMaterialWithTransferFn);
+
+  const [newId, setNewId] = useState("");
+  const [scope, setScope] = useState<"selected" | "all">(
+    selectedIds.length > 0 ? "selected" : "all",
+  );
+  const [pass, setPass] = useState("");
+
+  // Post-replace state
+  type ReplaceResult = { updated: number; skipped: { id: string }[] };
+  const [result, setResult] = useState<ReplaceResult | null>(null);
+  const [impact, setImpact] = useState<{ vale_reqs: number; site_delivery_items: number } | null>(null);
+  const [askDelete, setAskDelete] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setNewId("");
+      setScope(selectedIds.length > 0 ? "selected" : "all");
+      setPass("");
+      setResult(null);
+      setImpact(null);
+      setAskDelete(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const newMaterial = allMaterials.find((m) => m.id === newId) ?? null;
+  const sameUnit = oldMaterial && newMaterial && oldMaterial.unit === newMaterial.unit;
+  const canSubmit =
+    !!oldMaterial &&
+    !!newMaterial &&
+    oldMaterial.id !== newMaterial.id &&
+    pass.length > 0 &&
+    (scope === "all" || selectedIds.length > 0);
+
+  const replaceMut = useMutation({
+    mutationFn: async () => {
+      if (!oldMaterial || !newMaterial) throw new Error("Selección incompleta");
+      const res = await replaceFn({
+        data: {
+          passphrase: pass,
+          old_material_id: oldMaterial.id,
+          new_material_id: newMaterial.id,
+          scope,
+          req_ids: scope === "selected" ? selectedIds : undefined,
+        },
+      });
+      // Refrescar datos en cliente
+      onDone();
+      // Consultar impacto restante del material antiguo
+      const imp = await impactFn({ data: { material_id: oldMaterial.id } });
+      return { res, imp };
+    },
+    onSuccess: ({ res, imp }) => {
+      setResult(res as ReplaceResult);
+      setImpact(imp);
+      setAskDelete(true);
+      const msg =
+        `Reemplazo aplicado: ${res.updated} actualizado(s)` +
+        (res.skipped.length > 0
+          ? `, ${res.skipped.length} omitido(s) por duplicado.`
+          : ".");
+      toast.success(msg);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Error"),
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: async () => {
+      if (!oldMaterial || !newMaterial) throw new Error("Falta selección");
+      return deleteFn({
+        data: {
+          passphrase: pass,
+          old_material_id: oldMaterial.id,
+          new_material_id: newMaterial.id,
+        },
+      });
+    },
+    onSuccess: (r) => {
+      toast.success(
+        `Material eliminado. Entregas traspasadas: ${r.transferred}, fusionadas: ${r.merged}.`,
+      );
+      onDone();
+      onOpenChange(false);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Error"),
+  });
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent className="max-w-2xl">
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {askDelete ? "¿Eliminar el material antiguo?" : "Reemplazar material en vales"}
+          </AlertDialogTitle>
+        </AlertDialogHeader>
+
+        {!askDelete ? (
+          <div className="space-y-4">
+            <div className="rounded-md border border-border/60 bg-secondary/30 p-3 text-xs text-muted-foreground">
+              <p className="mb-1 font-semibold text-foreground">¿Cuándo usar esto?</p>
+              <ul className="ml-4 list-disc space-y-0.5">
+                <li>Un material fue mal cargado en los vales y el correcto es otro.</li>
+                <li>Un material se renombró o se unificó con otro.</li>
+              </ul>
+              <p className="mb-1 mt-2 font-semibold text-foreground">¿Cuándo NO usar esto?</p>
+              <ul className="ml-4 list-disc space-y-0.5">
+                <li>Si solo necesitas corregir la <b>cantidad</b> → usa el botón "Editar" de la fila.</li>
+                <li>Si quieres <b>quitar</b> el material de un vale → usa "Eliminar".</li>
+                <li>Si el material nuevo lleva <b>otra unidad</b>, revisa primero las cantidades; el reemplazo <b>no convierte unidades</b>.</li>
+              </ul>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div>
+                <Label>Material actual</Label>
+                <div className="mt-1 rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-sm">
+                  {oldMaterial ? (
+                    <>
+                      <span className="font-mono text-xs mr-2">{oldMaterial.code}</span>
+                      {oldMaterial.description}
+                      <span className="ml-1 text-muted-foreground">· {oldMaterial.unit}</span>
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </div>
+              </div>
+              <div>
+                <Label>Reemplazar por</Label>
+                <SearchableSelect
+                  value={newId}
+                  onChange={setNewId}
+                  placeholder="Selecciona el material nuevo…"
+                  searchPlaceholder="Buscar por código o descripción…"
+                  options={allMaterials
+                    .filter((m) => m.id !== oldMaterial?.id)
+                    .map((m) => ({
+                      value: m.id,
+                      label: `${m.code} · ${m.description}`,
+                      hint: m.unit,
+                      keywords: `${m.code} ${m.description} ${m.unit}`,
+                    }))}
+                />
+                {newMaterial && oldMaterial && !sameUnit && (
+                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                    ⚠ Distinta unidad ({oldMaterial.unit} → {newMaterial.unit}). Las cantidades NO se convertirán.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <Label>Aplicar en</Label>
+              <RadioGroup
+                value={scope}
+                onValueChange={(v) => setScope(v as "selected" | "all")}
+                className="mt-2 space-y-2"
+              >
+                <label className="flex items-start gap-2 rounded-md border border-border/60 p-3 text-sm">
+                  <RadioGroupItem value="selected" disabled={selectedIds.length === 0} className="mt-0.5" />
+                  <div>
+                    <div>Solo en las filas que marqué ({selectedIds.length})</div>
+                    {selectedIds.length === 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        Cierra este diálogo, marca las filas con los checkboxes y vuelve a abrir.
+                      </div>
+                    )}
+                  </div>
+                </label>
+                <label className="flex items-start gap-2 rounded-md border border-border/60 p-3 text-sm">
+                  <RadioGroupItem value="all" className="mt-0.5" />
+                  <div>
+                    En <b>todas</b> las apariciones de este material ({totalMatches} filas en total)
+                  </div>
+                </label>
+              </RadioGroup>
+            </div>
+
+            <div>
+              <Label>Contraseña de obra</Label>
+              <Input
+                type="password"
+                value={pass}
+                onChange={(e) => setPass(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-3 text-sm">
+            <div className="rounded-md border border-border/60 bg-secondary/30 p-3">
+              <p className="font-semibold">Resumen del reemplazo</p>
+              <ul className="ml-4 mt-1 list-disc text-muted-foreground">
+                <li>Filas actualizadas: <b className="text-foreground">{result?.updated ?? 0}</b></li>
+                {(result?.skipped.length ?? 0) > 0 && (
+                  <li>
+                    Filas omitidas por duplicado: <b className="text-foreground">{result?.skipped.length}</b>
+                    <div className="text-xs">(ya existía el material nuevo en esa misma etapa y tipo de casa)</div>
+                  </li>
+                )}
+              </ul>
+            </div>
+
+            <div className="rounded-md border border-amber-300/60 bg-amber-50/50 p-3 dark:bg-amber-950/20">
+              <p className="font-semibold">¿Quieres eliminar también el material antiguo?</p>
+              <p className="mt-1 text-muted-foreground text-xs">
+                <b>{oldMaterial?.code} · {oldMaterial?.description}</b> todavía tiene:
+              </p>
+              <ul className="ml-4 mt-1 list-disc text-xs">
+                <li>
+                  Vales que lo usan:{" "}
+                  <b>{impact?.vale_reqs ?? 0}</b>{" "}
+                  {(impact?.vale_reqs ?? 0) > 0 && (
+                    <span className="text-destructive">
+                      (no se puede eliminar hasta que sean 0)
+                    </span>
+                  )}
+                </li>
+                <li>
+                  Entregas a sitios/casas registradas: <b>{impact?.site_delivery_items ?? 0}</b>
+                </li>
+              </ul>
+
+              <div className="mt-3 space-y-2 text-xs">
+                <p className="font-semibold text-foreground">Si eliges SÍ:</p>
+                <ul className="ml-4 list-disc text-muted-foreground">
+                  <li>Las {impact?.site_delivery_items ?? 0} entregas se traspasarán al material nuevo (<b>{newMaterial?.code}</b>). Si en una misma entrega ya existe el nuevo, se SUMARÁN las cantidades.</li>
+                  <li>Se eliminará el material antiguo de la lista de materiales.</li>
+                  <li>Esta acción no se puede deshacer.</li>
+                </ul>
+                <p className="font-semibold text-foreground">Si eliges NO:</p>
+                <ul className="ml-4 list-disc text-muted-foreground">
+                  <li>El material antiguo seguirá en la lista (puedes seguir buscándolo, editarlo o reemplazarlo después).</li>
+                  <li>Las entregas históricas siguen apuntando a él.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div>
+              <Label>Confirma con la contraseña de obra</Label>
+              <Input
+                type="password"
+                value={pass}
+                onChange={(e) => setPass(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+        )}
+
+        <AlertDialogFooter>
+          {!askDelete ? (
+            <>
+              <AlertDialogCancel disabled={replaceMut.isPending}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={!canSubmit || replaceMut.isPending}
+                onClick={(e) => {
+                  e.preventDefault();
+                  replaceMut.mutate();
+                }}
+              >
+                {replaceMut.isPending ? "Reemplazando…" : "Reemplazar"}
+              </AlertDialogAction>
+            </>
+          ) : (
+            <>
+              <AlertDialogCancel
+                disabled={deleteMut.isPending}
+                onClick={() => onOpenChange(false)}
+              >
+                No, conservar material antiguo
+              </AlertDialogCancel>
+              <AlertDialogAction
+                disabled={
+                  !pass ||
+                  deleteMut.isPending ||
+                  (impact?.vale_reqs ?? 0) > 0
+                }
+                onClick={(e) => {
+                  e.preventDefault();
+                  deleteMut.mutate();
+                }}
+              >
+                {deleteMut.isPending ? "Eliminando…" : "Sí, eliminar y traspasar"}
+              </AlertDialogAction>
+            </>
+          )}
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 
