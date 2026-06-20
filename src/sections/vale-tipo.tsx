@@ -214,7 +214,7 @@ export function ValeTipoSection() {
 
 
       {/* Selectores */}
-      <div className="surface-card grid grid-cols-1 gap-3 p-5 md:grid-cols-3">
+      <div ref={selectorsRef} className="surface-card grid grid-cols-1 gap-3 p-5 md:grid-cols-3">
         <div>
           <Label>Tipo de vivienda</Label>
           <Select
