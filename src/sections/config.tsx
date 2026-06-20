@@ -333,47 +333,118 @@ function BackupRestoreCard() {
 }
 
 // =====================================================================
-// BITÁCORA DE ELIMINACIONES (solo lectura).
+// HISTORIAL DE CAMBIOS (modificaciones + eliminaciones, simples y en cascada).
 // =====================================================================
+
+// Etiquetas amigables para los nombres internos de tabla.
+const TABLE_FRIENDLY: Record<string, string> = {
+  receptions: "Recepciones",
+  deliveries: "Entregas",
+  delivery_items: "Ítems de entrega",
+  delivery_houses: "Casas en entrega",
+  materials_v2: "Materiales",
+  house_types: "Tipos de casa",
+  house_material_req: "Requisitos por casa",
+  vale_types_v2: "Vales",
+  vale_stages: "Etapas de vale",
+  vale_reqs: "Requisitos de etapa",
+  sites: "Sitios",
+  site_deliveries: "Entregas a sitio",
+  site_delivery_items: "Ítems de entrega a sitio",
+  inventory_counts: "Conteos de inventario",
+  inventory_adjustments: "Ajustes de inventario",
+  house_exec_overrides: "Ajustes manuales de viviendas",
+  project_config: "Configuración del proyecto",
+};
+
+const ACTION_LABEL: Record<string, { text: string; tone: string }> = {
+  insert: { text: "Creado", tone: "bg-[oklch(0.4_0.08_115)]/15 text-[oklch(0.55_0.1_115)] border-[oklch(0.4_0.08_115)]/30" },
+  update: { text: "Modificado", tone: "bg-amber-500/15 text-amber-600 border-amber-500/30 dark:text-amber-300" },
+  delete: { text: "Eliminado", tone: "bg-destructive/15 text-destructive border-destructive/30" },
+  cascade_delete: { text: "Eliminado en cascada", tone: "bg-orange-500/15 text-orange-600 border-orange-500/30 dark:text-orange-300" },
+};
+
+function friendlyTable(t: string): string {
+  return TABLE_FRIENDLY[t] ?? t;
+}
+
+// Búsqueda por tokens (regla global del sitio).
+function tokenMatch(haystack: string, search: string): boolean {
+  const tokens = search.toLowerCase().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+  const h = haystack.toLowerCase();
+  return tokens.every((t) => h.includes(t));
+}
+
 function DeletionLogCard() {
   const [tableFilter, setTableFilter] = useState<string>("");
   const [search, setSearch] = useState("");
+  const [kindFilter, setKindFilter] = useState<"all" | "mods" | "dels">("all");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [detail, setDetail] = useState<any | null>(null);
+
   const q = useQuery({
-    queryKey: ["deletion_log"],
+    queryKey: ["history_log"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("deletion_log" as never)
         .select("*")
         .order("deleted_at", { ascending: false })
-        .limit(500);
+        .limit(1000);
+      if (error) throw new Error(error.message);
+      return (data ?? []) as any[];
+    },
+  });
+
+  // Para el modal de detalle de cascada: traemos TODA la fila del lote.
+  const batchQ = useQuery({
+    queryKey: ["history_batch", detail?.batch_id],
+    enabled: !!detail?.batch_id && detail?.action === "cascade_delete",
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("deletion_log" as never)
+        .select("*")
+        .eq("batch_id", detail.batch_id)
+        .order("deleted_at", { ascending: true });
       if (error) throw new Error(error.message);
       return (data ?? []) as any[];
     },
   });
 
   const filtered = useMemo(() => {
-    const s = search.toLowerCase().trim();
     return (q.data ?? []).filter((r: any) => {
       if (tableFilter && r.table_name !== tableFilter) return false;
-      if (!s) return true;
-      return (
-        r.table_name?.toLowerCase().includes(s) ||
-        r.record_id?.toLowerCase().includes(s) ||
-        r.reason?.toLowerCase().includes(s) ||
-        r.deleted_by?.toLowerCase().includes(s) ||
-        JSON.stringify(r.record_snapshot ?? {}).toLowerCase().includes(s)
-      );
+      if (kindFilter === "mods" && !(r.action === "update" || r.action === "insert")) return false;
+      if (kindFilter === "dels" && !(r.action === "delete" || r.action === "cascade_delete")) return false;
+      if (dateFrom && r.deleted_at < dateFrom) return false;
+      if (dateTo && r.deleted_at > `${dateTo}T23:59:59.999Z`) return false;
+      if (!search.trim()) return true;
+      const hay = [
+        r.record_label ?? "",
+        friendlyTable(r.table_name),
+        r.reason ?? "",
+        r.deleted_by ?? "",
+        r.record_id ?? "",
+        JSON.stringify(r.record_snapshot ?? {}),
+      ].join(" ");
+      return tokenMatch(hay, search);
     });
-  }, [q.data, tableFilter, search]);
+  }, [q.data, tableFilter, search, kindFilter, dateFrom, dateTo]);
 
   function exportCsv() {
-    const headers = ["deleted_at", "deleted_by", "table_name", "record_id", "parent_table", "parent_id", "reason", "batch_id", "snapshot"];
+    const headers = ["Fecha y hora", "Usuario", "Qué pasó", "Tipo de registro", "Qué cosa", "Motivo", "ID interno", "Lote (cascada)"];
     const lines = [headers.join(",")];
     for (const r of filtered) {
       const row = [
-        r.deleted_at, r.deleted_by, r.table_name, r.record_id,
-        r.parent_table ?? "", r.parent_id ?? "", (r.reason ?? "").replace(/,/g, ";"),
-        r.batch_id, JSON.stringify(r.record_snapshot ?? {}).replace(/"/g, '""'),
+        fmtDateTime(r.deleted_at),
+        r.deleted_by,
+        ACTION_LABEL[r.action]?.text ?? r.action,
+        friendlyTable(r.table_name),
+        r.record_label ?? "",
+        (r.reason ?? "").replace(/,/g, ";"),
+        r.record_id,
+        r.batch_id,
       ];
       lines.push(row.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","));
     }
@@ -381,7 +452,7 @@ function DeletionLogCard() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `bitacora-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `historial-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -394,63 +465,205 @@ function DeletionLogCard() {
   return (
     <div className="surface-card p-5">
       <h3 className="mb-1 flex items-center gap-2 font-display text-lg font-semibold">
-        <FileClock className="h-5 w-5" /> Bitácora de eliminaciones
+        <FileClock className="h-5 w-5" /> Historial de cambios
       </h3>
       <p className="mb-3 text-xs text-muted-foreground">
-        Registro permanente y solo lectura de cada dato eliminado del sistema (incluyendo borrados en cascada).
+        Registro permanente y de sólo lectura de cada <b>modificación</b> y <b>eliminación</b> del sistema
+        (incluyendo eliminaciones en cascada). Cada línea responde: <i>¿qué cosa?</i>, <i>¿qué pasó?</i>,
+        <i> ¿cuándo y quién?</i> y <i>¿por qué?</i>.
       </p>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
+
+      {/* Filtros */}
+      <div className="mb-3 flex flex-wrap items-end gap-2">
+        <div className="flex gap-1 rounded-lg border border-border p-1">
+          <button
+            type="button"
+            onClick={() => setKindFilter("all")}
+            className={`rounded-md px-3 py-1 text-xs transition ${kindFilter === "all" ? "bg-secondary font-semibold" : "text-muted-foreground hover:bg-secondary/50"}`}
+          >Todo</button>
+          <button
+            type="button"
+            onClick={() => setKindFilter("mods")}
+            className={`rounded-md px-3 py-1 text-xs transition ${kindFilter === "mods" ? "bg-secondary font-semibold" : "text-muted-foreground hover:bg-secondary/50"}`}
+          >Modificaciones</button>
+          <button
+            type="button"
+            onClick={() => setKindFilter("dels")}
+            className={`rounded-md px-3 py-1 text-xs transition ${kindFilter === "dels" ? "bg-secondary font-semibold" : "text-muted-foreground hover:bg-secondary/50"}`}
+          >Eliminaciones</button>
+        </div>
+
         <Input
-          placeholder="Buscar…"
+          placeholder="Buscar guía, factura, vale, material, motivo…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-xs"
         />
         <Select value={tableFilter || "__all"} onValueChange={(v) => setTableFilter(v === "__all" ? "" : v)}>
-          <SelectTrigger className="w-48"><SelectValue placeholder="Tabla" /></SelectTrigger>
+          <SelectTrigger className="w-56"><SelectValue placeholder="Tipo de registro" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="__all">Todas las tablas</SelectItem>
-            {uniqueTables.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+            <SelectItem value="__all">Todos los tipos</SelectItem>
+            {uniqueTables.map((t) => <SelectItem key={t} value={t}>{friendlyTable(t)}</SelectItem>)}
           </SelectContent>
         </Select>
-        <span className="chip">{filtered.length} entradas</span>
+        <div>
+          <Label className="text-[10px] uppercase text-muted-foreground">Desde</Label>
+          <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className="h-9 w-36" />
+        </div>
+        <div>
+          <Label className="text-[10px] uppercase text-muted-foreground">Hasta</Label>
+          <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className="h-9 w-36" />
+        </div>
+        {(search || tableFilter || dateFrom || dateTo || kindFilter !== "all") && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => { setSearch(""); setTableFilter(""); setDateFrom(""); setDateTo(""); setKindFilter("all"); }}
+          >Quitar filtros</Button>
+        )}
+        <span className="chip">{filtered.length} de {q.data?.length ?? 0}</span>
         <div className="ml-auto">
           <Button variant="outline" size="sm" onClick={exportCsv} disabled={filtered.length === 0}>
             <Download className="h-3.5 w-3.5" /> Exportar CSV
           </Button>
         </div>
       </div>
-      <div className="max-h-96 overflow-auto rounded-lg border border-border">
+
+      <div className="max-h-[28rem] overflow-auto rounded-lg border border-border">
         <table className="min-w-full text-xs">
-          <thead className="sticky top-0 bg-secondary/60 text-left uppercase tracking-wider text-muted-foreground">
+          <thead className="sticky top-0 z-10 bg-secondary/80 text-left uppercase tracking-wider text-muted-foreground backdrop-blur">
             <tr>
               <th className="px-3 py-2">Fecha y hora</th>
               <th className="px-3 py-2">Usuario</th>
-              <th className="px-3 py-2">Tabla</th>
-              <th className="px-3 py-2">ID</th>
-              <th className="px-3 py-2">Padre</th>
+              <th className="px-3 py-2">Qué pasó</th>
+              <th className="px-3 py-2">Qué cosa</th>
               <th className="px-3 py-2">Motivo</th>
+              <th className="px-3 py-2">Detalle</th>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r: any) => (
-              <tr key={r.id} className="border-t border-border/60">
-                <td className="px-3 py-1.5 tabular-nums">{fmtDateTime(r.deleted_at)}</td>
-                <td className="px-3 py-1.5">{r.deleted_by}</td>
-                <td className="px-3 py-1.5 font-mono">{r.table_name}</td>
-                <td className="px-3 py-1.5 font-mono">{r.record_id}</td>
-                <td className="px-3 py-1.5 font-mono text-muted-foreground">
-                  {r.parent_table ? `${r.parent_table}/${r.parent_id?.slice(0, 8)}…` : "—"}
-                </td>
-                <td className="px-3 py-1.5">{r.reason ?? "—"}</td>
-              </tr>
-            ))}
+            {filtered.map((r: any) => {
+              const a = ACTION_LABEL[r.action] ?? { text: r.action, tone: "" };
+              return (
+                <tr key={r.id} className="border-t border-border/60 align-top">
+                  <td className="px-3 py-2 tabular-nums whitespace-nowrap">{fmtDateTime(r.deleted_at)}</td>
+                  <td className="px-3 py-2">{r.deleted_by}</td>
+                  <td className="px-3 py-2">
+                    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${a.tone}`}>
+                      {a.text}
+                    </span>
+                    <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">
+                      {friendlyTable(r.table_name)}
+                    </div>
+                  </td>
+                  <td className="px-3 py-2">
+                    <div className="font-medium">{r.record_label ?? r.record_id}</div>
+                    {r.parent_table && (
+                      <div className="text-[10px] text-muted-foreground">
+                        Borrado junto a su {friendlyTable(r.parent_table)}
+                      </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2 max-w-[14rem]">{r.reason ?? "—"}</td>
+                  <td className="px-3 py-2">
+                    <Button variant="outline" size="sm" onClick={() => setDetail(r)}>
+                      Ver detalle
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
             {filtered.length === 0 && (
               <tr><td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">Sin entradas.</td></tr>
             )}
           </tbody>
         </table>
       </div>
+
+      {/* Modal de detalle */}
+      <AlertDialog open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <AlertDialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {detail && (ACTION_LABEL[detail.action]?.text ?? detail.action)} · {detail && friendlyTable(detail.table_name)}
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-1 text-sm">
+                <div><b>Qué cosa:</b> {detail?.record_label ?? detail?.record_id}</div>
+                <div><b>Cuándo:</b> {detail && fmtDateTime(detail.deleted_at)}</div>
+                <div><b>Quién:</b> {detail?.deleted_by}</div>
+                <div><b>Por qué:</b> {detail?.reason ?? "— (sin motivo registrado)"}</div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {/* MODIFICACIÓN: tabla antes/después */}
+          {detail?.action === "update" && detail?.changes && (
+            <div className="rounded-lg border border-border">
+              <div className="border-b border-border bg-secondary/50 px-3 py-2 text-xs font-semibold uppercase tracking-wider">
+                Cambios realizados
+              </div>
+              <table className="min-w-full text-xs">
+                <thead className="text-left text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2">Campo</th>
+                    <th className="px-3 py-2">Antes</th>
+                    <th className="px-3 py-2">Después</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(detail.changes as Record<string, { antes: any; despues: any }>).map(([field, ch]) => (
+                    <tr key={field} className="border-t border-border/60 align-top">
+                      <td className="px-3 py-2 font-mono">{field}</td>
+                      <td className="px-3 py-2 text-destructive">{String(ch.antes ?? "—")}</td>
+                      <td className="px-3 py-2 text-[oklch(0.55_0.1_115)]">{String(ch.despues ?? "—")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* ELIMINACIÓN EN CASCADA: árbol */}
+          {detail?.action === "cascade_delete" && (
+            <div className="rounded-lg border border-border">
+              <div className="border-b border-border bg-secondary/50 px-3 py-2 text-xs font-semibold uppercase tracking-wider">
+                Todo lo que se eliminó en este mismo lote
+              </div>
+              <div className="max-h-72 overflow-auto p-3 text-xs">
+                {batchQ.isLoading && <div className="text-muted-foreground">Cargando…</div>}
+                {batchQ.data && (
+                  <ul className="space-y-1">
+                    {batchQ.data.map((row: any) => (
+                      <li
+                        key={row.id}
+                        className={`rounded px-2 py-1 ${row.parent_table ? "ml-4 border-l-2 border-border pl-3" : "font-medium"}`}
+                      >
+                        <span className="text-muted-foreground">[{friendlyTable(row.table_name)}]</span>{" "}
+                        {row.record_label ?? row.record_id}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* JSON completo plegable */}
+          <details className="rounded-lg border border-border bg-background/50">
+            <summary className="cursor-pointer px-3 py-2 text-xs font-semibold text-muted-foreground">
+              Ver datos completos (técnico)
+            </summary>
+            <pre className="max-h-64 overflow-auto p-3 text-[10px] leading-tight">
+              {JSON.stringify(detail?.record_snapshot ?? {}, null, 2)}
+            </pre>
+          </details>
+
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cerrar</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
