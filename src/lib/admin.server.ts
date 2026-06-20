@@ -13,7 +13,7 @@ export function checkPassphrase(provided: string | undefined | null) {
 export const ALLOWED_TABLES = [
   "project_config",
   "house_types",
-  "materials",
+  "materials_v2",
   "house_material_req",
   "receptions",
   "deliveries",

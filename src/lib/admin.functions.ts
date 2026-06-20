@@ -5,7 +5,6 @@ import { z } from "zod";
 const tableEnum = z.enum([
   "project_config",
   "house_types",
-  "materials",
   "house_material_req",
   "receptions",
   "deliveries",

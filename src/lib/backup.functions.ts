@@ -9,7 +9,6 @@ import { z } from "zod";
 export const ALL_TABLES = [
   "project_config",
   "house_types",
-  "materials",
   "materials_v2",
   "house_material_req",
   "vale_types_v2",
@@ -104,18 +103,11 @@ const CASCADE_GRAPH: Record<string, { table: string; fk: string }[]> = {
     { table: "vale_reqs", fk: "material_id" },
     { table: "site_delivery_items", fk: "material_id" },
   ],
-  materials: [
-    { table: "receptions", fk: "material_code" },
-    { table: "delivery_items", fk: "material_code" },
-    { table: "house_material_req", fk: "material_code" },
-  ],
 };
 
 /** Determina la columna de match para una tabla: 'code' o 'id'. */
 function matchColFor(table: string): "id" | "code" {
-  if (table === "materials" || table === "house_types" || table === "project_config") {
-    return table === "materials" || table === "house_types" ? "code" : "id";
-  }
+  if (table === "house_types") return "code";
   return "id";
 }
 
@@ -242,7 +234,7 @@ export const resetSystemFn = createServerFn({ method: "POST" })
     for (const t of [...tablesToWipe].reverse()) {
       const { error } = await (supabaseAdmin.from(t as never) as any).delete().not("id", "is", null);
       if (error) {
-        const colCheck = ["materials", "house_types"].includes(t) ? "code" : "id";
+        const colCheck = t === "house_types" ? "code" : "id";
         const { error: e2 } = await (supabaseAdmin.from(t as never) as any).delete().not(colCheck, "is", null);
         if (e2) throw new Error(`Borrando ${t}: ${e2.message}`);
       }
