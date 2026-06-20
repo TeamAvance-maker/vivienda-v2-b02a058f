@@ -685,7 +685,7 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
           <TableToolbar
             ctrl={ctrl}
             searchPlaceholder="Buscar en resultados (tipo, vale, etapa)…"
-            extraActions={undefined as any}
+            
             rightSlot={
               <Button
                 variant="outline"
