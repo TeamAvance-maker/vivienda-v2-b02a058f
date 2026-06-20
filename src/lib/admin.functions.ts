@@ -28,6 +28,8 @@ const mutationSchema = z.object({
   action: z.enum(["update", "delete", "insert"]),
   match: z.record(z.string(), z.any()).optional(),
   values: z.record(z.string(), z.any()).optional(),
+  /** Motivo opcional escrito por el usuario; queda guardado en el historial. */
+  reason: z.string().optional(),
 });
 
 export const verifyPassphraseFn = createServerFn({ method: "POST" })
@@ -55,6 +57,7 @@ export const adminMutateFn = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import(
       "@/integrations/supabase/client.server"
     );
+    const { logHistory, diffSnapshots } = await import("./history.server");
 
     // Bloquear edición/eliminación de conteos que ya generaron ajuste.
     if (
@@ -75,15 +78,39 @@ export const adminMutateFn = createServerFn({ method: "POST" })
       }
     }
 
+    // Helper: leer el registro original ANTES de la mutación, para el historial.
+    async function readBefore(): Promise<Record<string, any> | null> {
+      if (!data.match || Object.keys(data.match).length === 0) return null;
+      let q: any = supabaseAdmin.from(data.table).select("*");
+      for (const [k, v] of Object.entries(data.match)) q = q.eq(k, v);
+      const { data: rows, error } = await q.limit(1);
+      if (error) return null;
+      return (rows && rows[0]) || null;
+    }
+
+    function idOf(snap: Record<string, any> | null): string {
+      if (!snap) return JSON.stringify(data.match ?? {});
+      return String(snap.id ?? snap.code ?? JSON.stringify(data.match ?? {}));
+    }
 
     if (data.action === "delete") {
       if (!data.match || Object.keys(data.match).length === 0) {
         throw new Error("Falta filtro para eliminar.");
       }
+      const before = await readBefore();
       let q: any = supabaseAdmin.from(data.table).delete();
       for (const [k, v] of Object.entries(data.match)) q = q.eq(k, v);
       const { error } = await q;
       if (error) throw new Error(error.message);
+      if (before) {
+        await logHistory({
+          action: "delete",
+          table: data.table,
+          recordId: idOf(before),
+          snapshot: before,
+          reason: data.reason ?? null,
+        });
+      }
       return { ok: true };
     }
 
@@ -92,19 +119,43 @@ export const adminMutateFn = createServerFn({ method: "POST" })
         throw new Error("Falta filtro para actualizar.");
       }
       if (!data.values) throw new Error("Faltan valores.");
+      const before = await readBefore();
       let q: any = supabaseAdmin.from(data.table).update(data.values as any);
       for (const [k, v] of Object.entries(data.match)) q = q.eq(k, v);
       const { error } = await q;
       if (error) throw new Error(error.message);
+      const after = await readBefore();
+      const changes = diffSnapshots(before, after);
+      if (Object.keys(changes).length > 0) {
+        await logHistory({
+          action: "update",
+          table: data.table,
+          recordId: idOf(after ?? before),
+          snapshot: before,
+          changes,
+          reason: data.reason ?? null,
+        });
+      }
       return { ok: true };
     }
 
     // insert privilegiado
     if (!data.values) throw new Error("Faltan valores.");
-    const { error } = await supabaseAdmin
+    const { data: inserted, error } = await supabaseAdmin
       .from(data.table)
-      .insert(data.values as any);
+      .insert(data.values as any)
+      .select("*")
+      .maybeSingle();
     if (error) throw new Error(error.message);
+    if (inserted) {
+      await logHistory({
+        action: "insert",
+        table: data.table,
+        recordId: idOf(inserted as any),
+        snapshot: inserted as any,
+        reason: data.reason ?? null,
+      });
+    }
     return { ok: true };
   });
 
