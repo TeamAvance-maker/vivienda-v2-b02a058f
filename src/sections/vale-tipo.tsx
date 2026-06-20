@@ -1,13 +1,24 @@
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowRight, Check, ChevronsUpDown, Pencil, Plus, Search, Trash2 } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { ArrowRight, Check, ChevronsUpDown, Pencil, Plus, Repeat2, Search, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   SortableTh,
   TablePagination,
   TableToolbar,
   useTableControls,
 } from "@/components/data-table";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  RadioGroup,
+  RadioGroupItem,
+} from "@/components/ui/radio-group";
+import {
+  deleteMaterialWithTransferFn,
+  getMaterialImpactFn,
+  replaceMaterialInValesFn,
+} from "@/lib/material-replace.functions";
+
 import { toast } from "sonner";
 import { SectionHeader } from "@/components/app-shell";
 import { requestAdminMutation } from "@/components/passphrase-dialog";
