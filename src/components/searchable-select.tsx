@@ -31,6 +31,7 @@ interface Props {
   emptyText?: string;
   className?: string;
   disabled?: boolean;
+  id?: string;
 }
 
 export function SearchableSelect({
@@ -42,6 +43,7 @@ export function SearchableSelect({
   emptyText = "Sin resultados",
   className,
   disabled,
+  id,
 }: Props) {
   const [open, setOpen] = useState(false);
   const current = options.find((o) => o.value === value);
@@ -49,6 +51,7 @@ export function SearchableSelect({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          id={id}
           type="button"
           variant="outline"
           role="combobox"
@@ -68,7 +71,9 @@ export function SearchableSelect({
             const opt = options.find((o) => o.value === itemValue);
             if (!opt) return 0;
             const hay = `${opt.label} ${opt.keywords ?? ""} ${opt.hint ?? ""}`.toLowerCase();
-            return hay.includes(search.toLowerCase()) ? 1 : 0;
+            const tokens = search.toLowerCase().split(/\s+/).filter(Boolean);
+            if (tokens.length === 0) return 1;
+            return tokens.every((t) => hay.includes(t)) ? 1 : 0;
           }}
         >
           <CommandInput placeholder={searchPlaceholder} />

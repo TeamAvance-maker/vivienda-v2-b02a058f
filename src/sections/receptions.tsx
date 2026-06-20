@@ -69,14 +69,22 @@ export function ReceptionsSection() {
 
   const filtered = useMemo(() => {
     const s = search.toLowerCase().trim();
-    const base = !s
+    const tokens = s.split(/\s+/).filter(Boolean);
+    const base = tokens.length === 0
       ? (list.data ?? [])
-      : (list.data ?? []).filter(
-          (r) =>
-            r.guia.toLowerCase().includes(s) ||
-            r.material_code.toLowerCase().includes(s) ||
-            r.date.includes(s),
-        );
+      : (list.data ?? []).filter((r) => {
+          const m = materials.data?.find((x) => x.code === r.material_code);
+          const hay = [
+            r.guia,
+            r.material_code,
+            r.date,
+            fmtDate(r.date),
+            m?.description ?? "",
+            HAND_LABEL[r.handedness],
+            String(r.qty),
+          ].join(" ").toLowerCase();
+          return tokens.every((t) => hay.includes(t));
+        });
     const sorted = [...base].sort((a, b) => {
       const av = a[sortKey] as any;
       const bv = b[sortKey] as any;
@@ -89,7 +97,8 @@ export function ReceptionsSection() {
       return sortDir === "asc" ? cmp : -cmp;
     });
     return sorted;
-  }, [list.data, search, sortKey, sortDir]);
+  }, [list.data, materials.data, search, sortKey, sortDir]);
+
 
   useEffect(() => { setPage(1); }, [search, pageSize, sortKey, sortDir]);
 
@@ -119,24 +128,45 @@ export function ReceptionsSection() {
 
       <div className="surface-card p-5">
         <h3 className="mb-3 font-display text-base font-semibold">Nueva recepción</h3>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
+        <p className="mb-3 text-xs text-muted-foreground">Tip: pulsa Enter para avanzar al siguiente campo. En “Cantidad”, Enter registra la recepción.</p>
+        <form
+          className="grid grid-cols-1 gap-3 md:grid-cols-6"
+          onSubmit={(e) => { e.preventDefault(); add(); }}
+        >
           <div>
-            <Label>Fecha</Label>
-            <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+            <Label htmlFor="rec-date">Fecha</Label>
+            <Input
+              id="rec-date"
+              type="date"
+              value={form.date}
+              onChange={(e) => setForm({ ...form, date: e.target.value })}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); document.getElementById("rec-guia")?.focus(); } }}
+            />
           </div>
           <div>
-            <Label>Guía</Label>
-            <Input value={form.guia} onChange={(e) => setForm({ ...form, guia: e.target.value })} placeholder="G-1234" />
+            <Label htmlFor="rec-guia">Guía</Label>
+            <Input
+              id="rec-guia"
+              value={form.guia}
+              onChange={(e) => setForm({ ...form, guia: e.target.value })}
+              placeholder="G-1234"
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); document.getElementById("rec-material")?.focus(); } }}
+            />
           </div>
           <div className="md:col-span-2">
-            <Label>Material</Label>
+            <Label htmlFor="rec-material">Material</Label>
             <div className="flex gap-2">
               <div className="flex-1">
                 <SearchableSelect
+                  id="rec-material"
                   value={form.material_code}
                   onChange={(v) => {
                     const m = materials.data?.find((x) => x.code === v);
                     setForm({ ...form, material_code: v, handedness: m?.tracks_handedness ? "left" : "none" });
+                    setTimeout(() => {
+                      const next = m?.tracks_handedness ? "rec-hand" : "rec-qty";
+                      document.getElementById(next)?.focus();
+                    }, 50);
                   }}
                   placeholder="Selecciona material"
                   searchPlaceholder="Buscar por código o descripción…"
@@ -159,13 +189,16 @@ export function ReceptionsSection() {
             </div>
           </div>
           <div>
-            <Label>Sentido</Label>
+            <Label htmlFor="rec-hand">Sentido</Label>
             <Select
               value={form.handedness}
-              onValueChange={(v) => setForm({ ...form, handedness: v as Handedness })}
+              onValueChange={(v) => {
+                setForm({ ...form, handedness: v as Handedness });
+                setTimeout(() => document.getElementById("rec-qty")?.focus(), 50);
+              }}
               disabled={!mat?.tracks_handedness}
             >
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger id="rec-hand"><SelectValue /></SelectTrigger>
               <SelectContent>
                 {handOpts.map((h) => (
                   <SelectItem key={h} value={h}>{HAND_LABEL[h]}</SelectItem>
@@ -174,19 +207,21 @@ export function ReceptionsSection() {
             </Select>
           </div>
           <div>
-            <Label>Cantidad</Label>
+            <Label htmlFor="rec-qty">Cantidad</Label>
             <Input
+              id="rec-qty"
               type="number"
               min={1}
               value={form.qty}
               onChange={(e) => setForm({ ...form, qty: Number(e.target.value) })}
             />
           </div>
-        </div>
-        <div className="mt-3 flex justify-end">
-          <Button onClick={add}>Registrar recepción</Button>
-        </div>
+          <div className="md:col-span-6 mt-1 flex justify-end">
+            <Button type="submit">Registrar recepción</Button>
+          </div>
+        </form>
       </div>
+
 
       <div className="surface-card overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 p-3">
