@@ -103,18 +103,11 @@ const CASCADE_GRAPH: Record<string, { table: string; fk: string }[]> = {
     { table: "vale_reqs", fk: "material_id" },
     { table: "site_delivery_items", fk: "material_id" },
   ],
-  materials: [
-    { table: "receptions", fk: "material_code" },
-    { table: "delivery_items", fk: "material_code" },
-    { table: "house_material_req", fk: "material_code" },
-  ],
 };
 
 /** Determina la columna de match para una tabla: 'code' o 'id'. */
 function matchColFor(table: string): "id" | "code" {
-  if (table === "materials" || table === "house_types" || table === "project_config") {
-    return table === "materials" || table === "house_types" ? "code" : "id";
-  }
+  if (table === "house_types") return "code";
   return "id";
 }
 
