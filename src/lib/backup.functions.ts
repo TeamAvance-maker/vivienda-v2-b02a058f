@@ -234,7 +234,7 @@ export const resetSystemFn = createServerFn({ method: "POST" })
     for (const t of [...tablesToWipe].reverse()) {
       const { error } = await (supabaseAdmin.from(t as never) as any).delete().not("id", "is", null);
       if (error) {
-        const colCheck = ["materials", "house_types"].includes(t) ? "code" : "id";
+        const colCheck = t === "house_types" ? "code" : "id";
         const { error: e2 } = await (supabaseAdmin.from(t as never) as any).delete().not(colCheck, "is", null);
         if (e2) throw new Error(`Borrando ${t}: ${e2.message}`);
       }
