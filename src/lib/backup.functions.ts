@@ -9,7 +9,6 @@ import { z } from "zod";
 export const ALL_TABLES = [
   "project_config",
   "house_types",
-  "materials",
   "materials_v2",
   "house_material_req",
   "vale_types_v2",
