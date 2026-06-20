@@ -559,8 +559,16 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
     setSelectedIds(new Set());
   }, [materialId]);
 
+  const sortedMaterials = useMemo(
+    () =>
+      [...(materials.data ?? [])].sort(
+        (a, b) =>
+          (a.sort_order ?? 0) - (b.sort_order ?? 0) ||
+          a.code.localeCompare(b.code),
+      ),
     [materials.data],
   );
+
 
   const stagesById = useMemo(() => {
     const m = new Map<string, ValeStage>();
