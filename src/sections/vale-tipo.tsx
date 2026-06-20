@@ -685,11 +685,50 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
           <TableToolbar
             ctrl={ctrl}
             searchPlaceholder="Buscar en resultados (tipo, vale, etapa)…"
+            extraActions={
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={rows.length === 0}
+                onClick={() => setReplaceOpen(true)}
+                title="Reemplazar este material por otro en los vales"
+              >
+                <Repeat2 className="mr-2 h-4 w-4" />
+                Reemplazar por otro material…
+              </Button>
+            }
           />
+          {selectedIds.size > 0 && (
+            <div className="border-b border-border/60 bg-secondary/40 px-4 py-2 text-xs text-muted-foreground">
+              {selectedIds.size} fila(s) marcadas para reemplazo selectivo.
+              <button
+                type="button"
+                className="ml-2 underline"
+                onClick={() => setSelectedIds(new Set())}
+              >
+                Quitar selección
+              </button>
+            </div>
+          )}
           <div className="max-h-[60vh] overflow-auto">
             <table className="min-w-full text-sm">
               <thead className="sticky top-0 z-10 bg-secondary/80 text-left text-xs uppercase tracking-wider text-muted-foreground backdrop-blur">
                 <tr>
+                  <th className="px-3 py-2.5 w-8">
+                    <Checkbox
+                      checked={
+                        ctrl.visible.length > 0 &&
+                        ctrl.visible.every((r) => selectedIds.has(r.req.id))
+                      }
+                      onCheckedChange={(v) => {
+                        const next = new Set(selectedIds);
+                        if (v) ctrl.visible.forEach((r) => next.add(r.req.id));
+                        else ctrl.visible.forEach((r) => next.delete(r.req.id));
+                        setSelectedIds(next);
+                      }}
+                      aria-label="Marcar página visible"
+                    />
+                  </th>
                   <SortableTh ctrl={ctrl} sortKey="house">Tipo casa</SortableTh>
                   <SortableTh ctrl={ctrl} sortKey="vale">Vale</SortableTh>
                   <SortableTh ctrl={ctrl} sortKey="stage">Etapa</SortableTh>
@@ -704,12 +743,28 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
                     r.stageName && r.stageName.trim() && r.stageName.trim() !== `Etapa ${r.stageNumber}`
                       ? `Etapa ${r.stageNumber} · ${r.stageName}`
                       : `Etapa ${r.stageNumber}`;
+                  const checked = selectedIds.has(r.req.id);
                   return (
                     <tr
                       key={r.req.id}
                       className="cursor-pointer border-t border-border/60 hover:bg-secondary/40"
                       onClick={() => onGo(r.req)}
                     >
+                      <td
+                        className="px-3 py-2.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(v) => {
+                            const next = new Set(selectedIds);
+                            if (v) next.add(r.req.id);
+                            else next.delete(r.req.id);
+                            setSelectedIds(next);
+                          }}
+                          aria-label="Marcar fila"
+                        />
+                      </td>
                       <td className="px-4 py-2.5 font-medium">{r.houseType}</td>
                       <td className="px-4 py-2.5">
                         <span className="font-mono text-xs mr-2">{r.valeCode}</span>
@@ -761,7 +816,7 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
                 })}
                 {ctrl.visible.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
                       {rows.length === 0
                         ? "Este material no aparece en ningún vale."
                         : "Sin resultados para esos filtros."}
@@ -778,6 +833,7 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
           Selecciona un material para ver dónde se usa.
         </div>
       )}
+
 
       <AlertDialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <AlertDialogContent>
