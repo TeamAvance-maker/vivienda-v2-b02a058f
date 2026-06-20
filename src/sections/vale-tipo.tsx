@@ -550,13 +550,13 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
   );
 
   const stagesById = useMemo(() => {
-    const m = new Map<string, (typeof valeStages.data extends (infer U)[] | undefined ? U : never)>();
+    const m = new Map<string, ValeStage>();
     for (const s of valeStages.data ?? []) m.set(s.id, s);
     return m;
   }, [valeStages.data]);
 
   const valeTypesById = useMemo(() => {
-    const m = new Map<string, (typeof valeTypes.data extends (infer U)[] | undefined ? U : never)>();
+    const m = new Map<string, ValeTypeV2>();
     for (const v of valeTypes.data ?? []) m.set(v.id, v);
     return m;
   }, [valeTypes.data]);
