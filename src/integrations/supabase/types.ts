@@ -241,13 +241,6 @@ export type Database = {
             referencedRelation: "v_houses_executed"
             referencedColumns: ["house_type_code"]
           },
-          {
-            foreignKeyName: "house_material_req_material_code_fkey"
-            columns: ["material_code"]
-            isOneToOne: false
-            referencedRelation: "materials"
-            referencedColumns: ["code"]
-          },
         ]
       }
       house_types: {
@@ -371,33 +364,6 @@ export type Database = {
             referencedColumns: ["code"]
           },
         ]
-      }
-      materials: {
-        Row: {
-          code: string
-          created_at: string
-          description: string
-          sort_order: number
-          tracks_handedness: boolean
-          unit: string
-        }
-        Insert: {
-          code: string
-          created_at?: string
-          description?: string
-          sort_order?: number
-          tracks_handedness?: boolean
-          unit?: string
-        }
-        Update: {
-          code?: string
-          created_at?: string
-          description?: string
-          sort_order?: number
-          tracks_handedness?: boolean
-          unit?: string
-        }
-        Relationships: []
       }
       materials_v2: {
         Row: {
@@ -759,15 +725,7 @@ export type Database = {
           material_code: string | null
           qty: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "house_material_req_material_code_fkey"
-            columns: ["material_code"]
-            isOneToOne: false
-            referencedRelation: "materials"
-            referencedColumns: ["code"]
-          },
-        ]
+        Relationships: []
       }
       v_stock: {
         Row: {
