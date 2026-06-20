@@ -47,9 +47,10 @@ export function ReceptionsSection() {
     if (!form.qty || form.qty <= 0) return toast.error("Cantidad inválida");
     const guia = form.guia.trim().toUpperCase();
     if (!guia) return toast.error("Ingresa guía o factura (obligatorio)");
-    if (!/^[GF]-\d{8}$/.test(guia)) {
-      return toast.error("Formato inválido. Usa G-XXXXXXXX (guía) o F-XXXXXXXX (factura), 8 dígitos.");
+    if (!/^[GF]-\d{1,8}$/.test(guia)) {
+      return toast.error("Formato inválido. Usa G-… (guía) o F-… (factura), de 1 a 8 dígitos.");
     }
+
     const handed = handOpts.includes(form.handedness) ? form.handedness : handOpts[0];
     requestAdminMutation({
       table: "receptions",
