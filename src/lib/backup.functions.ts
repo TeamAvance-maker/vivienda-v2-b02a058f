@@ -161,16 +161,20 @@ export const cascadeDeleteFn = createServerFn({ method: "POST" })
 
     // Bitácora: insertar TODO antes de borrar, en un batch_id común.
     const batchId = crypto.randomUUID();
-    const logRows = rows.map((r) => ({
+    const { humanLabel } = await import("./history.server");
+    const isCascade = rows.length > 1;
+    const logRows = await Promise.all(rows.map(async (r) => ({
       batch_id: batchId,
+      action: isCascade ? "cascade_delete" : "delete",
       table_name: r.table,
       record_id: String(r.record[matchColFor(r.table)]),
       record_snapshot: r.record,
+      record_label: await humanLabel(r.table, r.record),
       parent_table: r.parent_table ?? null,
       parent_id: r.parent_id ?? null,
       reason: data.reason ?? null,
       deleted_by: "superadmin",
-    }));
+    })));
     const { error: logErr } = await supabaseAdmin.from("deletion_log").insert(logRows as any);
     if (logErr) throw new Error(`Bitácora: ${logErr.message}`);
 
