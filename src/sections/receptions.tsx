@@ -235,7 +235,7 @@ export function ReceptionsSection() {
       <div className="surface-card overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border/60 p-3">
           <Input
-            placeholder="Buscar por guía, material, fecha…"
+            placeholder="Buscar por guía, factura, material, fecha…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="max-w-xs"
