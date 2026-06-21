@@ -139,11 +139,15 @@ export function useTableControls<T>(opts: UseTableControlsOptions<T>): TableCont
     let out = data.slice();
     const s = search.trim().toLowerCase();
     if (s && searchFields) {
-      out = out.filter((row) =>
-        searchFields(row).some((v) =>
-          v != null && String(v).toLowerCase().includes(s),
-        ),
-      );
+      // Coincidencia por tokens: la fila debe contener TODOS los términos
+      // (separados por espacios) en cualquiera de sus campos de búsqueda.
+      const tokens = s.split(/\s+/).filter(Boolean);
+      out = out.filter((row) => {
+        const hay = searchFields(row)
+          .map((v) => (v == null ? "" : String(v).toLowerCase()))
+          .join(" \u0001 ");
+        return tokens.every((t) => hay.includes(t));
+      });
     }
     if (numericFilters) {
       for (const f of numericFilters) {
