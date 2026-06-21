@@ -1,6 +1,14 @@
 import { motion } from "framer-motion";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, Grid3x3, Home, Layers, PackageCheck, Wrench } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+
 import {
   SortableTh,
   TablePagination,
@@ -27,13 +35,23 @@ import {
   useSiteDeliveries,
   useSiteDeliveryItems,
 } from "@/lib/sites-queries";
-import { buildMaps, cellStatus } from "@/lib/sites-compute";
-import { fmtDate, fmtNumber, housesPossible, makeMap, pendingHouses } from "@/lib/compute";
+import { buildMaps, cellStatus, pendingDemand, sitesCompletableWithStock } from "@/lib/sites-compute";
+import { fmtDate, fmtNumber, makeMap, pendingHouses } from "@/lib/compute";
 import { HAND_SHORT } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 
+function ResumenItem({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+  return (
+    <div className={cn("rounded-md border bg-card/50 px-3 py-2", highlight && "border-primary/40 bg-primary/5")}>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="num-display text-lg">{fmtNumber(value)}</div>
+    </div>
+  );
+}
+
 function KPI({
+
   icon: Icon,
   label,
   value,
@@ -145,13 +163,8 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
     return map;
   }, [matsV2Q.data, sDelivQ.data, sItemsQ.data]);
 
-  const possible = housesPossible({
-    houseTypes: ht,
-    reqs: reqs.data ?? [],
-    stock: vStock.data ?? [],
-    executed: vExecuted.data ?? [],
-    materials: ms,
-  });
+  // (cálculo viejo v1 reemplazado por indicador v2 — ver `indicador` abajo)
+
 
   // Materiales críticos (stock <= umbral pero >0) o agotados
   const threshold = cfg.data?.critical_stock_threshold ?? 10;
@@ -265,6 +278,83 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
     return counts;
   }, [v2Maps, sitesQ.data, vtQ.data]);
 
+  // ====== Indicador principal v2: sitios completables con el stock actual ======
+  // Stock por material v2 = suma del stock v1 (todas las handedness) cuyo code coincide.
+  const stockByMatV2 = useMemo(() => {
+    const map = new Map<string, number>();
+    const stockByCode = new Map<string, number>();
+    for (const r of vStock.data ?? []) {
+      stockByCode.set(r.material_code, (stockByCode.get(r.material_code) ?? 0) + Number(r.qty));
+    }
+    for (const m of matsV2Q.data ?? []) {
+      map.set(m.id, stockByCode.get(m.code) ?? 0);
+    }
+    return map;
+  }, [vStock.data, matsV2Q.data]);
+
+  const indicador = useMemo(() => {
+    const sites = sitesQ.data ?? [];
+    const vales = vtQ.data ?? [];
+    if (!v2Maps || sites.length === 0 || vales.length === 0) {
+      return {
+        completable: 0,
+        pendingCount: 0,
+        limiterId: null as string | null,
+        demandByMaterial: new Map<string, number>(),
+        incompleteSitesByVale: new Map<string, number>(),
+        pendingSitesByType: new Map<string, number>(),
+      };
+    }
+    const demand = pendingDemand({ sites, valeTypes: vales, maps: v2Maps });
+    const fit = sitesCompletableWithStock({
+      sites,
+      valeTypes: vales,
+      maps: v2Maps,
+      stockByMaterial: stockByMatV2,
+    });
+    return { ...fit, ...demand };
+  }, [v2Maps, sitesQ.data, vtQ.data, stockByMatV2]);
+
+  const matsById = useMemo(
+    () => new Map((matsV2Q.data ?? []).map((m) => [m.id, m])),
+    [matsV2Q.data],
+  );
+  const limiterMat = indicador.limiterId ? matsById.get(indicador.limiterId) : null;
+  const limiterShort = limiterMat ? Math.max(0, (indicador.demandByMaterial.get(limiterMat.id) ?? 0) - (stockByMatV2.get(limiterMat.id) ?? 0)) : 0;
+
+  // Tablas para el panel "Ver Detalle"
+  const detalleMateriales = useMemo(() => {
+    const rows = [...indicador.demandByMaterial.entries()].map(([mid, demanda]) => {
+      const mat = matsById.get(mid);
+      const stock = stockByMatV2.get(mid) ?? 0;
+      const deficit = demanda - stock;
+      return { mid, mat, demanda, stock, deficit };
+    });
+    return {
+      deficit: rows.filter((r) => r.deficit > 0).sort((a, b) => b.deficit - a.deficit),
+      ajustados: rows
+        .filter((r) => r.deficit <= 0 && r.demanda > 0 && r.stock - r.demanda <= r.demanda * 0.2)
+        .sort((a, b) => (a.stock - a.demanda) - (b.stock - b.demanda)),
+    };
+  }, [indicador.demandByMaterial, stockByMatV2, matsById]);
+
+  const detalleVales = useMemo(() => {
+    const vales = vtQ.data ?? [];
+    return vales
+      .map((v) => ({ vale: v, incompletos: indicador.incompleteSitesByVale.get(v.id) ?? 0 }))
+      .filter((r) => r.incompletos > 0)
+      .sort((a, b) => b.incompletos - a.incompletos);
+  }, [vtQ.data, indicador.incompleteSitesByVale]);
+
+  const detalleSitiosPorTipo = useMemo(() => {
+    return [...indicador.pendingSitesByType.entries()]
+      .map(([tipo, n]) => ({ tipo, n }))
+      .sort((a, b) => b.n - a.n);
+  }, [indicador.pendingSitesByType]);
+
+  const [openDetalle, setOpenDetalle] = useState(false);
+
+
   const goPlanoWithFilter = (overall: "terminado" | "en-ejecucion" | "sin-iniciar") => {
     try { sessionStorage.setItem("plano:overall", overall); } catch {}
     onNavigate?.("plano");
@@ -343,32 +433,219 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
             Indicador principal
           </div>
           <h2 className="mt-2 max-w-2xl font-display text-lg font-medium text-[oklch(0.93_0.04_80)] md:text-xl">
-            Viviendas que pueden completarse con el stock actual
+            Sitios que pueden completarse con el stock actual
           </h2>
           <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-2">
             <div className="num-display text-6xl text-white md:text-7xl">
-              {fmtNumber(possible.total)}
+              {fmtNumber(indicador.completable)}
             </div>
             <div className="text-sm text-[oklch(0.85_0.06_80)]">
-              de <span className="font-medium text-white">{fmtNumber(pending)}</span> viviendas pendientes
+              de <span className="font-medium text-white">{fmtNumber(indicador.pendingCount)}</span> sitios pendientes
             </div>
           </div>
-          {possible.limiterLabel ? (
-            <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-sm">
-              <AlertTriangle className="h-4 w-4 text-[oklch(0.85_0.13_75)]" />
-              <span className="text-[oklch(0.93_0.04_80)]">Material limitante:</span>
-              <span className="font-medium text-white">
-                {possible.limiterLabel}
-                {possible.limiterDescription ? ` · ${possible.limiterDescription}` : ""}
-              </span>
-            </div>
-          ) : (
-            <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-sm text-[oklch(0.93_0.04_80)]">
-              <PackageCheck className="h-4 w-4" /> Stock suficiente para todas las viviendas pendientes.
-            </div>
-          )}
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            {limiterMat ? (
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-sm">
+                <AlertTriangle className="h-4 w-4 text-[oklch(0.85_0.13_75)]" />
+                <span className="text-[oklch(0.93_0.04_80)]">Material limitante:</span>
+                <span className="font-medium text-white">
+                  {limiterMat.code} · {limiterMat.description}
+                </span>
+                <span className="text-[oklch(0.85_0.06_80)]">
+                  · Faltan <span className="font-medium text-white">{fmtNumber(limiterShort)}</span> u.
+                </span>
+              </div>
+            ) : indicador.pendingCount === 0 ? (
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-sm text-[oklch(0.93_0.04_80)]">
+                <PackageCheck className="h-4 w-4" /> No hay sitios pendientes.
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-sm text-[oklch(0.93_0.04_80)]">
+                <PackageCheck className="h-4 w-4" /> Stock suficiente para completar los {fmtNumber(indicador.pendingCount)} sitios pendientes.
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setOpenDetalle(true)}
+              className="inline-flex items-center gap-1 rounded-full border border-white/25 bg-white/10 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-white/20"
+            >
+              Ver Detalle →
+            </button>
+          </div>
         </div>
       </motion.div>
+
+      {/* Panel lateral: resumen detallado */}
+      <Sheet open={openDetalle} onOpenChange={setOpenDetalle}>
+        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
+          <SheetHeader>
+            <SheetTitle>Resumen detallado de stock vs demanda</SheetTitle>
+            <SheetDescription>
+              Cálculo automático a partir de sitios, vales, entregas y stock actual.
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-6 text-sm">
+            {/* Resumen general */}
+            <section>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Resumen general
+              </h3>
+              <div className="grid grid-cols-2 gap-2">
+                <ResumenItem label="Sitios totales" value={siteStatusCounts.total} />
+                <ResumenItem label="Terminados" value={siteStatusCounts.terminado} />
+                <ResumenItem label="En ejecución" value={siteStatusCounts.enEjecucion} />
+                <ResumenItem label="Sin iniciar" value={siteStatusCounts.sinIniciar} />
+                <ResumenItem label="Vales aplicables" value={valeKpis.total} />
+                <ResumenItem label="Vales completos" value={valeKpis.completas} />
+                <ResumenItem label="Vales parciales" value={valeKpis.parciales} />
+                <ResumenItem label="Vales sin tocar" value={valeKpis.vacias} />
+                <ResumenItem label="Sitios pendientes" value={indicador.pendingCount} highlight />
+                <ResumenItem label="Completables ahora" value={indicador.completable} highlight />
+              </div>
+            </section>
+
+            {/* Materiales con déficit */}
+            <section>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Materiales con déficit ({detalleMateriales.deficit.length})
+              </h3>
+              {detalleMateriales.deficit.length === 0 ? (
+                <p className="text-muted-foreground">Sin déficit: el stock cubre toda la demanda pendiente.</p>
+              ) : (
+                <div className="overflow-hidden rounded-lg border">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-2 py-1.5 text-left">Material</th>
+                        <th className="px-2 py-1.5 text-right">Stock</th>
+                        <th className="px-2 py-1.5 text-right">Demanda</th>
+                        <th className="px-2 py-1.5 text-right">Déficit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detalleMateriales.deficit.map((r) => (
+                        <tr key={r.mid} className="border-t">
+                          <td className="px-2 py-1.5">
+                            <div className="font-medium">{r.mat?.code ?? "—"}</div>
+                            <div className="text-muted-foreground">{r.mat?.description ?? ""}</div>
+                          </td>
+                          <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.stock)}</td>
+                          <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.demanda)}</td>
+                          <td className="px-2 py-1.5 text-right font-mono font-semibold text-destructive">
+                            −{fmtNumber(r.deficit)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            {/* Materiales ajustados */}
+            {detalleMateriales.ajustados.length > 0 && (
+              <section>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Materiales ajustados ({detalleMateriales.ajustados.length})
+                </h3>
+                <p className="mb-2 text-xs text-muted-foreground">Holgura ≤ 20 % sobre la demanda — pueden faltar pronto.</p>
+                <div className="overflow-hidden rounded-lg border">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-2 py-1.5 text-left">Material</th>
+                        <th className="px-2 py-1.5 text-right">Stock</th>
+                        <th className="px-2 py-1.5 text-right">Demanda</th>
+                        <th className="px-2 py-1.5 text-right">Holgura</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detalleMateriales.ajustados.map((r) => (
+                        <tr key={r.mid} className="border-t">
+                          <td className="px-2 py-1.5">
+                            <div className="font-medium">{r.mat?.code ?? "—"}</div>
+                            <div className="text-muted-foreground">{r.mat?.description ?? ""}</div>
+                          </td>
+                          <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.stock)}</td>
+                          <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.demanda)}</td>
+                          <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.stock - r.demanda)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+
+            {/* Sitios pendientes por tipo */}
+            <section>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Sitios pendientes por tipo de vivienda
+              </h3>
+              {detalleSitiosPorTipo.length === 0 ? (
+                <p className="text-muted-foreground">No hay sitios pendientes.</p>
+              ) : (
+                <div className="overflow-hidden rounded-lg border">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-2 py-1.5 text-left">Tipo</th>
+                        <th className="px-2 py-1.5 text-right">Pendientes</th>
+                        <th className="px-2 py-1.5 text-right">% del total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detalleSitiosPorTipo.map((r) => (
+                        <tr key={r.tipo} className="border-t">
+                          <td className="px-2 py-1.5 font-medium">{r.tipo}</td>
+                          <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.n)}</td>
+                          <td className="px-2 py-1.5 text-right font-mono">
+                            {indicador.pendingCount ? ((r.n / indicador.pendingCount) * 100).toFixed(1) : "0.0"}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+
+            {/* Vales incompletos */}
+            <section>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Vales con sitios incompletos
+              </h3>
+              {detalleVales.length === 0 ? (
+                <p className="text-muted-foreground">Todos los vales aplicables están completos.</p>
+              ) : (
+                <div className="overflow-hidden rounded-lg border">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-2 py-1.5 text-left">Vale</th>
+                        <th className="px-2 py-1.5 text-right">Sitios incompletos</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detalleVales.map((r) => (
+                        <tr key={r.vale.id} className="border-t">
+                          <td className="px-2 py-1.5">
+                            <div className="font-medium">{r.vale.code}</div>
+                            <div className="text-muted-foreground">{r.vale.name}</div>
+                          </td>
+                          <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.incompletos)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </div>
+        </SheetContent>
+      </Sheet>
+
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">

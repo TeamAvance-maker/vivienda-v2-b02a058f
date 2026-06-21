@@ -85,3 +85,118 @@ export const STATUS_COLOR: Record<CellStatus, string> = {
   empty: "bg-muted hover:bg-muted/70",
   na: "bg-secondary/40 hover:bg-secondary/60 opacity-40",
 };
+
+/**
+ * Demanda pendiente (en unidades) por material, considerando todos los sitios
+ * y vales aplicables. Suma faltante = max(0, req.qty - entregado) por etapa.
+ * También devuelve, por vale tipo, cuántos sitios tienen ese vale incompleto.
+ */
+export function pendingDemand(input: {
+  sites: Site[];
+  valeTypes: ValeTypeV2[];
+  maps: Maps;
+}) {
+  const demandByMaterial = new Map<string, number>();
+  const incompleteSitesByVale = new Map<string, number>();
+  const pendingSitesByType = new Map<string, number>();
+  const pendingSiteIds = new Set<string>();
+
+  for (const site of input.sites) {
+    let sitePending = false;
+    for (const v of input.valeTypes) {
+      const stages = input.maps.stagesByVale.get(v.id) ?? [];
+      if (stages.length === 0) continue;
+      let valeAppliesToSite = false;
+      let valeIncomplete = false;
+      for (const st of stages) {
+        const reqs = input.maps.reqsByStageHouse.get(st.id)?.get(site.house_type) ?? [];
+        if (reqs.length === 0) continue;
+        valeAppliesToSite = true;
+        const delivered =
+          input.maps.deliveredBySiteStageMat.get(site.id)?.get(st.id) ?? new Map();
+        for (const r of reqs) {
+          const got = delivered.get(r.material_id) ?? 0;
+          const missing = Math.max(0, r.qty - got);
+          if (missing > 0) {
+            valeIncomplete = true;
+            demandByMaterial.set(
+              r.material_id,
+              (demandByMaterial.get(r.material_id) ?? 0) + missing,
+            );
+          }
+        }
+      }
+      if (valeAppliesToSite && valeIncomplete) {
+        incompleteSitesByVale.set(v.id, (incompleteSitesByVale.get(v.id) ?? 0) + 1);
+        sitePending = true;
+      }
+    }
+    if (sitePending) {
+      pendingSiteIds.add(site.id);
+      pendingSitesByType.set(
+        site.house_type,
+        (pendingSitesByType.get(site.house_type) ?? 0) + 1,
+      );
+    }
+  }
+
+  return { demandByMaterial, incompleteSitesByVale, pendingSitesByType, pendingSiteIds };
+}
+
+/**
+ * Recorre los sitios pendientes en orden (manzana, sitio) y descuenta del
+ * stock; cuenta cuántos pueden quedar 100% completos y cuál es el primer
+ * material que se agota.
+ */
+export function sitesCompletableWithStock(input: {
+  sites: Site[];
+  valeTypes: ValeTypeV2[];
+  maps: Maps;
+  stockByMaterial: Map<string, number>;
+}) {
+  const stock = new Map(input.stockByMaterial);
+  const sorted = [...input.sites].sort(
+    (a, b) => a.manzana - b.manzana || a.sitio.localeCompare(b.sitio),
+  );
+  let completable = 0;
+  let limiterId: string | null = null;
+  let pendingCount = 0;
+
+  for (const site of sorted) {
+    const need = new Map<string, number>();
+    let hasPending = false;
+    for (const v of input.valeTypes) {
+      const stages = input.maps.stagesByVale.get(v.id) ?? [];
+      for (const st of stages) {
+        const reqs = input.maps.reqsByStageHouse.get(st.id)?.get(site.house_type) ?? [];
+        if (reqs.length === 0) continue;
+        const delivered =
+          input.maps.deliveredBySiteStageMat.get(site.id)?.get(st.id) ?? new Map();
+        for (const r of reqs) {
+          const got = delivered.get(r.material_id) ?? 0;
+          const missing = Math.max(0, r.qty - got);
+          if (missing > 0) {
+            need.set(r.material_id, (need.get(r.material_id) ?? 0) + missing);
+            hasPending = true;
+          }
+        }
+      }
+    }
+    if (!hasPending) continue;
+    pendingCount++;
+    let ok = true;
+    for (const [mid, q] of need) {
+      if ((stock.get(mid) ?? 0) < q) {
+        ok = false;
+        if (!limiterId) limiterId = mid;
+        break;
+      }
+    }
+    if (ok) {
+      for (const [mid, q] of need) stock.set(mid, (stock.get(mid) ?? 0) - q);
+      completable++;
+    }
+  }
+  return { completable, pendingCount, limiterId };
+}
+
