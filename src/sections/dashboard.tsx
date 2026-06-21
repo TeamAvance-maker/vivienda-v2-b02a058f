@@ -608,7 +608,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
             Indicador principal
           </div>
           <h2 className="mt-2 max-w-2xl font-display text-lg font-medium text-[oklch(0.93_0.04_80)] md:text-xl">
-            Sitios que pueden completarse con el stock actual
+            Sitios que pueden Completarse con el Stock Actual
           </h2>
           <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-2">
             <div className="num-display text-6xl text-white md:text-7xl">
@@ -1250,7 +1250,7 @@ function DeliveriesHistoryTable({ rows }: { rows: HistRow[] }) {
   return (
     <div className="surface-card overflow-hidden p-0">
       <div className="px-5 pt-5">
-        <h3 className="font-display text-lg font-semibold">Tabla Maestra de Control</h3>
+        <h3 className="font-display text-lg font-semibold">Historial de Entregas por Vale</h3>
         <p className="text-xs text-muted-foreground">
           Registro completo (sólo lectura). Usa la búsqueda, el orden y la paginación.
         </p>
