@@ -546,3 +546,94 @@ function MasterTable({ rows, loading }: { rows: MasterRow[]; loading: boolean })
   );
 }
 
+// ============================================================
+// Historial de entregas por vale (sólo lectura, búsqueda/orden/paginación)
+// ============================================================
+type HistRow = {
+  id: string;
+  date: string | null | undefined;
+  createdAt: string;
+  site?: { manzana: number; sitio: number } | undefined;
+  vale?: { name: string } | undefined;
+  stageNum?: number;
+  materialCount: number;
+  mode: string;
+};
+
+function DeliveriesHistoryTable({ rows }: { rows: HistRow[] }) {
+  const ctrl = useTableControls<HistRow>({
+    data: rows,
+    searchFields: (r) => [
+      r.site ? `M${r.site.manzana}` : "",
+      r.site ? `Sitio ${r.site.sitio}` : "",
+      r.vale?.name,
+      r.stageNum ? `Etapa ${r.stageNum}` : "",
+      r.mode === "auto" ? "Auto-completar" : "Manual",
+      fmtDate(r.date),
+    ],
+    sortFns: {
+      fecha: (a, b) => a.createdAt.localeCompare(b.createdAt),
+      sitio: (a, b) =>
+        (a.site?.manzana ?? 0) - (b.site?.manzana ?? 0) ||
+        (a.site?.sitio ?? 0) - (b.site?.sitio ?? 0),
+      vale: (a, b) => (a.vale?.name ?? "").localeCompare(b.vale?.name ?? ""),
+      etapa: (a, b) => (a.stageNum ?? 0) - (b.stageNum ?? 0),
+      materiales: (a, b) => a.materialCount - b.materialCount,
+      modo: (a, b) => a.mode.localeCompare(b.mode),
+    },
+    defaultSort: { key: "fecha", dir: "desc" },
+    defaultPageSize: 25,
+  });
+
+  return (
+    <div className="surface-card overflow-hidden p-0">
+      <div className="px-5 pt-5">
+        <h3 className="font-display text-lg font-semibold">Historial de entregas por vale</h3>
+        <p className="text-xs text-muted-foreground">
+          Registro completo (sólo lectura). Usa la búsqueda, el orden y la paginación.
+        </p>
+      </div>
+      <TableToolbar ctrl={ctrl} searchPlaceholder="Buscar por sitio, vale, etapa…" />
+      <div className="overflow-auto">
+        <table className="min-w-full text-sm">
+          <thead className="bg-card text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b border-border">
+              <SortableTh ctrl={ctrl} sortKey="fecha">Fecha</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="sitio">Sitio</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="vale">Vale</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="etapa">Etapa</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="materiales" align="right">Materiales</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="modo">Modo</SortableTh>
+            </tr>
+          </thead>
+          <tbody>
+            {ctrl.visible.map((e) => (
+              <tr key={e.id} className="border-b border-border/50">
+                <td className="px-4 py-2">{fmtDate(e.date)}</td>
+                <td className="px-4 py-2">
+                  {e.site ? `M${e.site.manzana} · Sitio ${e.site.sitio}` : "—"}
+                </td>
+                <td className="px-4 py-2">{e.vale?.name ?? "—"}</td>
+                <td className="px-4 py-2">{e.stageNum ?? "—"}</td>
+                <td className="px-4 py-2 text-right num-display">{fmtNumber(e.materialCount)}</td>
+                <td className="px-4 py-2">
+                  <span className="chip">{e.mode === "auto" ? "Auto-completar" : "Manual"}</span>
+                </td>
+              </tr>
+            ))}
+            {ctrl.visible.length === 0 && (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                  {rows.length === 0 ? "Aún no hay entregas registradas." : "Sin resultados para tu búsqueda."}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <TablePagination ctrl={ctrl} />
+    </div>
+  );
+}
+
+
