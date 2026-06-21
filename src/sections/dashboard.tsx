@@ -605,7 +605,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
       <Sheet open={openDetalle} onOpenChange={setOpenDetalle}>
         <SheetContent
           side="right"
-          className="flex h-screen w-screen max-w-none flex-col gap-0 p-0 sm:max-w-none"
+          className="flex h-screen w-screen max-w-none flex-col gap-0 p-0 duration-700 data-[state=closed]:duration-500 data-[state=open]:duration-700 sm:max-w-none"
         >
           {/* Barra superior fija */}
           <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b bg-background/95 px-6 py-3 backdrop-blur">
