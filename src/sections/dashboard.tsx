@@ -375,26 +375,35 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <KPI icon={Home} label="Viviendas totales" value={fmtNumber(totalHouses)} />
         <KPI
-          icon={PackageCheck}
-          label="Ejecutadas"
-          value={fmtNumber(executedTotal)}
+          icon={CheckCircle2}
+          label="Terminadas"
+          value={fmtNumber(siteStatusCounts.terminado)}
           tone="good"
-          hint={`${totalHouses ? Math.round((executedTotal / totalHouses) * 100) : 0}% del total`}
+          hint={`${siteStatusCounts.total ? Math.round((siteStatusCounts.terminado / siteStatusCounts.total) * 100) : 0}% de los sitios`}
+          onClick={() => goPlanoWithFilter("terminado")}
         />
         <KPI
           icon={Wrench}
-          label="Viviendas incompletas"
-          value={fmtNumber(incompleteTotal)}
-          tone={incompleteTotal > 0 ? "warn" : "default"}
-          hint="Abiertas manualmente"
+          label="En Ejecución"
+          value={fmtNumber(siteStatusCounts.enEjecucion)}
+          tone={siteStatusCounts.enEjecucion > 0 ? "warn" : "default"}
+          hint="Con al menos un material entregado"
+          onClick={() => goPlanoWithFilter("en-ejecucion")}
         />
-        <KPI icon={TrendingUp} label="Pendientes" value={fmtNumber(pending)} />
+        <KPI
+          icon={Clock}
+          label="Sin Iniciar"
+          value={fmtNumber(siteStatusCounts.sinIniciar)}
+          hint="Sin ningún vale entregado"
+          onClick={() => goPlanoWithFilter("sin-iniciar")}
+        />
         <KPI
           icon={AlertTriangle}
           label="Materiales críticos"
           value={fmtNumber(criticals.length)}
           tone={criticals.length ? "warn" : "default"}
           hint={`≤ ${threshold} u.`}
+          onClick={scrollToAlerts}
         />
       </div>
 
