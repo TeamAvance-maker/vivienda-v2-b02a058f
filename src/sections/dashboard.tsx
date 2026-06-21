@@ -502,55 +502,70 @@ type MasterRow = {
 };
 
 function MasterTable({ rows, loading }: { rows: MasterRow[]; loading: boolean }) {
-  const [q, setQ] = useState("");
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return rows;
-    return rows.filter(
-      (r) =>
-        r.code.toLowerCase().includes(s) ||
-        (r.mat?.description ?? "").toLowerCase().includes(s),
-    );
-  }, [rows, q]);
+  const ctrl = useTableControls<MasterRow>({
+    data: rows,
+    searchFields: (r) => [
+      r.code,
+      r.mat?.description,
+      HAND_SHORT[r.hand as keyof typeof HAND_SHORT],
+    ],
+    sortFns: {
+      material: (a, b) => a.code.localeCompare(b.code),
+      sentido: (a, b) => String(a.hand).localeCompare(String(b.hand)),
+      necesario: (a, b) => a.required - b.required,
+      recepcionado: (a, b) => a.received - b.received,
+      entregado: (a, b) => a.delivered - b.delivered,
+      saldo: (a, b) => a.saldo - b.saldo,
+      pendienteRecep: (a, b) => a.pendienteRecep - b.pendienteRecep,
+      pct: (a, b) => a.pct - b.pct,
+    },
+    numericFilters: [
+      { key: "necesario", label: "Necesario", accessor: (r) => r.required },
+      { key: "recepcionado", label: "Recepcionado", accessor: (r) => r.received },
+      { key: "entregado", label: "Entregado", accessor: (r) => r.delivered },
+      { key: "saldo", label: "Saldo", accessor: (r) => r.saldo },
+      { key: "pendienteRecep", label: "Pend. comprar", accessor: (r) => r.pendienteRecep },
+      { key: "pct", label: "% Cumpl.", accessor: (r) => r.pct },
+    ],
+    defaultPageSize: 25,
+  });
 
   return (
-    <div className="surface-card p-5">
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h3 className="font-display text-lg font-semibold">Tabla maestra de control</h3>
-          <p className="text-xs text-muted-foreground">
-            Necesario / Recepcionado / Entregado / Saldo / Pendiente por comprar
-          </p>
-        </div>
-        <div className="relative w-full sm:w-72">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="Buscar por código o descripción…"
-            className="pl-8"
-          />
-        </div>
+    <div className="surface-card overflow-hidden p-0">
+      <div className="px-5 pt-5">
+        <h3 className="font-display text-lg font-semibold">Tabla maestra de control</h3>
+        <p className="text-xs text-muted-foreground">
+          Necesario / Recepcionado / Entregado / Saldo / Pendiente por comprar
+        </p>
       </div>
-      <div className="text-xs text-muted-foreground mb-2">
-        Mostrando {filtered.length} de {rows.length} materiales
-      </div>
-      <div className="max-h-[60vh] overflow-auto rounded-md border border-border/60">
+      <TableToolbar
+        ctrl={ctrl}
+        searchPlaceholder="Buscar por código o descripción…"
+        numericFilters={[
+          { key: "necesario", label: "Necesario" },
+          { key: "recepcionado", label: "Recepcionado" },
+          { key: "entregado", label: "Entregado" },
+          { key: "saldo", label: "Saldo" },
+          { key: "pendienteRecep", label: "Pend. comprar" },
+          { key: "pct", label: "% Cumpl." },
+        ]}
+      />
+      <div className="max-h-[60vh] overflow-auto">
         <table className="min-w-full text-sm">
           <thead className="sticky top-0 z-10 bg-card text-left text-xs uppercase tracking-wider text-muted-foreground shadow-sm">
             <tr className="border-b border-border">
-              <th className="py-2 px-3">Material</th>
-              <th className="py-2 px-3">Sentido</th>
-              <th className="py-2 px-3 text-right">Necesario</th>
-              <th className="py-2 px-3 text-right">Recepcionado</th>
-              <th className="py-2 px-3 text-right">Entregado</th>
-              <th className="py-2 px-3 text-right">Saldo</th>
-              <th className="py-2 px-3 text-right">Pend. comprar</th>
-              <th className="py-2 px-3 text-right">% Cumpl.</th>
+              <SortableTh ctrl={ctrl} sortKey="material">Material</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="sentido">Sentido</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="necesario" align="right">Necesario</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="recepcionado" align="right">Recepcionado</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="entregado" align="right">Entregado</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="saldo" align="right">Saldo</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="pendienteRecep" align="right">Pend. comprar</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="pct" align="right">% Cumpl.</SortableTh>
             </tr>
           </thead>
           <tbody>
-            {filtered.map((r) => (
+            {ctrl.visible.map((r) => (
               <tr key={`${r.code}-${r.hand}`} className="border-b border-border/50">
                 <td className="py-2 px-3">
                   <div className="font-medium">{r.code}</div>
@@ -574,7 +589,7 @@ function MasterTable({ rows, loading }: { rows: MasterRow[]; loading: boolean })
                 <td className="py-2 px-3 text-right num-display">{r.pct}%</td>
               </tr>
             ))}
-            {filtered.length === 0 && (
+            {ctrl.visible.length === 0 && (
               <tr>
                 <td colSpan={8} className="py-8 text-center text-muted-foreground">
                   {loading ? "Cargando…" : rows.length === 0 ? "Aún no hay datos para mostrar." : "Sin resultados para tu búsqueda."}
@@ -584,6 +599,7 @@ function MasterTable({ rows, loading }: { rows: MasterRow[]; loading: boolean })
           </tbody>
         </table>
       </div>
+      <TablePagination ctrl={ctrl} />
     </div>
   );
 }
