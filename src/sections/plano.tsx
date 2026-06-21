@@ -921,7 +921,7 @@ function ProgressBadge({ pct }: { pct: number }) {
       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: TONE_TERM }} />
       </div>
-      <span className="tabular-nums text-[11px] font-semibold">{pct}%</span>
+      <span className="tabular-nums text-[11px] font-semibold">{pct.toFixed(2)}%</span>
     </div>
   );
 }
@@ -972,7 +972,7 @@ function DetallesValePanel({
         completos,
         parciales,
         sinEntregar,
-        pct: aplicable === 0 ? 0 : Math.round((completos / aplicable) * 100),
+        pct: aplicable === 0 ? 0 : (completos / aplicable) * 100,
       });
       const stages = valeStages.filter((x) => x.vale_type_id === vt.id).sort((a, b) => a.stage_number - b.stage_number);
       for (const st of stages) {
@@ -994,7 +994,7 @@ function DetallesValePanel({
           completos: comS,
           parciales: parS,
           sinEntregar: sinS,
-          pct: aplS === 0 ? 0 : Math.round((comS / aplS) * 100),
+          pct: aplS === 0 ? 0 : (comS / aplS) * 100,
         });
       }
     }
@@ -1082,7 +1082,7 @@ function DetallesManzanaPanel({ sites, valeTypes, maps }: { sites: Site[]; valeT
       terminados: v.term,
       enEjecucion: v.exe,
       sinIniciar: v.sin,
-      pct: v.total === 0 ? 0 : Math.round((v.term / v.total) * 100),
+      pct: v.total === 0 ? 0 : (v.term / v.total) * 100,
     }));
   }, [sites, valeTypes, maps]);
 
@@ -1164,7 +1164,7 @@ function DetallesTipoPanel({ sites, valeTypes, maps }: { sites: Site[]; valeType
       terminados: v.term,
       enEjecucion: v.exe,
       sinIniciar: v.sin,
-      pct: v.total === 0 ? 0 : Math.round((v.term / v.total) * 100),
+      pct: v.total === 0 ? 0 : (v.term / v.total) * 100,
     }));
   }, [sites, valeTypes, maps]);
 
