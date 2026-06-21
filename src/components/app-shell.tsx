@@ -278,6 +278,9 @@ export function AppShell({
         onMouseLeave={onLeave}
         projectName={projectName}
         onOpenHelp={() => setHelpOpen(true)}
+        isSuperadmin={isSuperadmin}
+        onSignOut={onSignOut ?? (() => {})}
+        userEmail={userEmail}
       />
 
       {/* Header móvil */}
