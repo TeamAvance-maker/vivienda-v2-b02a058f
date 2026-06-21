@@ -361,7 +361,16 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
     return `resumen-stock-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
   };
 
+  const collator = new Intl.Collator("es", { sensitivity: "base", numeric: true });
+  const sortMats = <T extends { mat?: { code?: string | null } | null }>(rows: T[]) =>
+    [...rows].sort((a, b) => collator.compare(a.mat?.code ?? "", b.mat?.code ?? ""));
+  const sortVales = <T extends { vale: { code: string } }>(rows: T[]) =>
+    [...rows].sort((a, b) => collator.compare(a.vale.code, b.vale.code));
+  const sortTipos = <T extends { tipo: string }>(rows: T[]) =>
+    [...rows].sort((a, b) => collator.compare(a.tipo, b.tipo));
+
   const exportarExcel = () => {
+
     const wb = XLSX.utils.book_new();
 
     const resumen = [
