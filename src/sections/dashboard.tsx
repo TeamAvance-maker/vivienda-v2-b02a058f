@@ -219,26 +219,40 @@ export function DashboardSection() {
   }, [sitesQ.data, vtQ.data, v2Maps, ht, vExecuted.data]);
 
   const valeKpis = useMemo(() => {
-    if (!v2Maps || !sitesQ.data || !vtQ.data) return { total: 0, completas: 0, parciales: 0, vacias: 0, porManzana: [] as { manzana: number; total: number; completas: number; pct: number }[] };
+    const empty = {
+      total: 0, completas: 0, parciales: 0, vacias: 0,
+      terminadas: 0, enEjecucion: 0, sinIniciar: 0, sitiosTotal: 0,
+      porManzana: [] as { manzana: number; total: number; completas: number; pct: number }[],
+    };
+    if (!v2Maps || !sitesQ.data || !vtQ.data) return empty;
     let total = 0, completas = 0, parciales = 0, vacias = 0;
+    let terminadas = 0, enEjecucion = 0, sinIniciar = 0;
     const perManz = new Map<number, { total: number; completas: number }>();
     for (const s of sitesQ.data) {
+      let siteHasAny = false;
+      let siteAllComplete = true;
+      let siteApplies = false;
       for (const v of vtQ.data) {
         const st = cellStatus(s, v, v2Maps);
         if (st === "na") continue;
+        siteApplies = true;
         total++;
         const m = perManz.get(s.manzana) ?? { total: 0, completas: 0 };
         m.total++;
-        if (st === "complete") { completas++; m.completas++; }
-        else if (st === "partial") parciales++;
-        else vacias++;
+        if (st === "complete") { completas++; m.completas++; siteHasAny = true; }
+        else if (st === "partial") { parciales++; siteHasAny = true; siteAllComplete = false; }
+        else { vacias++; siteAllComplete = false; }
         perManz.set(s.manzana, m);
       }
+      if (!siteApplies) { sinIniciar++; continue; }
+      if (siteAllComplete) terminadas++;
+      else if (siteHasAny) enEjecucion++;
+      else sinIniciar++;
     }
     const porManzana = [...perManz.entries()]
       .map(([manzana, v]) => ({ manzana, ...v, pct: v.total ? (v.completas / v.total) * 100 : 0 }))
       .sort((a, b) => a.manzana - b.manzana);
-    return { total, completas, parciales, vacias, porManzana };
+    return { total, completas, parciales, vacias, terminadas, enEjecucion, sinIniciar, sitiosTotal: sitesQ.data.length, porManzana };
   }, [v2Maps, sitesQ.data, vtQ.data]);
 
   // Historial completo de entregas por vale (sólo lectura)
