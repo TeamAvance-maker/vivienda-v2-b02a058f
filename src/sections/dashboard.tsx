@@ -879,7 +879,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
       {valeKpis.porManzana.length > 0 && (
         <div className="surface-card p-5">
           <div className="mb-3 flex items-end justify-between">
-            <h3 className="font-display text-lg font-semibold">Avance por manzana</h3>
+            <h3 className="font-display text-lg font-semibold">Avance por Manzana (Materiales Entregados)</h3>
             <span className="chip">{valeKpis.porManzana.length} manzanas</span>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -914,7 +914,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
 
       <div className="surface-card p-5">
         <div className="mb-3 flex items-end justify-between">
-          <h3 className="font-display text-lg font-semibold">Avance por tipo de vivienda</h3>
+          <h3 className="font-display text-lg font-semibold">Avance por Tipo de Vivienda (Materiales Entregados)</h3>
           <span className="chip">{ht.length} tipos</span>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -1137,7 +1137,7 @@ function MasterTable({ rows, loading }: { rows: MasterRow[]; loading: boolean })
   return (
     <div className="surface-card overflow-hidden p-0">
       <div className="px-5 pt-5">
-        <h3 className="font-display text-lg font-semibold">Tabla maestra de control</h3>
+        <h3 className="font-display text-lg font-semibold">Tabla Maestra de Control</h3>
         <p className="text-xs text-muted-foreground">
           Necesario / Recepcionado / Entregado / Saldo / Pendiente por comprar
         </p>
@@ -1250,7 +1250,7 @@ function DeliveriesHistoryTable({ rows }: { rows: HistRow[] }) {
   return (
     <div className="surface-card overflow-hidden p-0">
       <div className="px-5 pt-5">
-        <h3 className="font-display text-lg font-semibold">Historial de entregas por vale</h3>
+        <h3 className="font-display text-lg font-semibold">Tabla Maestra de Control</h3>
         <p className="text-xs text-muted-foreground">
           Registro completo (sólo lectura). Usa la búsqueda, el orden y la paginación.
         </p>

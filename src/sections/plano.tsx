@@ -1141,7 +1141,7 @@ function DetallesManzanaPanel({ sites, valeTypes, maps }: { sites: Site[]; valeT
   return (
     <>
       <SheetHeader>
-        <SheetTitle>Resumen por Manzana</SheetTitle>
+        <SheetTitle>Resumen por Manzana (Materiales Entregados)</SheetTitle>
         <SheetDescription>Avance promedio y conteo de estados por manzana.</SheetDescription>
       </SheetHeader>
       <div className="mt-4 space-y-2">
@@ -1226,7 +1226,7 @@ function DetallesTipoPanel({ sites, valeTypes, maps }: { sites: Site[]; valeType
   return (
     <>
       <SheetHeader>
-        <SheetTitle>Resumen por Tipo de casa</SheetTitle>
+        <SheetTitle>Resumen por Tipo de Vivienda (Materiales Entregados)</SheetTitle>
         <SheetDescription>Avance promedio y conteo de estados por tipo (A1, A2, B, C).</SheetDescription>
       </SheetHeader>
       <div className="mt-4 space-y-2">
