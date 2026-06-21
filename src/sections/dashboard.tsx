@@ -467,7 +467,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
       });
       autoTable(doc, {
         head: [["Tipo", "Pendientes", "% del total"]],
-        body: detalleSitiosPorTipo.map((r) => [r.tipo, fmtNumber(r.n), `${indicador.pendingCount ? ((r.n / indicador.pendingCount) * 100).toFixed(1) : "0.0"}%`]),
+        body: sortTipos(detalleSitiosPorTipo).map((r) => [r.tipo, fmtNumber(r.n), `${indicador.pendingCount ? ((r.n / indicador.pendingCount) * 100).toFixed(1) : "0.0"}%`]),
         styles: { fontSize: 8 },
       });
     }
