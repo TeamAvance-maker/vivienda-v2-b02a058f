@@ -1270,12 +1270,13 @@ function DetallesSitioPanel({ sites, valeTypes, maps }: { sites: Site[]; valeTyp
     if (!maps) return [];
     return sites.map((s) => {
       const prog = siteProgress(s, valeTypes, maps);
+      const lc = siteLineCounts(s, maps);
       return {
         key: `${s.manzana}-${s.sitio}`,
         manzana: s.manzana,
         sitio: s.sitio,
         tipo: s.house_type ?? "—",
-        pct: prog.pct,
+        pct: lc.total === 0 ? 0 : (lc.done / lc.total) * 100,
         estado: STATUS_LABEL[prog.status],
         estadoKey: prog.status,
         completos: prog.completos,
@@ -1284,6 +1285,7 @@ function DetallesSitioPanel({ sites, valeTypes, maps }: { sites: Site[]; valeTyp
       };
     });
   }, [sites, valeTypes, maps]);
+
 
   const ctrl = useTableControls<typeof rows[number]>({
     data: rows,
