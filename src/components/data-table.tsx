@@ -99,7 +99,7 @@ export function useTableControls<T>(opts: UseTableControlsOptions<T>): TableCont
     sortFns,
     numericFilters,
     defaultSort = null,
-    defaultPageSize = 25,
+    defaultPageSize = 10,
   } = opts;
 
   const [search, setSearch] = useState("");
