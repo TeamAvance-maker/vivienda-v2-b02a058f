@@ -6,11 +6,13 @@ import {
   HelpCircle,
   Home,
   HousePlus,
+  LogOut,
   Map as MapIcon,
   Menu as MenuIcon,
   PackagePlus,
   Settings2,
   Truck,
+  UserCog,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -28,7 +30,8 @@ export type TabKey =
   | "materiales"
   | "inventario"
   | "reportes"
-  | "config";
+  | "config"
+  | "usuarios";
 
 export const TABS: { key: TabKey; label: string; icon: typeof Home }[] = [
   { key: "dashboard", label: "Inicio", icon: Home },
@@ -43,6 +46,9 @@ export const TABS: { key: TabKey; label: string; icon: typeof Home }[] = [
 
 const CONFIG_TAB: { key: TabKey; label: string; icon: typeof Home } = {
   key: "config", label: "Configuración", icon: Settings2,
+};
+const USERS_TAB: { key: TabKey; label: string; icon: typeof Home } = {
+  key: "usuarios", label: "Usuarios", icon: UserCog,
 };
 
 const ALL_TABS = [...TABS, CONFIG_TAB];
