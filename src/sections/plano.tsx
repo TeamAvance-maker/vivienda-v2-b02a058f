@@ -972,7 +972,7 @@ function DetallesValePanel({
         completos,
         parciales,
         sinEntregar,
-        pct: aplicable === 0 ? 0 : Math.round((completos / aplicable) * 100),
+        pct: aplicable === 0 ? 0 : (completos / aplicable) * 100,
       });
       const stages = valeStages.filter((x) => x.vale_type_id === vt.id).sort((a, b) => a.stage_number - b.stage_number);
       for (const st of stages) {
