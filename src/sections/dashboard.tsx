@@ -239,6 +239,41 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
     return { total, completas, parciales, vacias, porManzana };
   }, [v2Maps, sitesQ.data, vtQ.data]);
 
+  // Estado por sitio (terminado / en-ejecucion / sin-iniciar) — auto.
+  const siteStatusCounts = useMemo(() => {
+    const counts = { terminado: 0, enEjecucion: 0, sinIniciar: 0, total: 0 };
+    const sites = sitesQ.data ?? [];
+    const vales = vtQ.data ?? [];
+    if (!v2Maps || sites.length === 0 || vales.length === 0) return counts;
+    for (const s of sites) {
+      counts.total++;
+      let appliesAny = false;
+      let allComplete = true;
+      let anyDelivered = false;
+      for (const v of vales) {
+        const st = cellStatus(s, v, v2Maps);
+        if (st === "na") continue;
+        appliesAny = true;
+        if (st === "complete") anyDelivered = true;
+        else if (st === "partial") { anyDelivered = true; allComplete = false; }
+        else allComplete = false;
+      }
+      if (!appliesAny) { counts.sinIniciar++; continue; }
+      if (allComplete) counts.terminado++;
+      else if (anyDelivered) counts.enEjecucion++;
+      else counts.sinIniciar++;
+    }
+    return counts;
+  }, [v2Maps, sitesQ.data, vtQ.data]);
+
+  const goPlanoWithFilter = (overall: "terminado" | "en-ejecucion" | "sin-iniciar") => {
+    try { sessionStorage.setItem("plano:overall", overall); } catch {}
+    onNavigate?.("plano");
+  };
+  const scrollToAlerts = () => {
+    document.getElementById("alertas-stock")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   // Historial completo de entregas por vale (sólo lectura)
   const historialEntregas = useMemo(() => {
     const sitesById = new Map((sitesQ.data ?? []).map((s) => [s.id, s]));
