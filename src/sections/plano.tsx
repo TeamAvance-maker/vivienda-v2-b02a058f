@@ -1067,7 +1067,7 @@ function DetallesManzanaPanel({ sites, valeTypes, maps }: { sites: Site[]; valeT
     const byMz = new Map<string, { total: number; term: number; exe: number; sin: number; sumPct: number }>();
     for (const s of sites) {
       const prog = siteProgress(s, valeTypes, maps);
-      const k = s.manzana;
+      const k = String(s.manzana);
       const acc = byMz.get(k) ?? { total: 0, term: 0, exe: 0, sin: 0, sumPct: 0 };
       acc.total++;
       acc.sumPct += prog.pct;
@@ -1086,9 +1086,17 @@ function DetallesManzanaPanel({ sites, valeTypes, maps }: { sites: Site[]; valeT
     }));
   }, [sites, valeTypes, maps]);
 
-  const ctrl = useTableControls({
-    rows,
-    searchKeys: ["manzana"],
+  const ctrl = useTableControls<typeof rows[number]>({
+    data: rows,
+    searchFields: (r) => [r.manzana],
+    sortFns: {
+      manzana: (a, b) => a.manzana.localeCompare(b.manzana, undefined, { numeric: true }),
+      total: (a, b) => a.total - b.total,
+      terminados: (a, b) => a.terminados - b.terminados,
+      enEjecucion: (a, b) => a.enEjecucion - b.enEjecucion,
+      sinIniciar: (a, b) => a.sinIniciar - b.sinIniciar,
+      pct: (a, b) => a.pct - b.pct,
+    },
     defaultSort: { key: "manzana", dir: "asc" },
     defaultPageSize: 10,
   });
