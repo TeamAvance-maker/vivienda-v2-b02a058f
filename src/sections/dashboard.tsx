@@ -569,13 +569,13 @@ function DeliveriesHistoryTable({ rows }: { rows: HistRow[] }) {
       r.vale?.name,
       r.stageNum ? `Etapa ${r.stageNum}` : "",
       r.mode === "auto" ? "Auto-completar" : "Manual",
-      fmtDate(r.date),
+      fmtDate(r.date ?? ""),
     ],
     sortFns: {
       fecha: (a, b) => a.createdAt.localeCompare(b.createdAt),
       sitio: (a, b) =>
         (a.site?.manzana ?? 0) - (b.site?.manzana ?? 0) ||
-        (a.site?.sitio ?? 0) - (b.site?.sitio ?? 0),
+        Number(a.site?.sitio ?? 0) - Number(b.site?.sitio ?? 0),
       vale: (a, b) => (a.vale?.name ?? "").localeCompare(b.vale?.name ?? ""),
       etapa: (a, b) => (a.stageNum ?? 0) - (b.stageNum ?? 0),
       materiales: (a, b) => a.materialCount - b.materialCount,
