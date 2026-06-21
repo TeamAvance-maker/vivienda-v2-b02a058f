@@ -351,33 +351,8 @@ export function DashboardSection() {
         </div>
       )}
 
-      {/* Últimas entregas por vale */}
-      {ultimasEntregas.length > 0 && (
-        <div className="surface-card p-5">
-          <div className="mb-3 flex items-end justify-between">
-            <h3 className="font-display text-lg font-semibold">Últimas entregas por vale</h3>
-            <span className="chip">{ultimasEntregas.length}</span>
-          </div>
-          <ul className="divide-y divide-border/50 text-sm">
-            {ultimasEntregas.map((e) => (
-              <li key={e.id} className="flex items-center justify-between py-2">
-                <div className="min-w-0">
-                  <div className="truncate font-medium">
-                    {e.site ? `M${e.site.manzana} · Sitio ${e.site.sitio}` : "—"}
-                    <span className="ml-2 text-xs text-muted-foreground">
-                      {e.vale?.name ?? "Vale"}{e.stageNum ? ` · Etapa ${e.stageNum}` : ""}
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {fmtDate(e.date)} · {e.mode === "auto" ? "Auto-completar" : "Manual"}
-                  </div>
-                </div>
-                <span className="chip">{e.materialCount} materiales</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/* Historial de entregas por vale */}
+      <DeliveriesHistoryTable rows={historialEntregas} />
 
       {/* Viviendas por tipo */}
 
