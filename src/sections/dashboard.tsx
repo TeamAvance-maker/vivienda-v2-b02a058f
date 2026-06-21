@@ -914,7 +914,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
 
       <div className="surface-card p-5">
         <div className="mb-3 flex items-end justify-between">
-          <h3 className="font-display text-lg font-semibold">Avance por tipo de vivienda</h3>
+          <h3 className="font-display text-lg font-semibold">Avance por Tipo de Vivienda (Materiales Entregados)</h3>
           <span className="chip">{ht.length} tipos</span>
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
