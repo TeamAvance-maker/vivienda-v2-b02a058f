@@ -153,13 +153,8 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
     return map;
   }, [matsV2Q.data, sDelivQ.data, sItemsQ.data]);
 
-  const possible = housesPossible({
-    houseTypes: ht,
-    reqs: reqs.data ?? [],
-    stock: vStock.data ?? [],
-    executed: vExecuted.data ?? [],
-    materials: ms,
-  });
+  // (cálculo viejo v1 reemplazado por indicador v2 — ver `indicador` abajo)
+
 
   // Materiales críticos (stock <= umbral pero >0) o agotados
   const threshold = cfg.data?.critical_stock_threshold ?? 10;
