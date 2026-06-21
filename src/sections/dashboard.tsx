@@ -36,7 +36,7 @@ import {
   useSiteDeliveryItems,
 } from "@/lib/sites-queries";
 import { buildMaps, cellStatus, pendingDemand, sitesCompletableWithStock } from "@/lib/sites-compute";
-import { fmtDate, fmtNumber, housesPossible, makeMap, pendingHouses } from "@/lib/compute";
+import { fmtDate, fmtNumber, makeMap, pendingHouses } from "@/lib/compute";
 import { HAND_SHORT } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
