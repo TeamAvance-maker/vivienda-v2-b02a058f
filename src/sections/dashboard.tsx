@@ -275,7 +275,7 @@ export function DashboardSection() {
       </motion.div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-7">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <KPI icon={Home} label="Viviendas totales" value={fmtNumber(totalHouses)} />
         <KPI
           icon={PackageCheck}
@@ -292,18 +292,12 @@ export function DashboardSection() {
           hint="Abiertas manualmente"
         />
         <KPI icon={TrendingUp} label="Pendientes" value={fmtNumber(pending)} />
-        <KPI icon={Boxes} label="Unidades en stock" value={fmtNumber(stockSum)} />
         <KPI
           icon={AlertTriangle}
           label="Materiales críticos"
           value={fmtNumber(criticals.length)}
           tone={criticals.length ? "warn" : "default"}
           hint={`≤ ${threshold} u.`}
-        />
-        <KPI
-          icon={Truck}
-          label="Recepciones acumuladas"
-          value={fmtNumber((vReceived.data ?? []).reduce((a, b) => a + b.qty, 0))}
         />
       </div>
 
