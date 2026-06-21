@@ -444,45 +444,132 @@ export function DashboardSection() {
 
 
       {/* Alertas */}
-      <div className="surface-card p-5">
-        <h3 className="mb-3 font-display text-lg font-semibold">Alertas</h3>
-        <ul className="space-y-2 text-sm">
-          {criticals.length === 0 && (
-            <li className="text-muted-foreground">Sin alertas de stock crítico.</li>
-          )}
-          {criticals.map((c) => {
-            const mat = ms.find((m) => m.code === c.code);
-            const isOut = c.qty <= 0;
-            return (
-              <li
-                key={`${c.code}-${c.hand}`}
-                className={cn(
-                  "flex items-center justify-between rounded-lg border border-border bg-background/60 px-3 py-2",
-                  isOut && "border-destructive/40 bg-destructive/5",
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <AlertTriangle
-                    className={cn(
-                      "h-4 w-4",
-                      isOut ? "text-destructive" : "text-[oklch(0.7_0.13_70)]",
-                    )}
-                  />
-                  <span className="font-medium">{c.code}</span>
-                  <span className="text-xs text-muted-foreground">{mat?.description ?? ""}</span>
-                  <span className="chip">{HAND_SHORT[c.hand as keyof typeof HAND_SHORT]}</span>
-                </div>
-                <div className="num-display">
-                  {fmtNumber(c.qty)}{" "}
-                  <span className="text-xs text-muted-foreground">
-                    {isOut ? "agotado" : "crítico"}
-                  </span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+      <AlertsTable rows={criticals} materials={ms} />
+    </div>
+  );
+}
+
+// ============================================================
+// Alertas de stock (búsqueda/orden/paginación, auto-actualizado)
+// ============================================================
+type AlertRow = { code: string; hand: string; qty: number };
+
+function AlertsTable({
+  rows,
+  materials,
+}: {
+  rows: AlertRow[];
+  materials: { code: string; description?: string }[];
+}) {
+  const enriched = useMemo(
+    () =>
+      rows.map((r) => {
+        const mat = materials.find((m) => m.code === r.code);
+        return {
+          ...r,
+          description: mat?.description ?? "",
+          estado: r.qty <= 0 ? "agotado" : "crítico",
+        };
+      }),
+    [rows, materials],
+  );
+
+  const ctrl = useTableControls<typeof enriched[number]>({
+    data: enriched,
+    searchFields: (r) => [
+      r.code,
+      r.description,
+      HAND_SHORT[r.hand as keyof typeof HAND_SHORT],
+      r.estado,
+    ],
+    sortFns: {
+      material: (a, b) => a.code.localeCompare(b.code),
+      sentido: (a, b) => String(a.hand).localeCompare(String(b.hand)),
+      stock: (a, b) => a.qty - b.qty,
+      estado: (a, b) => a.estado.localeCompare(b.estado),
+    },
+    numericFilters: [{ key: "stock", label: "Stock", accessor: (r) => r.qty }],
+    defaultSort: { key: "stock", dir: "asc" },
+  });
+
+  return (
+    <div className="surface-card overflow-hidden p-0">
+      <div className="px-5 pt-5">
+        <h3 className="font-display text-lg font-semibold">Alertas</h3>
+        <p className="text-xs text-muted-foreground">
+          Materiales con stock crítico o agotados (se actualiza solo).
+        </p>
       </div>
+      <TableToolbar
+        ctrl={ctrl}
+        searchPlaceholder="Buscar por código, descripción…"
+        numericFilters={[{ key: "stock", label: "Stock" }]}
+      />
+      <div className="overflow-auto">
+        <table className="min-w-full text-sm">
+          <thead className="bg-card text-left text-xs uppercase tracking-wider text-muted-foreground">
+            <tr className="border-b border-border">
+              <SortableTh ctrl={ctrl} sortKey="material">Material</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="sentido">Sentido</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="stock" align="right">Stock</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="estado">Estado</SortableTh>
+            </tr>
+          </thead>
+          <tbody>
+            {ctrl.visible.map((c) => {
+              const isOut = c.qty <= 0;
+              return (
+                <tr
+                  key={`${c.code}-${c.hand}`}
+                  className={cn(
+                    "border-b border-border/50",
+                    isOut && "bg-destructive/5",
+                  )}
+                >
+                  <td className="px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle
+                        className={cn(
+                          "h-4 w-4",
+                          isOut ? "text-destructive" : "text-[oklch(0.7_0.13_70)]",
+                        )}
+                      />
+                      <div>
+                        <div className="font-medium">{c.code}</div>
+                        <div className="text-xs text-muted-foreground">{c.description || "—"}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-2">
+                    <span className="chip">{HAND_SHORT[c.hand as keyof typeof HAND_SHORT]}</span>
+                  </td>
+                  <td className="px-4 py-2 text-right num-display">{fmtNumber(c.qty)}</td>
+                  <td className="px-4 py-2">
+                    <span
+                      className={cn(
+                        "chip",
+                        isOut && "border-destructive/40 text-destructive",
+                      )}
+                    >
+                      {c.estado}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+            {ctrl.visible.length === 0 && (
+              <tr>
+                <td colSpan={4} className="py-8 text-center text-muted-foreground">
+                  {rows.length === 0
+                    ? "Sin alertas de stock crítico."
+                    : "Sin resultados para tu búsqueda."}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <TablePagination ctrl={ctrl} />
     </div>
   );
 }
