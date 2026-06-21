@@ -787,7 +787,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
           icon={CheckCircle2}
           label="Terminadas"
           value={fmtNumber(siteStatusCounts.terminado)}
-          tone="good"
+          iconColor="oklch(0.52 0.07 145)"
           hint={`${siteStatusCounts.total ? Math.round((siteStatusCounts.terminado / siteStatusCounts.total) * 100) : 0}% de los sitios`}
           onClick={() => goPlanoWithFilter("terminado")}
         />
@@ -795,7 +795,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
           icon={Wrench}
           label="En Ejecución"
           value={fmtNumber(siteStatusCounts.enEjecucion)}
-          tone={siteStatusCounts.enEjecucion > 0 ? "warn" : "default"}
+          iconColor="oklch(0.65 0.09 80)"
           hint="Con al menos un material entregado"
           onClick={() => goPlanoWithFilter("en-ejecucion")}
         />
@@ -803,9 +803,11 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
           icon={Clock}
           label="Sin Iniciar"
           value={fmtNumber(siteStatusCounts.sinIniciar)}
+          iconColor="oklch(0.52 0.10 35)"
           hint="Sin ningún vale entregado"
           onClick={() => goPlanoWithFilter("sin-iniciar")}
         />
+
         <KPI
           icon={AlertTriangle}
           label="Materiales críticos"
