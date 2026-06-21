@@ -1,13 +1,14 @@
 import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock, Grid3x3, Home, Layers, PackageCheck, Wrench } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Clock, FileSpreadsheet, FileText, Grid3x3, Home, Layers, PackageCheck, Wrench } from "lucide-react";
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
 } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 import {
   SortableTh,
@@ -354,6 +355,131 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
 
   const [openDetalle, setOpenDetalle] = useState(false);
 
+  const exportFilename = () => {
+    const d = new Date();
+    const z = (n: number) => String(n).padStart(2, "0");
+    return `resumen-stock-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}`;
+  };
+
+  const exportarExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    const resumen = [
+      ["Indicador", "Valor"],
+      ["Sitios totales", siteStatusCounts.total],
+      ["Terminados", siteStatusCounts.terminado],
+      ["En ejecución", siteStatusCounts.enEjecucion],
+      ["Sin iniciar", siteStatusCounts.sinIniciar],
+      ["Vales aplicables", valeKpis.total],
+      ["Vales completos", valeKpis.completas],
+      ["Vales parciales", valeKpis.parciales],
+      ["Vales sin tocar", valeKpis.vacias],
+      ["Sitios pendientes", indicador.pendingCount],
+      ["Completables ahora", indicador.completable],
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumen), "Resumen");
+
+    const deficit = [["Código", "Descripción", "Stock", "Demanda", "Déficit"],
+      ...detalleMateriales.deficit.map((r) => [r.mat?.code ?? "", r.mat?.description ?? "", r.stock, r.demanda, -r.deficit])];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(deficit), "Déficit");
+
+    const ajustados = [["Código", "Descripción", "Stock", "Demanda", "Holgura"],
+      ...detalleMateriales.ajustados.map((r) => [r.mat?.code ?? "", r.mat?.description ?? "", r.stock, r.demanda, r.stock - r.demanda])];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ajustados), "Ajustados");
+
+    const tipos = [["Tipo", "Pendientes", "% del total"],
+      ...detalleSitiosPorTipo.map((r) => [r.tipo, r.n, indicador.pendingCount ? +((r.n / indicador.pendingCount) * 100).toFixed(1) : 0])];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tipos), "Sitios por tipo");
+
+    const vales = [["Código", "Nombre", "Sitios incompletos"],
+      ...detalleVales.map((r) => [r.vale.code, r.vale.name, r.incompletos])];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(vales), "Vales incompletos");
+
+    XLSX.writeFile(wb, `${exportFilename()}.xlsx`);
+  };
+
+  const exportarPDF = () => {
+    const doc = new jsPDF();
+    const fecha = new Date().toLocaleString("es-CL");
+    doc.setFontSize(14);
+    doc.text("Resumen detallado de stock vs demanda", 14, 16);
+    doc.setFontSize(9);
+    doc.text(`Generado: ${fecha}`, 14, 22);
+
+    autoTable(doc, {
+      startY: 28,
+      head: [["Indicador", "Valor"]],
+      body: [
+        ["Sitios totales", String(siteStatusCounts.total)],
+        ["Terminados", String(siteStatusCounts.terminado)],
+        ["En ejecución", String(siteStatusCounts.enEjecucion)],
+        ["Sin iniciar", String(siteStatusCounts.sinIniciar)],
+        ["Vales aplicables", String(valeKpis.total)],
+        ["Vales completos", String(valeKpis.completas)],
+        ["Vales parciales", String(valeKpis.parciales)],
+        ["Vales sin tocar", String(valeKpis.vacias)],
+        ["Sitios pendientes", String(indicador.pendingCount)],
+        ["Completables ahora", String(indicador.completable)],
+      ],
+      styles: { fontSize: 9 },
+    });
+
+    if (detalleMateriales.deficit.length) {
+      autoTable(doc, {
+        head: [["Materiales con déficit", "", "", "", ""]],
+        body: [],
+        styles: { fontSize: 10, fillColor: [240, 240, 240] },
+      });
+      autoTable(doc, {
+        head: [["Código", "Descripción", "Stock", "Demanda", "Déficit"]],
+        body: detalleMateriales.deficit.map((r) => [r.mat?.code ?? "", r.mat?.description ?? "", fmtNumber(r.stock), fmtNumber(r.demanda), `-${fmtNumber(r.deficit)}`]),
+        styles: { fontSize: 8 },
+      });
+    }
+
+    if (detalleMateriales.ajustados.length) {
+      autoTable(doc, {
+        head: [["Materiales ajustados (holgura ≤ 20%)", "", "", "", ""]],
+        body: [],
+        styles: { fontSize: 10, fillColor: [240, 240, 240] },
+      });
+      autoTable(doc, {
+        head: [["Código", "Descripción", "Stock", "Demanda", "Holgura"]],
+        body: detalleMateriales.ajustados.map((r) => [r.mat?.code ?? "", r.mat?.description ?? "", fmtNumber(r.stock), fmtNumber(r.demanda), fmtNumber(r.stock - r.demanda)]),
+        styles: { fontSize: 8 },
+      });
+    }
+
+    if (detalleSitiosPorTipo.length) {
+      autoTable(doc, {
+        head: [["Sitios pendientes por tipo de vivienda", "", ""]],
+        body: [],
+        styles: { fontSize: 10, fillColor: [240, 240, 240] },
+      });
+      autoTable(doc, {
+        head: [["Tipo", "Pendientes", "% del total"]],
+        body: detalleSitiosPorTipo.map((r) => [r.tipo, fmtNumber(r.n), `${indicador.pendingCount ? ((r.n / indicador.pendingCount) * 100).toFixed(1) : "0.0"}%`]),
+        styles: { fontSize: 8 },
+      });
+    }
+
+    if (detalleVales.length) {
+      autoTable(doc, {
+        head: [["Vales con sitios incompletos", "", ""]],
+        body: [],
+        styles: { fontSize: 10, fillColor: [240, 240, 240] },
+      });
+      autoTable(doc, {
+        head: [["Código", "Nombre", "Sitios incompletos"]],
+        body: detalleVales.map((r) => [r.vale.code, r.vale.name, fmtNumber(r.incompletos)]),
+        styles: { fontSize: 8 },
+      });
+    }
+
+    doc.save(`${exportFilename()}.pdf`);
+  };
+
+
 
   const goPlanoWithFilter = (overall: "terminado" | "en-ejecucion" | "sin-iniciar") => {
     try { sessionStorage.setItem("plano:overall", overall); } catch {}
@@ -477,15 +603,27 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
 
       {/* Panel lateral: resumen detallado */}
       <Sheet open={openDetalle} onOpenChange={setOpenDetalle}>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
-          <SheetHeader>
-            <SheetTitle>Resumen detallado de stock vs demanda</SheetTitle>
-            <SheetDescription>
-              Cálculo automático a partir de sitios, vales, entregas y stock actual.
-            </SheetDescription>
-          </SheetHeader>
+        <SheetContent
+          side="right"
+          className="flex h-screen w-screen max-w-none flex-col gap-0 p-0 sm:max-w-none"
+        >
+          {/* Barra superior fija */}
+          <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b bg-background/95 px-6 py-3 backdrop-blur">
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-semibold">Resumen detallado de stock vs demanda</h2>
+              <p className="truncate text-xs text-muted-foreground">
+                Cálculo automático a partir de sitios, vales, entregas y stock actual.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setOpenDetalle(false)} className="shrink-0">
+              <ArrowLeft className="mr-1.5 h-4 w-4" /> Volver
+            </Button>
+          </header>
 
-          <div className="mt-6 space-y-6 text-sm">
+          {/* Zona scroll */}
+          <div className="flex-1 overflow-y-auto px-6 py-6">
+            <div className="mx-auto max-w-5xl space-y-6 text-sm">
+
             {/* Resumen general */}
             <section>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -642,9 +780,21 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
                 </div>
               )}
             </section>
+            </div>
           </div>
+
+          {/* Barra inferior fija */}
+          <footer className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-2 border-t bg-background/95 px-6 py-3 backdrop-blur">
+            <Button variant="outline" size="sm" onClick={exportarExcel}>
+              <FileSpreadsheet className="mr-1.5 h-4 w-4" /> Exportar a Excel
+            </Button>
+            <Button variant="default" size="sm" onClick={exportarPDF}>
+              <FileText className="mr-1.5 h-4 w-4" /> Exportar a PDF
+            </Button>
+          </footer>
         </SheetContent>
       </Sheet>
+
 
 
       {/* KPIs */}
