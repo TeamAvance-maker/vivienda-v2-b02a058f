@@ -200,9 +200,26 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
     const vales = vtQ.data ?? [];
     const totByType = new Map<string, number>();
     const execByType = new Map<string, number>();
+    const doneLinesByType = new Map<string, number>();
+    const totalLinesByType = new Map<string, number>();
     for (const s of sites) {
       totByType.set(s.house_type, (totByType.get(s.house_type) ?? 0) + 1);
-      if (!v2Maps || vales.length === 0) continue;
+      if (!v2Maps) continue;
+      // líneas por sitio
+      let sDone = 0, sTotal = 0;
+      for (const [stageId, byHouse] of v2Maps.reqsByStageHouse) {
+        const reqs = byHouse.get(s.house_type) ?? [];
+        if (reqs.length === 0) continue;
+        const delivered = v2Maps.deliveredBySiteStageMat.get(s.id)?.get(stageId) ?? new Map();
+        for (const r of reqs) {
+          sTotal++;
+          const got = delivered.get(r.material_id) ?? 0;
+          if (got >= r.qty) sDone++;
+        }
+      }
+      doneLinesByType.set(s.house_type, (doneLinesByType.get(s.house_type) ?? 0) + sDone);
+      totalLinesByType.set(s.house_type, (totalLinesByType.get(s.house_type) ?? 0) + sTotal);
+      if (vales.length === 0) continue;
       let appliesAny = false;
       let allComplete = true;
       for (const v of vales) {
@@ -216,7 +233,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
       }
     }
     if (sites.length === 0) {
-      return pendingHouses(ht, vExecuted.data ?? []);
+      return pendingHouses(ht, vExecuted.data ?? []).map((p) => ({ ...p, doneLines: 0, totalLines: 0 }));
     }
     const codes = new Set<string>([
       ...ht.map((h) => h.code),
@@ -232,6 +249,8 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
         total,
         executed,
         pending: Math.max(0, total - executed),
+        doneLines: doneLinesByType.get(code) ?? 0,
+        totalLines: totalLinesByType.get(code) ?? 0,
       };
     });
   }, [sitesQ.data, vtQ.data, v2Maps, ht, vExecuted.data]);
