@@ -513,7 +513,9 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
 
 
       {/* Alertas */}
-      <AlertsTable rows={criticals} materials={ms} />
+      <div id="alertas-stock" className="scroll-mt-24">
+        <AlertsTable rows={criticals} materials={ms} />
+      </div>
     </div>
   );
 }
