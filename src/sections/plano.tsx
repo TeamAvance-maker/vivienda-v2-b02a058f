@@ -1001,9 +1001,18 @@ function DetallesValePanel({
     return out;
   }, [sites, valeTypes, valeStages, maps]);
 
-  const ctrl = useTableControls({
-    rows,
-    searchKeys: ["code", "label"],
+  const ctrl = useTableControls<typeof rows[number]>({
+    data: rows,
+    searchFields: (r) => [r.code, r.label],
+    sortFns: {
+      code: (a, b) => a.code.localeCompare(b.code),
+      label: (a, b) => a.label.localeCompare(b.label),
+      aplicable: (a, b) => a.aplicable - b.aplicable,
+      completos: (a, b) => a.completos - b.completos,
+      parciales: (a, b) => a.parciales - b.parciales,
+      sinEntregar: (a, b) => a.sinEntregar - b.sinEntregar,
+      pct: (a, b) => a.pct - b.pct,
+    },
     defaultSort: { key: "pct", dir: "desc" },
     defaultPageSize: 10,
   });
