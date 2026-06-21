@@ -470,6 +470,9 @@ export function PlanoSection() {
               ))}
             </SelectContent>
           </Select>
+          <button type="button" onClick={() => setDetailsOpen("tipo")} className="mt-1 text-[10.5px] font-medium text-primary hover:underline">
+            Ver detalles →
+          </button>
         </div>
         <div>
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
