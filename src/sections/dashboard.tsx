@@ -883,11 +883,13 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
             <span className="chip">{valeKpis.porManzana.length} manzanas</span>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {valeKpis.porManzana.map((m) => (
+            {valeKpis.porManzana.map((m) => {
+              const pctStr = m.pct === 0 || m.pct === 100 ? m.pct.toFixed(0) : m.pct.toFixed(2);
+              return (
               <div key={m.manzana} className="rounded-xl border border-border bg-background/60 p-4">
                 <div className="flex items-center justify-between">
                   <div className="font-display text-base font-semibold">Manzana {m.manzana}</div>
-                  <span className="chip">{m.completas}/{m.total}</span>
+                  <span className="chip">{m.doneLines}/{m.totalLines}</span>
                 </div>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
                   <div
@@ -896,10 +898,11 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
                   />
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {m.pct.toFixed(1)}% de vales completos
+                  {pctStr}% de materiales entregados
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
