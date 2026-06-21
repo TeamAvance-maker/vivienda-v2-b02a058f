@@ -174,8 +174,8 @@ export function DashboardSection() {
     return { total, completas, parciales, vacias, porManzana };
   }, [v2Maps, sitesQ.data, vtQ.data]);
 
-  // Últimas entregas por vale
-  const ultimasEntregas = useMemo(() => {
+  // Historial completo de entregas por vale (sólo lectura)
+  const historialEntregas = useMemo(() => {
     const sitesById = new Map((sitesQ.data ?? []).map((s) => [s.id, s]));
     const stagesById = new Map((stagesQ.data ?? []).map((s) => [s.id, s]));
     const valeById = new Map((vtQ.data ?? []).map((v) => [v.id, v]));
@@ -183,24 +183,21 @@ export function DashboardSection() {
     for (const it of sItemsQ.data ?? []) {
       countByDeliv.set(it.delivery_id, (countByDeliv.get(it.delivery_id) ?? 0) + 1);
     }
-    return (sDelivQ.data ?? [])
-      .slice()
-      .sort((a, b) => (b.created_at ?? b.date ?? "").localeCompare(a.created_at ?? a.date ?? ""))
-      .slice(0, 10)
-      .map((d) => {
-        const site = sitesById.get(d.site_id);
-        const stage = stagesById.get(d.vale_stage_id);
-        const vale = stage ? valeById.get(stage.vale_type_id) : undefined;
-        return {
-          id: d.id,
-          date: d.date,
-          site,
-          vale,
-          stageNum: stage?.stage_number,
-          materialCount: countByDeliv.get(d.id) ?? 0,
-          mode: d.mode,
-        };
-      });
+    return (sDelivQ.data ?? []).map((d) => {
+      const site = sitesById.get(d.site_id);
+      const stage = stagesById.get(d.vale_stage_id);
+      const vale = stage ? valeById.get(stage.vale_type_id) : undefined;
+      return {
+        id: d.id,
+        date: d.date,
+        createdAt: d.created_at ?? d.date ?? "",
+        site,
+        vale,
+        stageNum: stage?.stage_number,
+        materialCount: countByDeliv.get(d.id) ?? 0,
+        mode: d.mode,
+      };
+    });
   }, [sDelivQ.data, sItemsQ.data, sitesQ.data, stagesQ.data, vtQ.data]);
 
   // Tabla maestra
