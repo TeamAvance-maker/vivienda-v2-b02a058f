@@ -58,6 +58,7 @@ function KPI({
   value,
   hint,
   tone = "default",
+  iconColor,
   onClick,
 }: {
   icon: typeof Home;
@@ -65,6 +66,7 @@ function KPI({
   value: string | number;
   hint?: string;
   tone?: "default" | "warn" | "good";
+  iconColor?: string;
   onClick?: () => void;
 }) {
   const clickable = !!onClick;
@@ -95,10 +97,15 @@ function KPI({
         <div
           className={cn(
             "rounded-full p-2",
-            tone === "warn" && "bg-destructive/10 text-destructive",
-            tone === "good" && "bg-[oklch(0.55_0.08_115/.15)] text-[oklch(0.4_0.08_115)]",
-            tone === "default" && "bg-secondary text-foreground/70",
+            !iconColor && tone === "warn" && "bg-destructive/10 text-destructive",
+            !iconColor && tone === "good" && "bg-[oklch(0.55_0.08_115/.15)] text-[oklch(0.4_0.08_115)]",
+            !iconColor && tone === "default" && "bg-secondary text-foreground/70",
           )}
+          style={
+            iconColor
+              ? { backgroundColor: `color-mix(in oklch, ${iconColor} 18%, transparent)`, color: iconColor }
+              : undefined
+          }
         >
           <Icon className="h-4 w-4" />
         </div>
