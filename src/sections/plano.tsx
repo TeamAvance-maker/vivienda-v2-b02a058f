@@ -608,6 +608,29 @@ export function PlanoSection() {
           {selected?.kind === "manzana" && <ManzanaPanel id={selected.id} lotInfo={lotInfo} />}
         </SheetContent>
       </Sheet>
+
+      {/* Panel "Ver detalles" por dimensión */}
+      <Sheet open={detailsOpen !== null} onOpenChange={(o) => !o && setDetailsOpen(null)}>
+        <SheetContent className="w-[720px] max-w-[97vw] overflow-y-auto sm:max-w-[720px]">
+          {detailsOpen === "vale" && (
+            <DetallesValePanel
+              sites={sitesQ.data ?? []}
+              valeTypes={valeTypes}
+              valeStages={valeStages}
+              maps={maps}
+            />
+          )}
+          {detailsOpen === "manzana" && (
+            <DetallesManzanaPanel sites={sitesQ.data ?? []} valeTypes={valeTypes} maps={maps} />
+          )}
+          {detailsOpen === "tipo" && (
+            <DetallesTipoPanel sites={sitesQ.data ?? []} valeTypes={valeTypes} maps={maps} />
+          )}
+          {detailsOpen === "sitio" && (
+            <DetallesSitioPanel sites={sitesQ.data ?? []} valeTypes={valeTypes} maps={maps} />
+          )}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
