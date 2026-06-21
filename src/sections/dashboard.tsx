@@ -40,37 +40,15 @@ function KPI({
   value,
   hint,
   tone = "default",
-  onClick,
 }: {
   icon: typeof Home;
   label: string;
   value: string | number;
   hint?: string;
   tone?: "default" | "warn" | "good";
-  onClick?: () => void;
 }) {
-  const clickable = !!onClick;
   return (
-    <div
-      onClick={onClick}
-      role={clickable ? "button" : undefined}
-      tabIndex={clickable ? 0 : undefined}
-      onKeyDown={
-        clickable
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onClick?.();
-              }
-            }
-          : undefined
-      }
-      className={cn(
-        "surface-card group relative overflow-hidden p-5 pb-7",
-        clickable &&
-          "cursor-pointer transition hover:-translate-y-0.5 hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-ring",
-      )}
-    >
+    <div className="surface-card group relative overflow-hidden p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           {label}
@@ -88,11 +66,6 @@ function KPI({
       </div>
       <div className="mt-3 num-display text-3xl md:text-4xl">{value}</div>
       {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
-      {clickable && (
-        <div className="absolute bottom-1.5 left-3 text-[10px] font-medium uppercase tracking-wider text-muted-foreground/80 group-hover:text-foreground">
-          Ver más →
-        </div>
-      )}
     </div>
   );
 }
@@ -219,40 +192,26 @@ export function DashboardSection() {
   }, [sitesQ.data, vtQ.data, v2Maps, ht, vExecuted.data]);
 
   const valeKpis = useMemo(() => {
-    const empty = {
-      total: 0, completas: 0, parciales: 0, vacias: 0,
-      terminadas: 0, enEjecucion: 0, sinIniciar: 0, sitiosTotal: 0,
-      porManzana: [] as { manzana: number; total: number; completas: number; pct: number }[],
-    };
-    if (!v2Maps || !sitesQ.data || !vtQ.data) return empty;
+    if (!v2Maps || !sitesQ.data || !vtQ.data) return { total: 0, completas: 0, parciales: 0, vacias: 0, porManzana: [] as { manzana: number; total: number; completas: number; pct: number }[] };
     let total = 0, completas = 0, parciales = 0, vacias = 0;
-    let terminadas = 0, enEjecucion = 0, sinIniciar = 0;
     const perManz = new Map<number, { total: number; completas: number }>();
     for (const s of sitesQ.data) {
-      let siteHasAny = false;
-      let siteAllComplete = true;
-      let siteApplies = false;
       for (const v of vtQ.data) {
         const st = cellStatus(s, v, v2Maps);
         if (st === "na") continue;
-        siteApplies = true;
         total++;
         const m = perManz.get(s.manzana) ?? { total: 0, completas: 0 };
         m.total++;
-        if (st === "complete") { completas++; m.completas++; siteHasAny = true; }
-        else if (st === "partial") { parciales++; siteHasAny = true; siteAllComplete = false; }
-        else { vacias++; siteAllComplete = false; }
+        if (st === "complete") { completas++; m.completas++; }
+        else if (st === "partial") parciales++;
+        else vacias++;
         perManz.set(s.manzana, m);
       }
-      if (!siteApplies) { sinIniciar++; continue; }
-      if (siteAllComplete) terminadas++;
-      else if (siteHasAny) enEjecucion++;
-      else sinIniciar++;
     }
     const porManzana = [...perManz.entries()]
       .map(([manzana, v]) => ({ manzana, ...v, pct: v.total ? (v.completas / v.total) * 100 : 0 }))
       .sort((a, b) => a.manzana - b.manzana);
-    return { total, completas, parciales, vacias, terminadas, enEjecucion, sinIniciar, sitiosTotal: sitesQ.data.length, porManzana };
+    return { total, completas, parciales, vacias, porManzana };
   }, [v2Maps, sitesQ.data, vtQ.data]);
 
   // Historial completo de entregas por vale (sólo lectura)
@@ -356,42 +315,28 @@ export function DashboardSection() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <KPI icon={Home} label="Viviendas totales" value={fmtNumber(totalHouses)} />
         <KPI
-          icon={CheckCircle2}
-          label="Terminadas"
-          value={fmtNumber(valeKpis.terminadas)}
+          icon={PackageCheck}
+          label="Ejecutadas"
+          value={fmtNumber(executedTotal)}
           tone="good"
-          hint={
-            valeKpis.sitiosTotal
-              ? `${Math.round((valeKpis.terminadas / valeKpis.sitiosTotal) * 100)}% de ${fmtNumber(valeKpis.sitiosTotal)} sitios`
-              : "Todos los vales entregados"
-          }
+          hint={`${totalHouses ? Math.round((executedTotal / totalHouses) * 100) : 0}% del total`}
         />
         <KPI
           icon={Wrench}
-          label="En ejecución"
-          value={fmtNumber(valeKpis.enEjecucion)}
-          tone={valeKpis.enEjecucion > 0 ? "warn" : "default"}
-          hint="Con al menos 1 material entregado"
+          label="Viviendas incompletas"
+          value={fmtNumber(incompleteTotal)}
+          tone={incompleteTotal > 0 ? "warn" : "default"}
+          hint="Abiertas manualmente"
         />
-        <KPI
-          icon={Clock}
-          label="Sin iniciar"
-          value={fmtNumber(valeKpis.sinIniciar)}
-          hint="Sin ningún vale entregado"
-        />
+        <KPI icon={TrendingUp} label="Pendientes" value={fmtNumber(pending)} />
         <KPI
           icon={AlertTriangle}
           label="Materiales críticos"
           value={fmtNumber(criticals.length)}
           tone={criticals.length ? "warn" : "default"}
           hint={`≤ ${threshold} u.`}
-          onClick={() => {
-            const el = document.getElementById("alertas-section");
-            if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-          }}
         />
       </div>
-
 
       {/* Avance Sitios × Vales */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -548,8 +493,7 @@ function AlertsTable({
   });
 
   return (
-    <div id="alertas-section" className="surface-card overflow-hidden p-0 scroll-mt-24">
-
+    <div className="surface-card overflow-hidden p-0">
       <div className="px-5 pt-5">
         <h3 className="font-display text-lg font-semibold">Alertas</h3>
         <p className="text-xs text-muted-foreground">
