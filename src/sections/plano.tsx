@@ -106,6 +106,7 @@ export function PlanoSection() {
   const [selected, setSelected] = useState<
     { kind: "site"; lot: PlanoLot } | { kind: "manzana"; id: string } | null
   >(null);
+  const [detailsOpen, setDetailsOpen] = useState<null | "vale" | "manzana" | "tipo" | "sitio">(null);
 
   const loading =
     sitesQ.isLoading ||
