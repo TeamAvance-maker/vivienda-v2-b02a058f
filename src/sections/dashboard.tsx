@@ -780,9 +780,21 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
                 </div>
               )}
             </section>
+            </div>
           </div>
+
+          {/* Barra inferior fija */}
+          <footer className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-2 border-t bg-background/95 px-6 py-3 backdrop-blur">
+            <Button variant="outline" size="sm" onClick={exportarExcel}>
+              <FileSpreadsheet className="mr-1.5 h-4 w-4" /> Exportar a Excel
+            </Button>
+            <Button variant="default" size="sm" onClick={exportarPDF}>
+              <FileText className="mr-1.5 h-4 w-4" /> Exportar a PDF
+            </Button>
+          </footer>
         </SheetContent>
       </Sheet>
+
 
 
       {/* KPIs */}
