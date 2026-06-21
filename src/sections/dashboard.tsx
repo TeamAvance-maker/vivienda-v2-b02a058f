@@ -140,7 +140,52 @@ export function DashboardSection() {
     })
     .filter((r) => r.qty <= threshold);
 
-  const pendientes = pendingHouses(ht, vExecuted.data ?? []);
+  // Avance por tipo de vivienda — derivado AUTOMÁTICAMENTE de los sitios v2
+  // y del estado de sus vales (una vivienda está "ejecutada" cuando todos
+  // sus vales aplicables están completos).
+  const pendientes = useMemo(() => {
+    const sites = sitesQ.data ?? [];
+    const vales = vtQ.data ?? [];
+    // Conteo por house_type desde los sitios reales
+    const totByType = new Map<string, number>();
+    const execByType = new Map<string, number>();
+    for (const s of sites) {
+      totByType.set(s.house_type, (totByType.get(s.house_type) ?? 0) + 1);
+      if (!v2Maps || vales.length === 0) continue;
+      let appliesAny = false;
+      let allComplete = true;
+      for (const v of vales) {
+        const st = cellStatus(s, v, v2Maps);
+        if (st === "na") continue;
+        appliesAny = true;
+        if (st !== "complete") { allComplete = false; break; }
+      }
+      if (appliesAny && allComplete) {
+        execByType.set(s.house_type, (execByType.get(s.house_type) ?? 0) + 1);
+      }
+    }
+    // Si no hay sitios v2 cargados, fallback al cálculo v1 anterior.
+    if (sites.length === 0) {
+      return pendingHouses(ht, vExecuted.data ?? []);
+    }
+    // Listamos todos los tipos conocidos (de ht o de los sitios)
+    const codes = new Set<string>([
+      ...ht.map((h) => h.code),
+      ...sites.map((s) => s.house_type),
+    ]);
+    return [...codes].sort().map((code) => {
+      const def = ht.find((h) => h.code === code);
+      const total = totByType.get(code) ?? def?.qty ?? 0;
+      const executed = execByType.get(code) ?? 0;
+      return {
+        code,
+        name: def?.name ?? "",
+        total,
+        executed,
+        pending: Math.max(0, total - executed),
+      };
+    });
+  }, [sitesQ.data, vtQ.data, v2Maps, ht, vExecuted.data]);
 
   // KPIs Sitios × Vales
   const v2Maps = useMemo(() => {
