@@ -548,7 +548,8 @@ function AlertsTable({
   });
 
   return (
-    <div className="surface-card overflow-hidden p-0">
+    <div id="alertas-section" className="surface-card overflow-hidden p-0 scroll-mt-24">
+
       <div className="px-5 pt-5">
         <h3 className="font-display text-lg font-semibold">Alertas</h3>
         <p className="text-xs text-muted-foreground">
