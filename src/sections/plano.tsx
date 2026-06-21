@@ -1082,7 +1082,7 @@ function DetallesManzanaPanel({ sites, valeTypes, maps }: { sites: Site[]; valeT
       terminados: v.term,
       enEjecucion: v.exe,
       sinIniciar: v.sin,
-      pct: v.total === 0 ? 0 : Math.round((v.term / v.total) * 100),
+      pct: v.total === 0 ? 0 : (v.term / v.total) * 100,
     }));
   }, [sites, valeTypes, maps]);
 
