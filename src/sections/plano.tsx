@@ -994,7 +994,7 @@ function DetallesValePanel({
           completos: comS,
           parciales: parS,
           sinEntregar: sinS,
-          pct: aplS === 0 ? 0 : Math.round((comS / aplS) * 100),
+          pct: aplS === 0 ? 0 : (comS / aplS) * 100,
         });
       }
     }
