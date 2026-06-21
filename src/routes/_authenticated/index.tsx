@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Toaster } from "sonner";
 import { AppShell, type TabKey } from "@/components/app-shell";
@@ -13,9 +14,11 @@ import { MaterialsSection } from "@/sections/materials";
 import { ReceptionsSection } from "@/sections/receptions";
 import { ReportsSection } from "@/sections/reports";
 import { PlanoSection } from "@/sections/plano";
+import { UsersSection } from "@/sections/users";
 import { useConfig } from "@/lib/queries";
+import { supabase } from "@/integrations/supabase/client";
 
-export const Route = createFileRoute("/")({
+export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
       { title: "Control de obra" },
@@ -30,21 +33,53 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const { user } = Route.useRouteContext();
   const [tab, setTab] = useState<TabKey>("dashboard");
   const cfg = useConfig();
 
+  const { data: isSuperadmin = false } = useQuery({
+    queryKey: ["is-superadmin", user.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "superadmin")
+        .maybeSingle();
+      if (error) throw error;
+      return !!data;
+    },
+  });
+
+  // Si dejó de ser superadmin y la pestaña activa es usuarios → fallback
+  const effectiveTab: TabKey =
+    tab === "usuarios" && !isSuperadmin ? "dashboard" : tab;
+
   return (
     <>
-      <AppShell active={tab} onChange={setTab} projectName={cfg.data?.name ?? "Mi Obra"}>
-        {tab === "plano" && <PlanoSection />}
-        {tab === "dashboard" && <DashboardSection onNavigate={(t) => setTab(t)} />}
-        {tab === "recepciones" && <ReceptionsSection />}
-        {tab === "entregas" && <DeliveriesSection />}
-        {tab === "inventario" && <InventorySection />}
-        {tab === "casas" && <CasasSection />}
-        {tab === "materiales" && <MaterialsSection />}
-        {tab === "reportes" && <ReportsSection />}
-        {tab === "config" && <ConfigSection />}
+      <AppShell
+        active={effectiveTab}
+        onChange={setTab}
+        projectName={cfg.data?.name ?? "Mi Obra"}
+        isSuperadmin={isSuperadmin}
+        userEmail={user.email ?? ""}
+        onSignOut={async () => {
+          await supabase.auth.signOut();
+          window.location.href = "/auth";
+        }}
+      >
+        {effectiveTab === "plano" && <PlanoSection />}
+        {effectiveTab === "dashboard" && (
+          <DashboardSection onNavigate={(t) => setTab(t)} />
+        )}
+        {effectiveTab === "recepciones" && <ReceptionsSection />}
+        {effectiveTab === "entregas" && <DeliveriesSection />}
+        {effectiveTab === "inventario" && <InventorySection />}
+        {effectiveTab === "casas" && <CasasSection />}
+        {effectiveTab === "materiales" && <MaterialsSection />}
+        {effectiveTab === "reportes" && <ReportsSection />}
+        {effectiveTab === "config" && <ConfigSection />}
+        {effectiveTab === "usuarios" && isSuperadmin && <UsersSection />}
       </AppShell>
       <PassphraseProvider />
       <CascadeDeleteProvider />
@@ -60,10 +95,6 @@ function Index() {
             title: "!text-base sm:!text-lg !font-semibold",
             description: "!text-sm sm:!text-base",
             error: "!bg-destructive !text-destructive-foreground !border-destructive",
-          },
-          style: {
-            // Centrado vertical en pantalla, encima de cualquier diálogo
-            // (sonner posiciona top-center; lo bajamos al centro vertical)
           },
         }}
         offset="45vh"

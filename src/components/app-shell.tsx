@@ -6,11 +6,13 @@ import {
   HelpCircle,
   Home,
   HousePlus,
+  LogOut,
   Map as MapIcon,
   Menu as MenuIcon,
   PackagePlus,
   Settings2,
   Truck,
+  UserCog,
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -28,7 +30,8 @@ export type TabKey =
   | "materiales"
   | "inventario"
   | "reportes"
-  | "config";
+  | "config"
+  | "usuarios";
 
 export const TABS: { key: TabKey; label: string; icon: typeof Home }[] = [
   { key: "dashboard", label: "Inicio", icon: Home },
@@ -43,6 +46,9 @@ export const TABS: { key: TabKey; label: string; icon: typeof Home }[] = [
 
 const CONFIG_TAB: { key: TabKey; label: string; icon: typeof Home } = {
   key: "config", label: "Configuración", icon: Settings2,
+};
+const USERS_TAB: { key: TabKey; label: string; icon: typeof Home } = {
+  key: "usuarios", label: "Usuarios", icon: UserCog,
 };
 
 const ALL_TABS = [...TABS, CONFIG_TAB];
@@ -59,6 +65,9 @@ function SidebarRail({
   onMouseLeave,
   projectName,
   onOpenHelp,
+  isSuperadmin,
+  onSignOut,
+  userEmail,
 }: {
   active: TabKey;
   onChange: (k: TabKey) => void;
@@ -67,6 +76,9 @@ function SidebarRail({
   onMouseLeave: () => void;
   projectName: string;
   onOpenHelp: () => void;
+  isSuperadmin: boolean;
+  onSignOut: () => void;
+  userEmail: string;
 }) {
   return (
     <motion.aside
@@ -163,8 +175,7 @@ function SidebarRail({
             )}
           </AnimatePresence>
         </button>
-        {(() => {
-          const t = CONFIG_TAB;
+        {[...(isSuperadmin ? [USERS_TAB] : []), CONFIG_TAB].map((t) => {
           const Icon = t.icon;
           const isActive = active === t.key;
           return (
@@ -195,8 +206,28 @@ function SidebarRail({
               </AnimatePresence>
             </button>
           );
-        })()}
+        })}
         <ThemeToggle collapsed={!expanded} />
+        <button
+          onClick={onSignOut}
+          title={`Cerrar sesión (${userEmail})`}
+          className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+        >
+          <LogOut className="h-5 w-5 shrink-0" />
+          <AnimatePresence>
+            {expanded && (
+              <motion.span
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -6 }}
+                transition={{ duration: 0.15 }}
+                className="truncate text-left"
+              >
+                Cerrar sesión
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </button>
       </div>
     </motion.aside>
   );
@@ -207,11 +238,17 @@ export function AppShell({
   onChange,
   projectName,
   children,
+  isSuperadmin = false,
+  onSignOut,
+  userEmail = "",
 }: {
   active: TabKey;
   onChange: (k: TabKey) => void;
   projectName: string;
   children: ReactNode;
+  isSuperadmin?: boolean;
+  onSignOut?: () => void;
+  userEmail?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -241,6 +278,9 @@ export function AppShell({
         onMouseLeave={onLeave}
         projectName={projectName}
         onOpenHelp={() => setHelpOpen(true)}
+        isSuperadmin={isSuperadmin}
+        onSignOut={onSignOut ?? (() => {})}
+        userEmail={userEmail}
       />
 
       {/* Header móvil */}
@@ -319,6 +359,20 @@ export function AppShell({
                   <HelpCircle className="h-5 w-5 shrink-0" />
                   <span>Ayuda</span>
                 </button>
+                {isSuperadmin && (
+                  <button
+                    onClick={() => { onChange(USERS_TAB.key); setMobileOpen(false); }}
+                    className={cn(
+                      "mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                      active === USERS_TAB.key
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                    )}
+                  >
+                    <USERS_TAB.icon className="h-5 w-5 shrink-0" />
+                    <span>{USERS_TAB.label}</span>
+                  </button>
+                )}
                 <button
                   onClick={() => { onChange(CONFIG_TAB.key); setMobileOpen(false); }}
                   className={cn(
@@ -332,6 +386,15 @@ export function AppShell({
                   <span>{CONFIG_TAB.label}</span>
                 </button>
                 <ThemeToggle />
+                {onSignOut && (
+                  <button
+                    onClick={() => { setMobileOpen(false); onSignOut(); }}
+                    className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <LogOut className="h-5 w-5 shrink-0" />
+                    <span>Cerrar sesión</span>
+                  </button>
+                )}
               </div>
             </motion.aside>
           </>
