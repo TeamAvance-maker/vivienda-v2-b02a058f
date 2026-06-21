@@ -603,15 +603,27 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
 
       {/* Panel lateral: resumen detallado */}
       <Sheet open={openDetalle} onOpenChange={setOpenDetalle}>
-        <SheetContent side="right" className="w-full overflow-y-auto sm:max-w-xl">
-          <SheetHeader>
-            <SheetTitle>Resumen detallado de stock vs demanda</SheetTitle>
-            <SheetDescription>
-              Cálculo automático a partir de sitios, vales, entregas y stock actual.
-            </SheetDescription>
-          </SheetHeader>
+        <SheetContent
+          side="right"
+          className="flex h-screen w-screen max-w-none flex-col gap-0 p-0 sm:max-w-none"
+        >
+          {/* Barra superior fija */}
+          <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b bg-background/95 px-6 py-3 backdrop-blur">
+            <div className="min-w-0">
+              <h2 className="truncate text-lg font-semibold">Resumen detallado de stock vs demanda</h2>
+              <p className="truncate text-xs text-muted-foreground">
+                Cálculo automático a partir de sitios, vales, entregas y stock actual.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => setOpenDetalle(false)} className="shrink-0">
+              <ArrowLeft className="mr-1.5 h-4 w-4" /> Volver
+            </Button>
+          </header>
 
-          <div className="mt-6 space-y-6 text-sm">
+          {/* Zona scroll */}
+          <div className="flex-1 overflow-y-auto px-6 py-6">
+            <div className="mx-auto max-w-5xl space-y-6 text-sm">
+
             {/* Resumen general */}
             <section>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
