@@ -200,9 +200,26 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
     const vales = vtQ.data ?? [];
     const totByType = new Map<string, number>();
     const execByType = new Map<string, number>();
+    const doneLinesByType = new Map<string, number>();
+    const totalLinesByType = new Map<string, number>();
     for (const s of sites) {
       totByType.set(s.house_type, (totByType.get(s.house_type) ?? 0) + 1);
-      if (!v2Maps || vales.length === 0) continue;
+      if (!v2Maps) continue;
+      // líneas por sitio
+      let sDone = 0, sTotal = 0;
+      for (const [stageId, byHouse] of v2Maps.reqsByStageHouse) {
+        const reqs = byHouse.get(s.house_type) ?? [];
+        if (reqs.length === 0) continue;
+        const delivered = v2Maps.deliveredBySiteStageMat.get(s.id)?.get(stageId) ?? new Map();
+        for (const r of reqs) {
+          sTotal++;
+          const got = delivered.get(r.material_id) ?? 0;
+          if (got >= r.qty) sDone++;
+        }
+      }
+      doneLinesByType.set(s.house_type, (doneLinesByType.get(s.house_type) ?? 0) + sDone);
+      totalLinesByType.set(s.house_type, (totalLinesByType.get(s.house_type) ?? 0) + sTotal);
+      if (vales.length === 0) continue;
       let appliesAny = false;
       let allComplete = true;
       for (const v of vales) {
@@ -216,7 +233,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
       }
     }
     if (sites.length === 0) {
-      return pendingHouses(ht, vExecuted.data ?? []);
+      return pendingHouses(ht, vExecuted.data ?? []).map((p) => ({ ...p, doneLines: 0, totalLines: 0 }));
     }
     const codes = new Set<string>([
       ...ht.map((h) => h.code),
@@ -232,29 +249,45 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
         total,
         executed,
         pending: Math.max(0, total - executed),
+        doneLines: doneLinesByType.get(code) ?? 0,
+        totalLines: totalLinesByType.get(code) ?? 0,
       };
     });
   }, [sitesQ.data, vtQ.data, v2Maps, ht, vExecuted.data]);
 
   const valeKpis = useMemo(() => {
-    if (!v2Maps || !sitesQ.data || !vtQ.data) return { total: 0, completas: 0, parciales: 0, vacias: 0, porManzana: [] as { manzana: number; total: number; completas: number; pct: number }[] };
+    if (!v2Maps || !sitesQ.data || !vtQ.data) return { total: 0, completas: 0, parciales: 0, vacias: 0, porManzana: [] as { manzana: number; total: number; completas: number; pct: number; doneLines: number; totalLines: number }[] };
     let total = 0, completas = 0, parciales = 0, vacias = 0;
-    const perManz = new Map<number, { total: number; completas: number }>();
+    const perManz = new Map<number, { total: number; completas: number; doneLines: number; totalLines: number }>();
     for (const s of sitesQ.data) {
+      // Conteo de líneas (etapa × material) del sitio
+      let sDone = 0, sTotal = 0;
+      for (const [stageId, byHouse] of v2Maps.reqsByStageHouse) {
+        const reqs = byHouse.get(s.house_type) ?? [];
+        if (reqs.length === 0) continue;
+        const delivered = v2Maps.deliveredBySiteStageMat.get(s.id)?.get(stageId) ?? new Map();
+        for (const r of reqs) {
+          sTotal++;
+          const got = delivered.get(r.material_id) ?? 0;
+          if (got >= r.qty) sDone++;
+        }
+      }
+      const m = perManz.get(s.manzana) ?? { total: 0, completas: 0, doneLines: 0, totalLines: 0 };
+      m.doneLines += sDone;
+      m.totalLines += sTotal;
       for (const v of vtQ.data) {
         const st = cellStatus(s, v, v2Maps);
         if (st === "na") continue;
         total++;
-        const m = perManz.get(s.manzana) ?? { total: 0, completas: 0 };
         m.total++;
         if (st === "complete") { completas++; m.completas++; }
         else if (st === "partial") parciales++;
         else vacias++;
-        perManz.set(s.manzana, m);
       }
+      perManz.set(s.manzana, m);
     }
     const porManzana = [...perManz.entries()]
-      .map(([manzana, v]) => ({ manzana, ...v, pct: v.total ? (v.completas / v.total) * 100 : 0 }))
+      .map(([manzana, v]) => ({ manzana, ...v, pct: v.totalLines ? (v.doneLines / v.totalLines) * 100 : 0 }))
       .sort((a, b) => a.manzana - b.manzana);
     return { total, completas, parciales, vacias, porManzana };
   }, [v2Maps, sitesQ.data, vtQ.data]);
@@ -850,11 +883,13 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
             <span className="chip">{valeKpis.porManzana.length} manzanas</span>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {valeKpis.porManzana.map((m) => (
+            {valeKpis.porManzana.map((m) => {
+              const pctStr = m.pct === 0 || m.pct === 100 ? m.pct.toFixed(0) : m.pct.toFixed(2);
+              return (
               <div key={m.manzana} className="rounded-xl border border-border bg-background/60 p-4">
                 <div className="flex items-center justify-between">
                   <div className="font-display text-base font-semibold">Manzana {m.manzana}</div>
-                  <span className="chip">{m.completas}/{m.total}</span>
+                  <span className="chip">{m.doneLines}/{m.totalLines}</span>
                 </div>
                 <div className="mt-2 h-2 overflow-hidden rounded-full bg-secondary">
                   <div
@@ -863,10 +898,11 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
                   />
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {m.pct.toFixed(1)}% de vales completos
+                  {pctStr}% de materiales entregados
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -883,7 +919,8 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           {pendientes.map((p) => {
-            const pct = p.total ? Math.round((p.executed / p.total) * 100) : 0;
+            const pct = p.totalLines ? (p.doneLines / p.totalLines) * 100 : 0;
+            const pctStr = pct === 0 || pct === 100 ? pct.toFixed(0) : pct.toFixed(2);
             return (
               <div
                 key={p.code}
@@ -906,7 +943,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
                   />
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {p.pending} pendientes · {pct}%
+                  {p.pending} pendientes · {pctStr}%
                 </div>
               </div>
             );
