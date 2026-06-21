@@ -1,55 +1,43 @@
-## Qué vamos a hacer
+## Cambios en el módulo Plano
 
-Agregar una **barra de progreso de un solo renglón con 3 colores** dentro del indicador principal (la tarjeta grande de arriba a la derecha del dashboard), que muestre de un vistazo cómo están repartidos los sitios totales:
+### 1. Permisos de trabajo (memoria del proyecto)
+- Marcar **Inicio** como bloqueado de nuevo y **Plano** como desbloqueado en `mem://index.md`, para que en lo sucesivo solo se toque Plano sin tu permiso.
 
-- 🟢 **Terminados** — verde suave estilo "salvia/oliva"
-- 🟡 **En ejecución** — dorado/ámbar tipo miel
-- 🔴 **Sin iniciar** — terracota suave (rojo "tierra cocida")
+### 2. Colores boutique en las etiquetas de estado
+En la barra de KPIs del Plano (arriba del filtro), las tarjetas "Terminados", "En ejecución" y "Sin iniciar" usarán los mismos tonos que pusimos en el Inicio:
 
-Estos tonos no serán colores puros: se ajustarán a la paleta "Boutique Café" del sitio, así que se sentirán parte del diseño (no semáforo de tránsito).   
-que sean más opacos de los que me sugeriste por favor
+- Terminados → verde olivo `oklch(0.52 0.07 145)`
+- En ejecución → amarillo miel `oklch(0.65 0.09 80)`
+- Sin iniciar → rojo terracota `oklch(0.52 0.10 35)`
 
-### Cómo se verá
+Se aplica al número grande (color del valor) y a un puntito de color a la izquierda del rótulo para que se lea de un vistazo. Las mismas tres tarjetas que aparecen al abrir el panel de Manzana también se alinean a estos tonos.
 
-```text
-┌──────────────────────────────────────────────────────────┐
-│  Distribución de sitios                                   │
-│  ████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  │
-│   45%           30%                25%                    │
-│                                                           │
-│  ● Terminados 45 (45%)  ● En ejecución 30 (30%)  ● Sin iniciar 25 (25%) │
-└──────────────────────────────────────────────────────────┘
-```
+No tocamos:
+- Los colores del plano cuando filtras por vale/etapa (verde claro / amarillo claro / gris) — esos son indicadores de avance de material, no de estado de sitio.
+- Las insignias "Completo / Parcial / Sin entregar / N/A" dentro del panel de sitio (igual razón).
 
-- Una sola barra dividida en 3 segmentos proporcionales al % de cada estado.
-- Encima/dentro de cada segmento, el **porcentaje**.
-- Debajo, una **leyenda** con el puntito de color, el nombre, la cantidad y el %.
+### 3. Verificación de métricas
+Repaso rápido (sin cambios de fórmula salvo que detecte un error):
+- **Total sitios**: cuenta de lotes dibujados con datos reales.
+- **Avance global**: promedio de % de avance de los sitios con datos.
+- **Terminados / En ejecución / Sin iniciar**: estado general por sitio (`siteProgress`).
+- **Vales completos**: completos / aplicables sumados sobre todos los sitios.
+- **Distribución por tipo**: conteo A1/A2/B/C.
+- **Bloque del vale/etapa**: completos/parciales/sin entregar/N/A.
 
-### Iconos de las etiquetas (KPIs)
+Si alguna no cuadra con lo que esperas, dímelo después de probar.
 
-En las tarjetitas KPI de abajo:
+### 4. "Ver detalles" debajo de cada filtro (excepto Estado)
+Debajo de los labels **Vale tipo / Etapa**, **Manzana**, **Tipo casa** y **Sitio** aparece un enlace pequeño "Ver detalles →". Al hacer click se abre un panel lateral (igual estilo que el de Sitio/Manzana) con la tabla estadística correspondiente:
 
-- ✅ **Terminadas** → icono en verde salvia
-- 🔧 **En Ejecución** → icono en dorado/ámbar
-- 🕒 **Sin Iniciar** → icono en terracota
+- **Vale tipo / Etapa** → tabla con cada vale y, debajo, cada etapa, mostrando: total aplicable, completos, parciales, sin entregar, % avance.
+- **Manzana** → tabla con cada manzana: total sitios, terminados, en ejecución, sin iniciar, % avance promedio.
+- **Tipo casa** → tabla con cada tipo (A1/A2/B/C): total sitios, terminados, en ejecución, sin iniciar, % avance promedio.
+- **Sitio** → tabla con cada sitio: manzana, tipo casa, % avance, estado, vales completos/aplicables. Con búsqueda por tokens y paginación (regla global de listbox: 10 por página).
 
-Los colores serán **exactamente los mismos** que la barra, para que el usuario vincule al instante: "el verde de la barra = la tarjeta de Terminadas".
+Las cuatro tablas con búsqueda por tokens (cuando aplique) y orden por columnas — siguiendo la regla global que ya usamos en el Inicio.
 
-## Detalles técnicos (para el agente)
-
-- Editar `src/sections/dashboard.tsx`:
-  - Dentro del `hero-card` (líneas ~566–610), agregar debajo del bloque de "Material limitante / Ver Detalle" un nuevo bloque con la barra apilada y la leyenda. Usa `siteStatusCounts.{terminado, enEjecucion, sinIniciar, total}` que ya existe.
-  - La barra: `div` con `flex h-3 w-full overflow-hidden rounded-full bg-white/10`, y 3 hijos con `style={{ width: pctX + "%" }}` y `background` de los 3 tonos.
-  - Tonos en `oklch` (boutique-café, ya disponibles como tokens):
-    - verde: `oklch(0.62 0.09 145)` (salvia / oliva tierno)
-    - amarillo: `var(--gold)` (ya existe — dorado miel)
-    - rojo: `var(--terracotta)` (ya existe — terracota)
-  - Leyenda: 3 chips con `inline-flex items-center gap-1.5` y un `span` redondo de 8px del color.
-  - En los `<KPI>` (líneas 722–744), pasar una nueva prop `iconColor` (string CSS color) y aplicarla al `<Icon>` correspondiente.
-  - Localizar el componente `KPI` (más abajo en el mismo archivo) y aceptar `iconColor?: string` → `<Icon style={{ color: iconColor }} />` cuando esté presente; si no, comportamiento actual intacto.
-
-## Lo que NO se toca
-
-- No se cambia el panel "Ver Detalle" (el que se desliza desde la derecha).
-- No se cambian los cálculos ni las exportaciones a Excel/PDF.
-- No se cambian otras secciones (Plano, Recepciones, etc.).
+### Detalles técnicos
+- Archivo a editar: `src/sections/plano.tsx` (StatCards con `iconColor`/dot, nuevos paneles `VerDetallesPanel` por dimensión usando `useTableControls`/`TableToolbar`/`SortableTh`/`TablePagination` que ya existen en el dashboard — se extraerán a un módulo compartido `src/lib/listbox-controls.tsx` si aún no lo están).
+- Cálculo de los resúmenes nuevos: reutiliza `siteProgress` + agrupación por manzana/tipo/vale-etapa en `useMemo`, sin tocar `sites-compute.ts` ni `plano-compute.ts`.
+- Memoria: actualizar `mem://index.md` Core ("Plano desbloqueado, resto bloqueado").
