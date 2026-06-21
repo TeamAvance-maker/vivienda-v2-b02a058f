@@ -41,7 +41,17 @@ import { HAND_SHORT } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 
+function ResumenItem({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+  return (
+    <div className={cn("rounded-md border bg-card/50 px-3 py-2", highlight && "border-primary/40 bg-primary/5")}>
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="num-display text-lg">{fmtNumber(value)}</div>
+    </div>
+  );
+}
+
 function KPI({
+
   icon: Icon,
   label,
   value,
