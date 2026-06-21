@@ -525,7 +525,7 @@ function MasterTable({ rows, loading }: { rows: MasterRow[]; loading: boolean })
       { key: "pendienteRecep", label: "Pend. comprar", accessor: (r) => r.pendienteRecep },
       { key: "pct", label: "% Cumpl.", accessor: (r) => r.pct },
     ],
-    defaultPageSize: 25,
+    defaultPageSize: 10,
   });
 
   return (
@@ -638,7 +638,7 @@ function DeliveriesHistoryTable({ rows }: { rows: HistRow[] }) {
       modo: (a, b) => a.mode.localeCompare(b.mode),
     },
     defaultSort: { key: "fecha", dir: "desc" },
-    defaultPageSize: 25,
+    defaultPageSize: 10,
   });
 
   return (
