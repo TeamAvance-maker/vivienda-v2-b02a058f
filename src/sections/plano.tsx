@@ -851,9 +851,9 @@ function ManzanaPanel({
         </div>
         <div className="grid grid-cols-2 gap-2 text-sm">
           <StatCard label="Total sitios" value={sum.total} />
-          <StatCard label="Terminados" value={sum.terminados} accent="#16a34a" />
-          <StatCard label="En ejecución" value={sum.enEjecucion} accent="#d97706" />
-          <StatCard label="Sin iniciar" value={sum.sinIniciar} accent="#64748b" />
+          <StatCard label="Terminados" value={sum.terminados} accent={TONE_TERM} showDot />
+          <StatCard label="En ejecución" value={sum.enEjecucion} accent={TONE_EXE} showDot />
+          <StatCard label="Sin iniciar" value={sum.sinIniciar} accent={TONE_SIN} showDot />
         </div>
         <div>
           <h4 className="mb-2 text-sm font-semibold">Distribución por tipo</h4>
