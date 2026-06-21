@@ -611,7 +611,7 @@ export function PlanoSection() {
 
       {/* Panel "Ver detalles" por dimensión */}
       <Sheet open={detailsOpen !== null} onOpenChange={(o) => !o && setDetailsOpen(null)}>
-        <SheetContent className="w-[720px] max-w-[97vw] overflow-y-auto sm:max-w-[720px]">
+        <SheetContent className="w-screen max-w-full overflow-y-auto lg:w-[75vw] lg:max-w-[75vw] sm:max-w-full">
           {detailsOpen === "vale" && (
             <DetallesValePanel
               sites={sitesQ.data ?? []}
