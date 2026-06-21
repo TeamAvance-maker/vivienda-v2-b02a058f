@@ -359,6 +359,20 @@ export function AppShell({
                   <HelpCircle className="h-5 w-5 shrink-0" />
                   <span>Ayuda</span>
                 </button>
+                {isSuperadmin && (
+                  <button
+                    onClick={() => { onChange(USERS_TAB.key); setMobileOpen(false); }}
+                    className={cn(
+                      "mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                      active === USERS_TAB.key
+                        ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                        : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
+                    )}
+                  >
+                    <USERS_TAB.icon className="h-5 w-5 shrink-0" />
+                    <span>{USERS_TAB.label}</span>
+                  </button>
+                )}
                 <button
                   onClick={() => { onChange(CONFIG_TAB.key); setMobileOpen(false); }}
                   className={cn(
@@ -372,6 +386,15 @@ export function AppShell({
                   <span>{CONFIG_TAB.label}</span>
                 </button>
                 <ThemeToggle />
+                {onSignOut && (
+                  <button
+                    onClick={() => { setMobileOpen(false); onSignOut(); }}
+                    className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <LogOut className="h-5 w-5 shrink-0" />
+                    <span>Cerrar sesión</span>
+                  </button>
+                )}
               </div>
             </motion.aside>
           </>
