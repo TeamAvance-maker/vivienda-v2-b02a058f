@@ -104,7 +104,7 @@ export function DashboardSection() {
   const pending = totalHouses - executedTotal;
 
   const stockMap = makeMap(vStock.data);
-  const stockSum = sumMap(stockMap);
+  
 
   const reqMap = makeMap(vRequired.data);
   const deliveredMap = makeMap(vDelivered.data);
