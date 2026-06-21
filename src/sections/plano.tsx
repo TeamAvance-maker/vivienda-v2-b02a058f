@@ -428,6 +428,26 @@ export function PlanoSection() {
         </div>
         <div>
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+            Estado {hasValeFilter ? "" : "(elige vale)"}
+          </label>
+          <Select
+            value={filters.estado || "all"}
+            onValueChange={(v) => setFilters((f) => ({ ...f, estado: v === "all" ? "" : v }))}
+            disabled={!hasValeFilter}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="terminado">Completo</SelectItem>
+              <SelectItem value="en-ejecucion">Parcial</SelectItem>
+              <SelectItem value="sin-iniciar">Sin entregar</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
             Manzana
           </label>
           <Select
@@ -487,26 +507,7 @@ export function PlanoSection() {
             Ver detalles →
           </button>
         </div>
-        <div>
-          <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-            Estado {hasValeFilter ? "" : "(elige vale)"}
-          </label>
-          <Select
-            value={filters.estado || "all"}
-            onValueChange={(v) => setFilters((f) => ({ ...f, estado: v === "all" ? "" : v }))}
-            disabled={!hasValeFilter}
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="terminado">Completo</SelectItem>
-              <SelectItem value="en-ejecucion">Parcial</SelectItem>
-              <SelectItem value="sin-iniciar">Sin entregar</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+
         <div className="md:col-span-6 flex justify-end">
           <Button variant="outline" onClick={limpiar}>
             Limpiar filtros
