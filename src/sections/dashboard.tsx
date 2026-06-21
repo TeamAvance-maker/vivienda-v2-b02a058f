@@ -356,28 +356,42 @@ export function DashboardSection() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <KPI icon={Home} label="Viviendas totales" value={fmtNumber(totalHouses)} />
         <KPI
-          icon={PackageCheck}
-          label="Ejecutadas"
-          value={fmtNumber(executedTotal)}
+          icon={CheckCircle2}
+          label="Terminadas"
+          value={fmtNumber(valeKpis.terminadas)}
           tone="good"
-          hint={`${totalHouses ? Math.round((executedTotal / totalHouses) * 100) : 0}% del total`}
+          hint={
+            valeKpis.sitiosTotal
+              ? `${Math.round((valeKpis.terminadas / valeKpis.sitiosTotal) * 100)}% de ${fmtNumber(valeKpis.sitiosTotal)} sitios`
+              : "Todos los vales entregados"
+          }
         />
         <KPI
           icon={Wrench}
-          label="Viviendas incompletas"
-          value={fmtNumber(incompleteTotal)}
-          tone={incompleteTotal > 0 ? "warn" : "default"}
-          hint="Abiertas manualmente"
+          label="En ejecución"
+          value={fmtNumber(valeKpis.enEjecucion)}
+          tone={valeKpis.enEjecucion > 0 ? "warn" : "default"}
+          hint="Con al menos 1 material entregado"
         />
-        <KPI icon={TrendingUp} label="Pendientes" value={fmtNumber(pending)} />
+        <KPI
+          icon={Clock}
+          label="Sin iniciar"
+          value={fmtNumber(valeKpis.sinIniciar)}
+          hint="Sin ningún vale entregado"
+        />
         <KPI
           icon={AlertTriangle}
           label="Materiales críticos"
           value={fmtNumber(criticals.length)}
           tone={criticals.length ? "warn" : "default"}
           hint={`≤ ${threshold} u.`}
+          onClick={() => {
+            const el = document.getElementById("alertas-section");
+            if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+          }}
         />
       </div>
+
 
       {/* Avance Sitios × Vales */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
