@@ -268,6 +268,83 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
     return counts;
   }, [v2Maps, sitesQ.data, vtQ.data]);
 
+  // ====== Indicador principal v2: sitios completables con el stock actual ======
+  // Stock por material v2 = suma del stock v1 (todas las handedness) cuyo code coincide.
+  const stockByMatV2 = useMemo(() => {
+    const map = new Map<string, number>();
+    const stockByCode = new Map<string, number>();
+    for (const r of vStock.data ?? []) {
+      stockByCode.set(r.material_code, (stockByCode.get(r.material_code) ?? 0) + Number(r.qty));
+    }
+    for (const m of matsV2Q.data ?? []) {
+      map.set(m.id, stockByCode.get(m.code) ?? 0);
+    }
+    return map;
+  }, [vStock.data, matsV2Q.data]);
+
+  const indicador = useMemo(() => {
+    const sites = sitesQ.data ?? [];
+    const vales = vtQ.data ?? [];
+    if (!v2Maps || sites.length === 0 || vales.length === 0) {
+      return {
+        completable: 0,
+        pendingCount: 0,
+        limiterId: null as string | null,
+        demandByMaterial: new Map<string, number>(),
+        incompleteSitesByVale: new Map<string, number>(),
+        pendingSitesByType: new Map<string, number>(),
+      };
+    }
+    const demand = pendingDemand({ sites, valeTypes: vales, maps: v2Maps });
+    const fit = sitesCompletableWithStock({
+      sites,
+      valeTypes: vales,
+      maps: v2Maps,
+      stockByMaterial: stockByMatV2,
+    });
+    return { ...fit, ...demand };
+  }, [v2Maps, sitesQ.data, vtQ.data, stockByMatV2]);
+
+  const matsById = useMemo(
+    () => new Map((matsV2Q.data ?? []).map((m) => [m.id, m])),
+    [matsV2Q.data],
+  );
+  const limiterMat = indicador.limiterId ? matsById.get(indicador.limiterId) : null;
+  const limiterShort = limiterMat ? Math.max(0, (indicador.demandByMaterial.get(limiterMat.id) ?? 0) - (stockByMatV2.get(limiterMat.id) ?? 0)) : 0;
+
+  // Tablas para el panel "Ver Detalle"
+  const detalleMateriales = useMemo(() => {
+    const rows = [...indicador.demandByMaterial.entries()].map(([mid, demanda]) => {
+      const mat = matsById.get(mid);
+      const stock = stockByMatV2.get(mid) ?? 0;
+      const deficit = demanda - stock;
+      return { mid, mat, demanda, stock, deficit };
+    });
+    return {
+      deficit: rows.filter((r) => r.deficit > 0).sort((a, b) => b.deficit - a.deficit),
+      ajustados: rows
+        .filter((r) => r.deficit <= 0 && r.demanda > 0 && r.stock - r.demanda <= r.demanda * 0.2)
+        .sort((a, b) => (a.stock - a.demanda) - (b.stock - b.demanda)),
+    };
+  }, [indicador.demandByMaterial, stockByMatV2, matsById]);
+
+  const detalleVales = useMemo(() => {
+    const vales = vtQ.data ?? [];
+    return vales
+      .map((v) => ({ vale: v, incompletos: indicador.incompleteSitesByVale.get(v.id) ?? 0 }))
+      .filter((r) => r.incompletos > 0)
+      .sort((a, b) => b.incompletos - a.incompletos);
+  }, [vtQ.data, indicador.incompleteSitesByVale]);
+
+  const detalleSitiosPorTipo = useMemo(() => {
+    return [...indicador.pendingSitesByType.entries()]
+      .map(([tipo, n]) => ({ tipo, n }))
+      .sort((a, b) => b.n - a.n);
+  }, [indicador.pendingSitesByType]);
+
+  const [openDetalle, setOpenDetalle] = useState(false);
+
+
   const goPlanoWithFilter = (overall: "terminado" | "en-ejecucion" | "sin-iniciar") => {
     try { sessionStorage.setItem("plano:overall", overall); } catch {}
     onNavigate?.("plano");
