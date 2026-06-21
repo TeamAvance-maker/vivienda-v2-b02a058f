@@ -325,7 +325,8 @@ export function PlanoSection() {
         <StatCard
           label="Terminados"
           value={stats.term}
-          accent="#16a34a"
+          accent={TONE_TERM}
+          showDot
           active={filters.overall === "terminado"}
           onClick={() =>
             setFilters((f) => ({ ...f, overall: f.overall === "terminado" ? "" : "terminado" }))
@@ -334,7 +335,8 @@ export function PlanoSection() {
         <StatCard
           label="En ejecución"
           value={stats.exe}
-          accent="#d97706"
+          accent={TONE_EXE}
+          showDot
           active={filters.overall === "en-ejecucion"}
           onClick={() =>
             setFilters((f) => ({
@@ -346,7 +348,8 @@ export function PlanoSection() {
         <StatCard
           label="Sin iniciar"
           value={stats.sin}
-          accent="#64748b"
+          accent={TONE_SIN}
+          showDot
           active={filters.overall === "sin-iniciar"}
           onClick={() =>
             setFilters((f) => ({
