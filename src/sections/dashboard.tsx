@@ -2,7 +2,13 @@ import { motion } from "framer-motion";
 import { useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import { AlertTriangle, Boxes, CheckCircle2, Clock, Grid3x3, Home, Layers, PackageCheck, TrendingUp, Truck, Wrench } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Grid3x3, Home, Layers, PackageCheck, TrendingUp, Wrench } from "lucide-react";
+import {
+  SortableTh,
+  TablePagination,
+  TableToolbar,
+  useTableControls,
+} from "@/components/data-table";
 import {
   useConfig,
   useHouseTypes,
