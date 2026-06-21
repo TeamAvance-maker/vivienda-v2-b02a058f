@@ -976,7 +976,10 @@ function DetallesValePanel({
     };
     const out: Row[] = [];
     for (const vt of valeTypes) {
+      const stages = valeStages.filter((x) => x.vale_type_id === vt.id).sort((a, b) => a.stage_number - b.stage_number);
+      const valeStageIds = stages.map((x) => x.id);
       let aplicable = 0, completos = 0, parciales = 0, sinEntregar = 0;
+      let valeDone = 0, valeTotal = 0;
       for (const s of sites) {
         const prog = siteProgress(s, valeTypes, maps);
         const v = prog.vales.find((x) => x.valeTypeId === vt.id);
@@ -986,6 +989,9 @@ function DetallesValePanel({
         if (v.status === "complete") completos++;
         else if (v.status === "partial") parciales++;
         else sinEntregar++;
+        const lc = siteLineCounts(s, maps, { stageIds: valeStageIds });
+        valeDone += lc.done;
+        valeTotal += lc.total;
       }
       out.push({
         key: `v:${vt.id}`,
@@ -996,11 +1002,11 @@ function DetallesValePanel({
         completos,
         parciales,
         sinEntregar,
-        pct: aplicable === 0 ? 0 : (completos / aplicable) * 100,
+        pct: valeTotal === 0 ? 0 : (valeDone / valeTotal) * 100,
       });
-      const stages = valeStages.filter((x) => x.vale_type_id === vt.id).sort((a, b) => a.stage_number - b.stage_number);
       for (const st of stages) {
         let aplS = 0, comS = 0, parS = 0, sinS = 0;
+        let stDone = 0, stTotal = 0;
         for (const s of sites) {
           const cs = stageCellStatus(s, st, maps);
           if (cs === "na") continue;
@@ -1008,6 +1014,9 @@ function DetallesValePanel({
           if (cs === "complete") comS++;
           else if (cs === "partial") parS++;
           else sinS++;
+          const lc = siteLineCounts(s, maps, { stageIds: [st.id] });
+          stDone += lc.done;
+          stTotal += lc.total;
         }
         out.push({
           key: `s:${st.id}`,
@@ -1018,11 +1027,12 @@ function DetallesValePanel({
           completos: comS,
           parciales: parS,
           sinEntregar: sinS,
-          pct: aplS === 0 ? 0 : (comS / aplS) * 100,
+          pct: stTotal === 0 ? 0 : (stDone / stTotal) * 100,
         });
       }
     }
     return out;
+
   }, [sites, valeTypes, valeStages, maps]);
 
   const ctrl = useTableControls<typeof rows[number]>({
