@@ -124,7 +124,6 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
   const ms = materials.data ?? [];
   const totalHouses = ht.reduce((a, b) => a + b.qty, 0);
   const executedTotal = (vExecuted.data ?? []).reduce((a, b) => a + b.qty, 0);
-  const incompleteTotal = incompleteHouses(overrides.data);
   const pending = totalHouses - executedTotal;
 
   const stockMap = makeMap(vStock.data);
