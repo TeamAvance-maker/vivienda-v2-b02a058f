@@ -1164,7 +1164,7 @@ function DetallesTipoPanel({ sites, valeTypes, maps }: { sites: Site[]; valeType
       terminados: v.term,
       enEjecucion: v.exe,
       sinIniciar: v.sin,
-      pct: v.total === 0 ? 0 : Math.round(v.sumPct / v.total),
+      pct: v.total === 0 ? 0 : Math.round((v.term / v.total) * 100),
     }));
   }, [sites, valeTypes, maps]);
 
