@@ -80,6 +80,18 @@ export function PlanoSection() {
     estado: "",
     overall: "",
   });
+
+  // Filtro inicial recibido desde otra sección (ej.: KPIs del Inicio).
+  useEffect(() => {
+    try {
+      const o = sessionStorage.getItem("plano:overall");
+      if (o === "terminado" || o === "en-ejecucion" || o === "sin-iniciar") {
+        setFilters((f) => ({ ...f, overall: o as SiteOverallStatus }));
+        sessionStorage.removeItem("plano:overall");
+      }
+    } catch {}
+  }, []);
+
   const [selected, setSelected] = useState<
     { kind: "site"; lot: PlanoLot } | { kind: "manzana"; id: string } | null
   >(null);
