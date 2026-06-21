@@ -614,8 +614,65 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
               Ver Detalle →
             </button>
           </div>
+
+          {/* Distribución de sitios — barra tricolor */}
+          {siteStatusCounts.total > 0 && (() => {
+            const T = siteStatusCounts.terminado;
+            const E = siteStatusCounts.enEjecucion;
+            const S = siteStatusCounts.sinIniciar;
+            const tot = siteStatusCounts.total;
+            const pT = (T / tot) * 100;
+            const pE = (E / tot) * 100;
+            const pS = (S / tot) * 100;
+            const fmtPct = (n: number) => `${n.toFixed(n < 10 ? 1 : 0)}%`;
+            return (
+              <div className="mt-6">
+                <div className="mb-2 text-[11px] font-medium uppercase tracking-[0.18em] text-[oklch(0.85_0.06_80)]">
+                  Distribución de sitios
+                </div>
+                <div className="flex h-3 w-full overflow-hidden rounded-full bg-white/10 ring-1 ring-white/10">
+                  {pT > 0 && (
+                    <div
+                      style={{ width: `${pT}%`, background: "oklch(0.52 0.07 145)" }}
+                      title={`Terminados: ${fmtPct(pT)}`}
+                    />
+                  )}
+                  {pE > 0 && (
+                    <div
+                      style={{ width: `${pE}%`, background: "oklch(0.65 0.09 80)" }}
+                      title={`En ejecución: ${fmtPct(pE)}`}
+                    />
+                  )}
+                  {pS > 0 && (
+                    <div
+                      style={{ width: `${pS}%`, background: "oklch(0.52 0.10 35)" }}
+                      title={`Sin iniciar: ${fmtPct(pS)}`}
+                    />
+                  )}
+                </div>
+                <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-[oklch(0.93_0.04_80)]">
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: "oklch(0.52 0.07 145)" }} />
+                    Terminados <span className="font-medium text-white">{fmtNumber(T)}</span>
+                    <span className="text-[oklch(0.82_0.06_80)]">({fmtPct(pT)})</span>
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: "oklch(0.65 0.09 80)" }} />
+                    En ejecución <span className="font-medium text-white">{fmtNumber(E)}</span>
+                    <span className="text-[oklch(0.82_0.06_80)]">({fmtPct(pE)})</span>
+                  </span>
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: "oklch(0.52 0.10 35)" }} />
+                    Sin iniciar <span className="font-medium text-white">{fmtNumber(S)}</span>
+                    <span className="text-[oklch(0.82_0.06_80)]">({fmtPct(pS)})</span>
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </motion.div>
+
 
       {/* Panel lateral: resumen detallado */}
       <Sheet open={openDetalle} onOpenChange={setOpenDetalle}>
