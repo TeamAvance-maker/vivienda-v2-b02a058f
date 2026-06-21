@@ -483,6 +483,9 @@ export function PlanoSection() {
             value={filters.sitio}
             onChange={(e) => setFilters((f) => ({ ...f, sitio: e.target.value }))}
           />
+          <button type="button" onClick={() => setDetailsOpen("sitio")} className="mt-1 text-[10.5px] font-medium text-primary hover:underline">
+            Ver detalles →
+          </button>
         </div>
         <div>
           <label className="mb-1 block text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
