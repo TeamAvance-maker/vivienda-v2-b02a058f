@@ -609,7 +609,7 @@ function DeliveriesHistoryTable({ rows }: { rows: HistRow[] }) {
           <tbody>
             {ctrl.visible.map((e) => (
               <tr key={e.id} className="border-b border-border/50">
-                <td className="px-4 py-2">{fmtDate(e.date)}</td>
+                <td className="px-4 py-2">{fmtDate(e.date ?? "")}</td>
                 <td className="px-4 py-2">
                   {e.site ? `M${e.site.manzana} · Sitio ${e.site.sitio}` : "—"}
                 </td>
