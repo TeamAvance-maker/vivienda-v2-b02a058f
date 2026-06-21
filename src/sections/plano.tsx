@@ -1245,9 +1245,17 @@ function DetallesSitioPanel({ sites, valeTypes, maps }: { sites: Site[]; valeTyp
     });
   }, [sites, valeTypes, maps]);
 
-  const ctrl = useTableControls({
-    rows,
-    searchKeys: ["manzana", "sitio", "tipo", "estado"],
+  const ctrl = useTableControls<typeof rows[number]>({
+    data: rows,
+    searchFields: (r) => [r.manzana, r.sitio, r.tipo, r.estado],
+    sortFns: {
+      manzana: (a, b) => a.manzana - b.manzana,
+      sitio: (a, b) => a.sitio.localeCompare(b.sitio, undefined, { numeric: true }),
+      tipo: (a, b) => a.tipo.localeCompare(b.tipo),
+      estado: (a, b) => a.estado.localeCompare(b.estado),
+      completos: (a, b) => a.completos - b.completos,
+      pct: (a, b) => a.pct - b.pct,
+    },
     defaultSort: { key: "pct", dir: "desc" },
     defaultPageSize: 10,
   });
