@@ -8,6 +8,12 @@ import { SearchableSelect, type SearchableOption } from "@/components/searchable
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import {
+  SortableTh,
+  TablePagination,
+  TableToolbar,
+  useTableControls,
+} from "@/components/data-table";
+import {
   useSites,
   useValeTypes,
   useValeStages,
@@ -27,6 +33,11 @@ import {
   type SiteOverallStatus,
 } from "@/lib/plano-compute";
 import type { CellStatus, Site, ValeStage, ValeTypeV2 } from "@/lib/sites-types";
+
+// Tonos boutique (deben coincidir con dashboard)
+const TONE_TERM = "oklch(0.52 0.07 145)"; // verde olivo
+const TONE_EXE = "oklch(0.65 0.09 80)";  // amarillo miel
+const TONE_SIN = "oklch(0.52 0.10 35)";  // rojo terracota
 
 type ValeFilter =
   | { type: "all" }
