@@ -660,33 +660,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
               {detalleMateriales.deficit.length === 0 ? (
                 <p className="text-muted-foreground">Sin déficit: el stock cubre toda la demanda pendiente.</p>
               ) : (
-                <div className="overflow-hidden rounded-lg border">
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted/50">
-                      <tr>
-                        <th className="px-2 py-1.5 text-left">Material</th>
-                        <th className="px-2 py-1.5 text-right">Stock</th>
-                        <th className="px-2 py-1.5 text-right">Demanda</th>
-                        <th className="px-2 py-1.5 text-right">Déficit</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detalleMateriales.deficit.map((r) => (
-                        <tr key={r.mid} className="border-t">
-                          <td className="px-2 py-1.5">
-                            <div className="font-medium">{r.mat?.code ?? "—"}</div>
-                            <div className="text-muted-foreground">{r.mat?.description ?? ""}</div>
-                          </td>
-                          <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.stock)}</td>
-                          <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.demanda)}</td>
-                          <td className="px-2 py-1.5 text-right font-mono font-semibold text-destructive">
-                            −{fmtNumber(r.deficit)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <DeficitListbox rows={detalleMateriales.deficit} />
               )}
             </section>
 
@@ -697,31 +671,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
                   Materiales ajustados ({detalleMateriales.ajustados.length})
                 </h3>
                 <p className="mb-2 text-xs text-muted-foreground">Holgura ≤ 20 % sobre la demanda — pueden faltar pronto.</p>
-                <div className="overflow-hidden rounded-lg border">
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted/50">
-                      <tr>
-                        <th className="px-2 py-1.5 text-left">Material</th>
-                        <th className="px-2 py-1.5 text-right">Stock</th>
-                        <th className="px-2 py-1.5 text-right">Demanda</th>
-                        <th className="px-2 py-1.5 text-right">Holgura</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detalleMateriales.ajustados.map((r) => (
-                        <tr key={r.mid} className="border-t">
-                          <td className="px-2 py-1.5">
-                            <div className="font-medium">{r.mat?.code ?? "—"}</div>
-                            <div className="text-muted-foreground">{r.mat?.description ?? ""}</div>
-                          </td>
-                          <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.stock)}</td>
-                          <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.demanda)}</td>
-                          <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.stock - r.demanda)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <AjustadosListbox rows={detalleMateriales.ajustados} />
               </section>
             )}
 
@@ -733,28 +683,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
               {detalleSitiosPorTipo.length === 0 ? (
                 <p className="text-muted-foreground">No hay sitios pendientes.</p>
               ) : (
-                <div className="overflow-hidden rounded-lg border">
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted/50">
-                      <tr>
-                        <th className="px-2 py-1.5 text-left">Tipo</th>
-                        <th className="px-2 py-1.5 text-right">Pendientes</th>
-                        <th className="px-2 py-1.5 text-right">% del total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detalleSitiosPorTipo.map((r) => (
-                        <tr key={r.tipo} className="border-t">
-                          <td className="px-2 py-1.5 font-medium">{r.tipo}</td>
-                          <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.n)}</td>
-                          <td className="px-2 py-1.5 text-right font-mono">
-                            {indicador.pendingCount ? ((r.n / indicador.pendingCount) * 100).toFixed(1) : "0.0"}%
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <SitiosPorTipoListbox rows={detalleSitiosPorTipo} total={indicador.pendingCount} />
               )}
             </section>
 
@@ -766,29 +695,10 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
               {detalleVales.length === 0 ? (
                 <p className="text-muted-foreground">Todos los vales aplicables están completos.</p>
               ) : (
-                <div className="overflow-hidden rounded-lg border">
-                  <table className="w-full text-xs">
-                    <thead className="bg-muted/50">
-                      <tr>
-                        <th className="px-2 py-1.5 text-left">Vale</th>
-                        <th className="px-2 py-1.5 text-right">Sitios incompletos</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detalleVales.map((r) => (
-                        <tr key={r.vale.id} className="border-t">
-                          <td className="px-2 py-1.5">
-                            <div className="font-medium">{r.vale.code}</div>
-                            <div className="text-muted-foreground">{r.vale.name}</div>
-                          </td>
-                          <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.incompletos)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <ValesIncompletosListbox rows={detalleVales} />
               )}
             </section>
+
             </div>
           </div>
 
