@@ -921,7 +921,7 @@ function ProgressBadge({ pct }: { pct: number }) {
       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
         <div className="h-full rounded-full" style={{ width: `${pct}%`, background: TONE_TERM }} />
       </div>
-      <span className="tabular-nums text-[11px] font-semibold">{pct}%</span>
+      <span className="tabular-nums text-[11px] font-semibold">{pct.toFixed(2)}%</span>
     </div>
   );
 }
