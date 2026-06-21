@@ -553,7 +553,7 @@ type HistRow = {
   id: string;
   date: string | null | undefined;
   createdAt: string;
-  site?: { manzana: number; sitio: number } | undefined;
+  site?: { manzana: number; sitio: number | string } | undefined;
   vale?: { name: string } | undefined;
   stageNum?: number;
   materialCount: number;
