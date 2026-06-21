@@ -1,43 +1,32 @@
-## Cambios en el módulo Plano
+## Problema
 
-### 1. Permisos de trabajo (memoria del proyecto)
-- Marcar **Inicio** como bloqueado de nuevo y **Plano** como desbloqueado en `mem://index.md`, para que en lo sucesivo solo se toque Plano sin tu permiso.
+Hoy el % de cada etiqueta cuenta sólo **sitios 100% terminados ÷ sitios aplicables**. Si tienes 58 sitios A1 y 16 están "en ejecución" (con materiales entregados pero no todos los vales completos), salen **0,00%** — aunque sí hay trabajo hecho.
 
-### 2. Colores boutique en las etiquetas de estado
-En la barra de KPIs del Plano (arriba del filtro), las tarjetas "Terminados", "En ejecución" y "Sin iniciar" usarán los mismos tonos que pusimos en el Inicio:
+## Cambio
 
-- Terminados → verde olivo `oklch(0.52 0.07 145)`
-- En ejecución → amarillo miel `oklch(0.65 0.09 80)`
-- Sin iniciar → rojo terracota `oklch(0.52 0.10 35)`
+Voy a calcular el avance contando **líneas de material** (cada combinación etapa + material que un sitio necesita según su tipo de casa), no sitios completos ni cantidades.
 
-Se aplica al número grande (color del valor) y a un puntito de color a la izquierda del rótulo para que se lea de un vistazo. Las mismas tres tarjetas que aparecen al abrir el panel de Manzana también se alinean a estos tonos.
+- Una "línea" se considera **cumplida** cuando lo entregado en ese sitio ≥ lo requerido.
+- **Avance del sitio** = líneas cumplidas ÷ líneas requeridas para ese sitio.
+- **Avance de un grupo** (vale/etapa, manzana, tipo, sitio) = suma de líneas cumplidas del grupo ÷ suma de líneas requeridas del grupo.
 
-No tocamos:
-- Los colores del plano cuando filtras por vale/etapa (verde claro / amarillo claro / gris) — esos son indicadores de avance de material, no de estado de sitio.
-- Las insignias "Completo / Parcial / Sin entregar / N/A" dentro del panel de sitio (igual razón).
+Así, un A1 con 16 sitios en ejecución reflejará un % pequeño pero visible (ej: 3,47%) en cuanto haya cualquier material entregado.
 
-### 3. Verificación de métricas
-Repaso rápido (sin cambios de fórmula salvo que detecte un error):
-- **Total sitios**: cuenta de lotes dibujados con datos reales.
-- **Avance global**: promedio de % de avance de los sitios con datos.
-- **Terminados / En ejecución / Sin iniciar**: estado general por sitio (`siteProgress`).
-- **Vales completos**: completos / aplicables sumados sobre todos los sitios.
-- **Distribución por tipo**: conteo A1/A2/B/C.
-- **Bloque del vale/etapa**: completos/parciales/sin entregar/N/A.
+## Dónde se aplica
 
-Si alguna no cuadra con lo que esperas, dímelo después de probar.
+Los 4 paneles "Ver detalles" usan el mismo método de conteo de líneas:
 
-### 4. "Ver detalles" debajo de cada filtro (excepto Estado)
-Debajo de los labels **Vale tipo / Etapa**, **Manzana**, **Tipo casa** y **Sitio** aparece un enlace pequeño "Ver detalles →". Al hacer click se abre un panel lateral (igual estilo que el de Sitio/Manzana) con la tabla estadística correspondiente:
+1. **Vale tipo / Etapa** — líneas cumplidas ÷ líneas aplicables, sumadas sobre todos los sitios (separado para fila de vale y filas de etapa).
+2. **Manzana** — líneas cumplidas ÷ líneas aplicables de los sitios de esa manzana.
+3. **Tipo casa** — líneas cumplidas ÷ líneas aplicables de los sitios de ese tipo.
+4. **Sitio** — líneas cumplidas ÷ líneas aplicables del sitio (la columna "Vales" sigue mostrando vales 100% completos como referencia).
 
-- **Vale tipo / Etapa** → tabla con cada vale y, debajo, cada etapa, mostrando: total aplicable, completos, parciales, sin entregar, % avance.
-- **Manzana** → tabla con cada manzana: total sitios, terminados, en ejecución, sin iniciar, % avance promedio.
-- **Tipo casa** → tabla con cada tipo (A1/A2/B/C): total sitios, terminados, en ejecución, sin iniciar, % avance promedio.
-- **Sitio** → tabla con cada sitio: manzana, tipo casa, % avance, estado, vales completos/aplicables. Con búsqueda por tokens y paginación (regla global de listbox: 10 por página).
+Se mantienen 2 decimales en todos los `%`.
 
-Las cuatro tablas con búsqueda por tokens (cuando aplique) y orden por columnas — siguiendo la regla global que ya usamos en el Inicio.
+## Detalle técnico
 
-### Detalles técnicos
-- Archivo a editar: `src/sections/plano.tsx` (StatCards con `iconColor`/dot, nuevos paneles `VerDetallesPanel` por dimensión usando `useTableControls`/`TableToolbar`/`SortableTh`/`TablePagination` que ya existen en el dashboard — se extraerán a un módulo compartido `src/lib/listbox-controls.tsx` si aún no lo están).
-- Cálculo de los resúmenes nuevos: reutiliza `siteProgress` + agrupación por manzana/tipo/vale-etapa en `useMemo`, sin tocar `sites-compute.ts` ni `plano-compute.ts`.
-- Memoria: actualizar `mem://index.md` Core ("Plano desbloqueado, resto bloqueado").
+- Edito `src/sections/plano.tsx`:
+  - Nueva función helper local `lineCounts(site, ...)` que devuelve `{ done, total }` usando `maps.reqsByStageHouse` + `maps.deliveredBySiteStageMat` (sin tocar `plano-compute.ts`).
+  - Reemplazo los 4 cálculos de `pct` en los paneles para usar acumuladores `sumDone / sumTotal` en vez de `completos/aplicable` o `term/total`.
+  - Las columnas "Terminados / En ejec. / Sin iniciar" y "Aplica / Completos / Parciales / Sin entr." **no cambian** — siguen contando sitios o vales como antes.
+- No toco la lógica de las KPIs principales ni los colores de celda del plano.
