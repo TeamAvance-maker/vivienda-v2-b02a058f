@@ -916,7 +916,8 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           {pendientes.map((p) => {
-            const pct = p.total ? Math.round((p.executed / p.total) * 100) : 0;
+            const pct = p.totalLines ? (p.doneLines / p.totalLines) * 100 : 0;
+            const pctStr = pct === 0 || pct === 100 ? pct.toFixed(0) : pct.toFixed(2);
             return (
               <div
                 key={p.code}
