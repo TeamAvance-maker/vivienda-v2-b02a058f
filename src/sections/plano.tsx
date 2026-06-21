@@ -915,6 +915,30 @@ function statusTone(s: SiteOverallStatus): string {
   return s === "terminado" ? TONE_TERM : s === "en-ejecucion" ? TONE_EXE : s === "sin-iniciar" ? TONE_SIN : "var(--muted-foreground)";
 }
 
+// Cuenta de líneas de material (etapa × material) requeridas y cumplidas
+// para un sitio. Una línea está "cumplida" cuando entregado ≥ requerido.
+function siteLineCounts(
+  site: Site,
+  maps: Maps,
+  opts?: { stageIds?: Iterable<string> },
+): { done: number; total: number } {
+  let done = 0;
+  let total = 0;
+  const stageIds = opts?.stageIds ?? maps.reqsByStageHouse.keys();
+  for (const sid of stageIds) {
+    const reqs = maps.reqsByStageHouse.get(sid)?.get(site.house_type) ?? [];
+    if (reqs.length === 0) continue;
+    const delivered = maps.deliveredBySiteStageMat.get(site.id)?.get(sid) ?? new Map();
+    for (const r of reqs) {
+      total++;
+      const got = delivered.get(r.material_id) ?? 0;
+      if (got >= r.qty) done++;
+    }
+  }
+  return { done, total };
+}
+
+
 function ProgressBadge({ pct }: { pct: number }) {
   return (
     <div className="flex items-center gap-2">
@@ -952,7 +976,10 @@ function DetallesValePanel({
     };
     const out: Row[] = [];
     for (const vt of valeTypes) {
+      const stages = valeStages.filter((x) => x.vale_type_id === vt.id).sort((a, b) => a.stage_number - b.stage_number);
+      const valeStageIds = stages.map((x) => x.id);
       let aplicable = 0, completos = 0, parciales = 0, sinEntregar = 0;
+      let valeDone = 0, valeTotal = 0;
       for (const s of sites) {
         const prog = siteProgress(s, valeTypes, maps);
         const v = prog.vales.find((x) => x.valeTypeId === vt.id);
@@ -962,6 +989,9 @@ function DetallesValePanel({
         if (v.status === "complete") completos++;
         else if (v.status === "partial") parciales++;
         else sinEntregar++;
+        const lc = siteLineCounts(s, maps, { stageIds: valeStageIds });
+        valeDone += lc.done;
+        valeTotal += lc.total;
       }
       out.push({
         key: `v:${vt.id}`,
@@ -972,11 +1002,11 @@ function DetallesValePanel({
         completos,
         parciales,
         sinEntregar,
-        pct: aplicable === 0 ? 0 : (completos / aplicable) * 100,
+        pct: valeTotal === 0 ? 0 : (valeDone / valeTotal) * 100,
       });
-      const stages = valeStages.filter((x) => x.vale_type_id === vt.id).sort((a, b) => a.stage_number - b.stage_number);
       for (const st of stages) {
         let aplS = 0, comS = 0, parS = 0, sinS = 0;
+        let stDone = 0, stTotal = 0;
         for (const s of sites) {
           const cs = stageCellStatus(s, st, maps);
           if (cs === "na") continue;
@@ -984,6 +1014,9 @@ function DetallesValePanel({
           if (cs === "complete") comS++;
           else if (cs === "partial") parS++;
           else sinS++;
+          const lc = siteLineCounts(s, maps, { stageIds: [st.id] });
+          stDone += lc.done;
+          stTotal += lc.total;
         }
         out.push({
           key: `s:${st.id}`,
@@ -994,11 +1027,12 @@ function DetallesValePanel({
           completos: comS,
           parciales: parS,
           sinEntregar: sinS,
-          pct: aplS === 0 ? 0 : (comS / aplS) * 100,
+          pct: stTotal === 0 ? 0 : (stDone / stTotal) * 100,
         });
       }
     }
     return out;
+
   }, [sites, valeTypes, valeStages, maps]);
 
   const ctrl = useTableControls<typeof rows[number]>({
@@ -1064,13 +1098,15 @@ function DetallesValePanel({
 function DetallesManzanaPanel({ sites, valeTypes, maps }: { sites: Site[]; valeTypes: ValeTypeV2[]; maps: Maps | null }) {
   const rows = useMemo(() => {
     if (!maps) return [];
-    const byMz = new Map<string, { total: number; term: number; exe: number; sin: number; sumPct: number }>();
+    const byMz = new Map<string, { total: number; term: number; exe: number; sin: number; done: number; lines: number }>();
     for (const s of sites) {
       const prog = siteProgress(s, valeTypes, maps);
+      const lc = siteLineCounts(s, maps);
       const k = String(s.manzana);
-      const acc = byMz.get(k) ?? { total: 0, term: 0, exe: 0, sin: 0, sumPct: 0 };
+      const acc = byMz.get(k) ?? { total: 0, term: 0, exe: 0, sin: 0, done: 0, lines: 0 };
       acc.total++;
-      acc.sumPct += prog.pct;
+      acc.done += lc.done;
+      acc.lines += lc.total;
       if (prog.status === "terminado") acc.term++;
       else if (prog.status === "en-ejecucion") acc.exe++;
       else if (prog.status === "sin-iniciar") acc.sin++;
@@ -1082,9 +1118,10 @@ function DetallesManzanaPanel({ sites, valeTypes, maps }: { sites: Site[]; valeT
       terminados: v.term,
       enEjecucion: v.exe,
       sinIniciar: v.sin,
-      pct: v.total === 0 ? 0 : (v.term / v.total) * 100,
+      pct: v.lines === 0 ? 0 : (v.done / v.lines) * 100,
     }));
   }, [sites, valeTypes, maps]);
+
 
   const ctrl = useTableControls<typeof rows[number]>({
     data: rows,
@@ -1146,13 +1183,15 @@ function DetallesManzanaPanel({ sites, valeTypes, maps }: { sites: Site[]; valeT
 function DetallesTipoPanel({ sites, valeTypes, maps }: { sites: Site[]; valeTypes: ValeTypeV2[]; maps: Maps | null }) {
   const rows = useMemo(() => {
     if (!maps) return [];
-    const byTipo = new Map<string, { total: number; term: number; exe: number; sin: number; sumPct: number }>();
+    const byTipo = new Map<string, { total: number; term: number; exe: number; sin: number; done: number; lines: number }>();
     for (const s of sites) {
       const prog = siteProgress(s, valeTypes, maps);
+      const lc = siteLineCounts(s, maps);
       const k = s.house_type ?? "—";
-      const acc = byTipo.get(k) ?? { total: 0, term: 0, exe: 0, sin: 0, sumPct: 0 };
+      const acc = byTipo.get(k) ?? { total: 0, term: 0, exe: 0, sin: 0, done: 0, lines: 0 };
       acc.total++;
-      acc.sumPct += prog.pct;
+      acc.done += lc.done;
+      acc.lines += lc.total;
       if (prog.status === "terminado") acc.term++;
       else if (prog.status === "en-ejecucion") acc.exe++;
       else if (prog.status === "sin-iniciar") acc.sin++;
@@ -1164,9 +1203,10 @@ function DetallesTipoPanel({ sites, valeTypes, maps }: { sites: Site[]; valeType
       terminados: v.term,
       enEjecucion: v.exe,
       sinIniciar: v.sin,
-      pct: v.total === 0 ? 0 : (v.term / v.total) * 100,
+      pct: v.lines === 0 ? 0 : (v.done / v.lines) * 100,
     }));
   }, [sites, valeTypes, maps]);
+
 
   const ctrl = useTableControls<typeof rows[number]>({
     data: rows,
@@ -1230,12 +1270,13 @@ function DetallesSitioPanel({ sites, valeTypes, maps }: { sites: Site[]; valeTyp
     if (!maps) return [];
     return sites.map((s) => {
       const prog = siteProgress(s, valeTypes, maps);
+      const lc = siteLineCounts(s, maps);
       return {
         key: `${s.manzana}-${s.sitio}`,
         manzana: s.manzana,
         sitio: s.sitio,
         tipo: s.house_type ?? "—",
-        pct: prog.pct,
+        pct: lc.total === 0 ? 0 : (lc.done / lc.total) * 100,
         estado: STATUS_LABEL[prog.status],
         estadoKey: prog.status,
         completos: prog.completos,
@@ -1244,6 +1285,7 @@ function DetallesSitioPanel({ sites, valeTypes, maps }: { sites: Site[]; valeTyp
       };
     });
   }, [sites, valeTypes, maps]);
+
 
   const ctrl = useTableControls<typeof rows[number]>({
     data: rows,
