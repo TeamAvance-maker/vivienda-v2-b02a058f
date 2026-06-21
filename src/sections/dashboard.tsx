@@ -1,8 +1,6 @@
 import { motion } from "framer-motion";
-import { useMemo, useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
-import { AlertTriangle, CheckCircle2, Clock, Grid3x3, Home, Layers, PackageCheck, TrendingUp, Wrench } from "lucide-react";
+import { useMemo } from "react";
+import { AlertTriangle, Home, PackageCheck, TrendingUp, Wrench } from "lucide-react";
 import {
   SortableTh,
   TablePagination,
