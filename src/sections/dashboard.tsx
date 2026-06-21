@@ -237,24 +237,38 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
   }, [sitesQ.data, vtQ.data, v2Maps, ht, vExecuted.data]);
 
   const valeKpis = useMemo(() => {
-    if (!v2Maps || !sitesQ.data || !vtQ.data) return { total: 0, completas: 0, parciales: 0, vacias: 0, porManzana: [] as { manzana: number; total: number; completas: number; pct: number }[] };
+    if (!v2Maps || !sitesQ.data || !vtQ.data) return { total: 0, completas: 0, parciales: 0, vacias: 0, porManzana: [] as { manzana: number; total: number; completas: number; pct: number; doneLines: number; totalLines: number }[] };
     let total = 0, completas = 0, parciales = 0, vacias = 0;
-    const perManz = new Map<number, { total: number; completas: number }>();
+    const perManz = new Map<number, { total: number; completas: number; doneLines: number; totalLines: number }>();
     for (const s of sitesQ.data) {
+      // Conteo de líneas (etapa × material) del sitio
+      let sDone = 0, sTotal = 0;
+      for (const [stageId, byHouse] of v2Maps.reqsByStageHouse) {
+        const reqs = byHouse.get(s.house_type) ?? [];
+        if (reqs.length === 0) continue;
+        const delivered = v2Maps.deliveredBySiteStageMat.get(s.id)?.get(stageId) ?? new Map();
+        for (const r of reqs) {
+          sTotal++;
+          const got = delivered.get(r.material_id) ?? 0;
+          if (got >= r.qty) sDone++;
+        }
+      }
+      const m = perManz.get(s.manzana) ?? { total: 0, completas: 0, doneLines: 0, totalLines: 0 };
+      m.doneLines += sDone;
+      m.totalLines += sTotal;
       for (const v of vtQ.data) {
         const st = cellStatus(s, v, v2Maps);
         if (st === "na") continue;
         total++;
-        const m = perManz.get(s.manzana) ?? { total: 0, completas: 0 };
         m.total++;
         if (st === "complete") { completas++; m.completas++; }
         else if (st === "partial") parciales++;
         else vacias++;
-        perManz.set(s.manzana, m);
       }
+      perManz.set(s.manzana, m);
     }
     const porManzana = [...perManz.entries()]
-      .map(([manzana, v]) => ({ manzana, ...v, pct: v.total ? (v.completas / v.total) * 100 : 0 }))
+      .map(([manzana, v]) => ({ manzana, ...v, pct: v.totalLines ? (v.doneLines / v.totalLines) * 100 : 0 }))
       .sort((a, b) => a.manzana - b.manzana);
     return { total, completas, parciales, vacias, porManzana };
   }, [v2Maps, sitesQ.data, vtQ.data]);
