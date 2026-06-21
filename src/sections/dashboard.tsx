@@ -140,13 +140,21 @@ export function DashboardSection() {
     })
     .filter((r) => r.qty <= threshold);
 
+  // KPIs Sitios × Vales
+  const v2Maps = useMemo(() => {
+    if (!stagesQ.data || !reqsV2Q.data || !sDelivQ.data || !sItemsQ.data || !matsV2Q.data) return null;
+    return buildMaps({
+      stages: stagesQ.data, reqs: reqsV2Q.data,
+      deliveries: sDelivQ.data, items: sItemsQ.data, materials: matsV2Q.data,
+    });
+  }, [stagesQ.data, reqsV2Q.data, sDelivQ.data, sItemsQ.data, matsV2Q.data]);
+
   // Avance por tipo de vivienda — derivado AUTOMÁTICAMENTE de los sitios v2
   // y del estado de sus vales (una vivienda está "ejecutada" cuando todos
   // sus vales aplicables están completos).
   const pendientes = useMemo(() => {
     const sites = sitesQ.data ?? [];
     const vales = vtQ.data ?? [];
-    // Conteo por house_type desde los sitios reales
     const totByType = new Map<string, number>();
     const execByType = new Map<string, number>();
     for (const s of sites) {
@@ -164,11 +172,9 @@ export function DashboardSection() {
         execByType.set(s.house_type, (execByType.get(s.house_type) ?? 0) + 1);
       }
     }
-    // Si no hay sitios v2 cargados, fallback al cálculo v1 anterior.
     if (sites.length === 0) {
       return pendingHouses(ht, vExecuted.data ?? []);
     }
-    // Listamos todos los tipos conocidos (de ht o de los sitios)
     const codes = new Set<string>([
       ...ht.map((h) => h.code),
       ...sites.map((s) => s.house_type),
@@ -186,15 +192,6 @@ export function DashboardSection() {
       };
     });
   }, [sitesQ.data, vtQ.data, v2Maps, ht, vExecuted.data]);
-
-  // KPIs Sitios × Vales
-  const v2Maps = useMemo(() => {
-    if (!stagesQ.data || !reqsV2Q.data || !sDelivQ.data || !sItemsQ.data || !matsV2Q.data) return null;
-    return buildMaps({
-      stages: stagesQ.data, reqs: reqsV2Q.data,
-      deliveries: sDelivQ.data, items: sItemsQ.data, materials: matsV2Q.data,
-    });
-  }, [stagesQ.data, reqsV2Q.data, sDelivQ.data, sItemsQ.data, matsV2Q.data]);
 
   const valeKpis = useMemo(() => {
     if (!v2Maps || !sitesQ.data || !vtQ.data) return { total: 0, completas: 0, parciales: 0, vacias: 0, porManzana: [] as { manzana: number; total: number; completas: number; pct: number }[] };
