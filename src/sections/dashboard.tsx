@@ -1195,4 +1195,194 @@ function DeliveriesHistoryTable({ rows }: { rows: HistRow[] }) {
   );
 }
 
+// ============================================================
+// Listboxes del panel "Ver Detalle" (búsqueda + orden + paginación 10)
+// ============================================================
+type DeficitRow = { mid: string; mat?: { code?: string; description?: string }; stock: number; demanda: number; deficit: number };
+type AjustadoRow = { mid: string; mat?: { code?: string; description?: string }; stock: number; demanda: number };
+type SitioTipoRow = { tipo: string; n: number };
+type ValeIncRow = { vale: { id: string; code: string; name?: string }; incompletos: number };
+
+function DeficitListbox({ rows }: { rows: DeficitRow[] }) {
+  const ctrl = useTableControls<DeficitRow>({
+    data: rows,
+    searchFields: (r) => [r.mat?.code, r.mat?.description],
+    sortFns: {
+      material: (a, b) => String(a.mat?.code ?? "").localeCompare(String(b.mat?.code ?? "")),
+      stock: (a, b) => a.stock - b.stock,
+      demanda: (a, b) => a.demanda - b.demanda,
+      deficit: (a, b) => a.deficit - b.deficit,
+    },
+    defaultSort: { key: "deficit", dir: "desc" },
+  });
+  return (
+    <div className="overflow-hidden rounded-lg border">
+      <TableToolbar ctrl={ctrl} searchPlaceholder="Buscar material…" />
+      <div className="overflow-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-muted/50 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <SortableTh ctrl={ctrl} sortKey="material">Material</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="stock" align="right">Stock</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="demanda" align="right">Demanda</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="deficit" align="right">Déficit</SortableTh>
+            </tr>
+          </thead>
+          <tbody>
+            {ctrl.visible.map((r) => (
+              <tr key={r.mid} className="border-t">
+                <td className="px-2 py-1.5">
+                  <div className="font-medium">{r.mat?.code ?? "—"}</div>
+                  <div className="text-muted-foreground">{r.mat?.description ?? ""}</div>
+                </td>
+                <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.stock)}</td>
+                <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.demanda)}</td>
+                <td className="px-2 py-1.5 text-right font-mono font-semibold text-destructive">
+                  −{fmtNumber(r.deficit)}
+                </td>
+              </tr>
+            ))}
+            {ctrl.visible.length === 0 && (
+              <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">Sin resultados.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <TablePagination ctrl={ctrl} />
+    </div>
+  );
+}
+
+function AjustadosListbox({ rows }: { rows: AjustadoRow[] }) {
+  const ctrl = useTableControls<AjustadoRow>({
+    data: rows,
+    searchFields: (r) => [r.mat?.code, r.mat?.description],
+    sortFns: {
+      material: (a, b) => String(a.mat?.code ?? "").localeCompare(String(b.mat?.code ?? "")),
+      stock: (a, b) => a.stock - b.stock,
+      demanda: (a, b) => a.demanda - b.demanda,
+      holgura: (a, b) => (a.stock - a.demanda) - (b.stock - b.demanda),
+    },
+    defaultSort: { key: "holgura", dir: "asc" },
+  });
+  return (
+    <div className="overflow-hidden rounded-lg border">
+      <TableToolbar ctrl={ctrl} searchPlaceholder="Buscar material…" />
+      <div className="overflow-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-muted/50 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <SortableTh ctrl={ctrl} sortKey="material">Material</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="stock" align="right">Stock</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="demanda" align="right">Demanda</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="holgura" align="right">Holgura</SortableTh>
+            </tr>
+          </thead>
+          <tbody>
+            {ctrl.visible.map((r) => (
+              <tr key={r.mid} className="border-t">
+                <td className="px-2 py-1.5">
+                  <div className="font-medium">{r.mat?.code ?? "—"}</div>
+                  <div className="text-muted-foreground">{r.mat?.description ?? ""}</div>
+                </td>
+                <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.stock)}</td>
+                <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.demanda)}</td>
+                <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.stock - r.demanda)}</td>
+              </tr>
+            ))}
+            {ctrl.visible.length === 0 && (
+              <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">Sin resultados.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <TablePagination ctrl={ctrl} />
+    </div>
+  );
+}
+
+function SitiosPorTipoListbox({ rows, total }: { rows: SitioTipoRow[]; total: number }) {
+  const ctrl = useTableControls<SitioTipoRow>({
+    data: rows,
+    searchFields: (r) => [r.tipo],
+    sortFns: {
+      tipo: (a, b) => a.tipo.localeCompare(b.tipo),
+      pendientes: (a, b) => a.n - b.n,
+    },
+    defaultSort: { key: "pendientes", dir: "desc" },
+  });
+  return (
+    <div className="overflow-hidden rounded-lg border">
+      <TableToolbar ctrl={ctrl} searchPlaceholder="Buscar tipo…" />
+      <div className="overflow-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-muted/50 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <SortableTh ctrl={ctrl} sortKey="tipo">Tipo</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="pendientes" align="right">Pendientes</SortableTh>
+              <th className="px-2 py-1.5 text-right">% del total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {ctrl.visible.map((r) => (
+              <tr key={r.tipo} className="border-t">
+                <td className="px-2 py-1.5 font-medium">{r.tipo}</td>
+                <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.n)}</td>
+                <td className="px-2 py-1.5 text-right font-mono">
+                  {total ? ((r.n / total) * 100).toFixed(1) : "0.0"}%
+                </td>
+              </tr>
+            ))}
+            {ctrl.visible.length === 0 && (
+              <tr><td colSpan={3} className="py-6 text-center text-muted-foreground">Sin resultados.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <TablePagination ctrl={ctrl} />
+    </div>
+  );
+}
+
+function ValesIncompletosListbox({ rows }: { rows: ValeIncRow[] }) {
+  const ctrl = useTableControls<ValeIncRow>({
+    data: rows,
+    searchFields: (r) => [r.vale.code, r.vale.name],
+    sortFns: {
+      vale: (a, b) => a.vale.code.localeCompare(b.vale.code),
+      incompletos: (a, b) => a.incompletos - b.incompletos,
+    },
+    defaultSort: { key: "incompletos", dir: "desc" },
+  });
+  return (
+    <div className="overflow-hidden rounded-lg border">
+      <TableToolbar ctrl={ctrl} searchPlaceholder="Buscar vale…" />
+      <div className="overflow-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-muted/50 text-left text-[11px] uppercase tracking-wider text-muted-foreground">
+            <tr>
+              <SortableTh ctrl={ctrl} sortKey="vale">Vale</SortableTh>
+              <SortableTh ctrl={ctrl} sortKey="incompletos" align="right">Sitios incompletos</SortableTh>
+            </tr>
+          </thead>
+          <tbody>
+            {ctrl.visible.map((r) => (
+              <tr key={r.vale.id} className="border-t">
+                <td className="px-2 py-1.5">
+                  <div className="font-medium">{r.vale.code}</div>
+                  <div className="text-muted-foreground">{r.vale.name}</div>
+                </td>
+                <td className="px-2 py-1.5 text-right font-mono">{fmtNumber(r.incompletos)}</td>
+              </tr>
+            ))}
+            {ctrl.visible.length === 0 && (
+              <tr><td colSpan={2} className="py-6 text-center text-muted-foreground">Sin resultados.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+      <TablePagination ctrl={ctrl} />
+    </div>
+  );
+}
 
