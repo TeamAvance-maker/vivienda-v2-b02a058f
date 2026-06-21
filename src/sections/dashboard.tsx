@@ -40,15 +40,36 @@ function KPI({
   value,
   hint,
   tone = "default",
+  onClick,
 }: {
   icon: typeof Home;
   label: string;
   value: string | number;
   hint?: string;
   tone?: "default" | "warn" | "good";
+  onClick?: () => void;
 }) {
+  const clickable = !!onClick;
   return (
-    <div className="surface-card group relative overflow-hidden p-5">
+    <div
+      className={cn(
+        "surface-card group relative overflow-hidden p-5",
+        clickable && "cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md",
+      )}
+      onClick={onClick}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           {label}
@@ -66,6 +87,11 @@ function KPI({
       </div>
       <div className="mt-3 num-display text-3xl md:text-4xl">{value}</div>
       {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
+      {clickable && (
+        <div className="pointer-events-none absolute bottom-2 right-3 text-[11px] font-medium text-muted-foreground/80 group-hover:text-primary">
+          Ver más →
+        </div>
+      )}
     </div>
   );
 }
