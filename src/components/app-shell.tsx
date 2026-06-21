@@ -65,6 +65,9 @@ function SidebarRail({
   onMouseLeave,
   projectName,
   onOpenHelp,
+  isSuperadmin,
+  onSignOut,
+  userEmail,
 }: {
   active: TabKey;
   onChange: (k: TabKey) => void;
@@ -73,6 +76,9 @@ function SidebarRail({
   onMouseLeave: () => void;
   projectName: string;
   onOpenHelp: () => void;
+  isSuperadmin: boolean;
+  onSignOut: () => void;
+  userEmail: string;
 }) {
   return (
     <motion.aside
@@ -169,8 +175,7 @@ function SidebarRail({
             )}
           </AnimatePresence>
         </button>
-        {(() => {
-          const t = CONFIG_TAB;
+        {[...(isSuperadmin ? [USERS_TAB] : []), CONFIG_TAB].map((t) => {
           const Icon = t.icon;
           const isActive = active === t.key;
           return (
@@ -201,8 +206,28 @@ function SidebarRail({
               </AnimatePresence>
             </button>
           );
-        })()}
+        })}
         <ThemeToggle collapsed={!expanded} />
+        <button
+          onClick={onSignOut}
+          title={`Cerrar sesión (${userEmail})`}
+          className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+        >
+          <LogOut className="h-5 w-5 shrink-0" />
+          <AnimatePresence>
+            {expanded && (
+              <motion.span
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -6 }}
+                transition={{ duration: 0.15 }}
+                className="truncate text-left"
+              >
+                Cerrar sesión
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </button>
       </div>
     </motion.aside>
   );
@@ -213,11 +238,17 @@ export function AppShell({
   onChange,
   projectName,
   children,
+  isSuperadmin = false,
+  onSignOut,
+  userEmail = "",
 }: {
   active: TabKey;
   onChange: (k: TabKey) => void;
   projectName: string;
   children: ReactNode;
+  isSuperadmin?: boolean;
+  onSignOut?: () => void;
+  userEmail?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
