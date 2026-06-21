@@ -1250,7 +1250,7 @@ function DeliveriesHistoryTable({ rows }: { rows: HistRow[] }) {
   return (
     <div className="surface-card overflow-hidden p-0">
       <div className="px-5 pt-5">
-        <h3 className="font-display text-lg font-semibold">Tabla Maestra de Control</h3>
+        <h3 className="font-display text-lg font-semibold">Historial de Entregas por Vale</h3>
         <p className="text-xs text-muted-foreground">
           Registro completo (sólo lectura). Usa la búsqueda, el orden y la paginación.
         </p>
