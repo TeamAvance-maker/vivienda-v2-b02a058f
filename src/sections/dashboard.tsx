@@ -480,7 +480,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
       });
       autoTable(doc, {
         head: [["Código", "Nombre", "Sitios incompletos"]],
-        body: detalleVales.map((r) => [r.vale.code, r.vale.name, fmtNumber(r.incompletos)]),
+        body: sortVales(detalleVales).map((r) => [r.vale.code, r.vale.name, fmtNumber(r.incompletos)]),
         styles: { fontSize: 8 },
       });
     }
