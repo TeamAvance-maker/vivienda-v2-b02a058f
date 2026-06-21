@@ -1,32 +1,68 @@
-## Problema
+## Objetivo
 
-Hoy el % de cada etiqueta cuenta sólo **sitios 100% terminados ÷ sitios aplicables**. Si tienes 58 sitios A1 y 16 están "en ejecución" (con materiales entregados pero no todos los vales completos), salen **0,00%** — aunque sí hay trabajo hecho.
+Desbloquear todo el sitio y hacer dos cambios globales:
 
-## Cambio
+1. Aplicar las reglas globales (búsqueda por tokens, ocultar flechitas en inputs numéricos, paginación por defecto 10, métricas auto-actualizadas, "Ver más →" en esquina inferior derecha de KPIs con onClick) en TODO el sitio.
+2. Quitar el botón flotante de ayuda (el círculo en la esquina inferior derecha), dejando solo la entrada "Ayuda" del menú lateral.
 
-Voy a calcular el avance contando **líneas de material** (cada combinación etapa + material que un sitio necesita según su tipo de casa), no sitios completos ni cantidades.
+## Paso 1 — Desbloqueo
 
-- Una "línea" se considera **cumplida** cuando lo entregado en ese sitio ≥ lo requerido.
-- **Avance del sitio** = líneas cumplidas ÷ líneas requeridas para ese sitio.
-- **Avance de un grupo** (vale/etapa, manzana, tipo, sitio) = suma de líneas cumplidas del grupo ÷ suma de líneas requeridas del grupo.
+- Actualizar `mem://index.md` para marcar el sitio como totalmente desbloqueado y permitir trabajar en todos los módulos.
 
-Así, un A1 con 16 sitios en ejecución reflejará un % pequeño pero visible (ej: 3,47%) en cuanto haya cualquier material entregado.
+## Paso 2 — Quitar el botón flotante de ayuda
 
-## Dónde se aplica
+- En `src/components/app-shell.tsx`: eliminar el `<HelpFab />` y su import. El menú lateral "Ayuda" sigue funcionando igual que ahora.
+- Dejar el archivo `src/components/help-fab.tsx` en el proyecto por si se quiere recuperar luego (no se borra, solo no se usa).
 
-Los 4 paneles "Ver detalles" usan el mismo método de conteo de líneas:
+## Paso 3 — Auditoría de reglas globales
 
-1. **Vale tipo / Etapa** — líneas cumplidas ÷ líneas aplicables, sumadas sobre todos los sitios (separado para fila de vale y filas de etapa).
-2. **Manzana** — líneas cumplidas ÷ líneas aplicables de los sitios de esa manzana.
-3. **Tipo casa** — líneas cumplidas ÷ líneas aplicables de los sitios de ese tipo.
-4. **Sitio** — líneas cumplidas ÷ líneas aplicables del sitio (la columna "Vales" sigue mostrando vales 100% completos como referencia).
+Revisar cada sección y aplicar lo que falte. Recorrido:
 
-Se mantienen 2 decimales en todos los `%`.
+- `src/sections/dashboard.tsx` (Inicio)
+- `src/sections/plano.tsx` (Plano)
+- `src/sections/materials.tsx`
+- `src/sections/receptions.tsx`
+- `src/sections/deliveries.tsx`
+- `src/sections/casas.tsx`
+- `src/sections/house-types.tsx`
+- `src/sections/sites.tsx`
+- `src/sections/inventory.tsx`
+- `src/sections/reports.tsx`
+- `src/sections/config.tsx`
+- `src/sections/vale-tipo.tsx`
+- Componentes compartidos: `src/components/data-table.tsx`, `src/components/searchable-select.tsx`.
 
-## Detalle técnico
+Para cada uno verificar y corregir:
 
-- Edito `src/sections/plano.tsx`:
-  - Nueva función helper local `lineCounts(site, ...)` que devuelve `{ done, total }` usando `maps.reqsByStageHouse` + `maps.deliveredBySiteStageMat` (sin tocar `plano-compute.ts`).
-  - Reemplazo los 4 cálculos de `pct` en los paneles para usar acumuladores `sumDone / sumTotal` en vez de `completos/aplicable` o `term/total`.
-  - Las columnas "Terminados / En ejec. / Sin iniciar" y "Aplica / Completos / Parciales / Sin entr." **no cambian** — siguen contando sitios o vales como antes.
-- No toco la lógica de las KPIs principales ni los colores de celda del plano.
+- **Búsqueda por tokens**: cualquier input de búsqueda (filtros de tabla, buscador de materiales, etc.) debe filtrar verificando que la fila contenga TODOS los términos separados por espacio (no coincidencia exacta ni "empieza por"). Centralizar como helper si conviene.
+- **Inputs numéricos sin flechitas**: ocultar los spinners nativos (CSS `appearance: none` + `::-webkit-inner-spin-button`) en todos los `<Input type="number">`. Aplicarlo a nivel global en `src/styles.css` para que cubra todo el sitio de una vez.
+- **Paginación por defecto 10**: en `data-table.tsx` y donde se use, dejar tamaño de página inicial = 10.
+- **KPIs con onClick**: cualquier tarjeta/etiqueta de métrica clickeable debe mostrar el texto **"Ver más →"** en la esquina **inferior derecha** de la tarjeta.
+- **Métricas automáticas**: confirmar que todos los contadores/porcentajes se recalculan cuando cambian los datos (sin necesidad de recargar). Revisar `useMemo`/`useQuery` y que no haya valores cacheados que se queden viejos.
+
+## Paso 4 — Verificación
+
+- Recorrer visualmente con Playwright las secciones principales (Inicio, Plano, Materiales, Recepciones, Entregas, Inventario, Reportes, Configuración) tomando capturas para confirmar:
+  - No aparece el círculo flotante de ayuda.
+  - Los inputs numéricos no muestran flechitas.
+  - Las búsquedas filtran por tokens.
+  - Las tarjetas KPI clickeables muestran "Ver más →" abajo a la derecha.
+
+## Notas técnicas
+
+- El CSS global de los spinners se añade una sola vez en `src/styles.css`:
+
+```text
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
+```
+
+- El helper de búsqueda por tokens vive en `src/lib/utils.ts` y se reutiliza desde cada sección/tabla:
+
+```text
+matchesTokens(haystack, query) →
+  haystack.toLowerCase() contiene cada token de query.toLowerCase().split(/\s+/)
+```
+
+- No se tocan migraciones ni esquema. Solo frontend/presentación en absolutamente todo el sitio, que no quede nada del frontend sin revisar.
