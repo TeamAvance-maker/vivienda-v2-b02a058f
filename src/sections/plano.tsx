@@ -606,12 +606,14 @@ function StatCard({
   accent,
   active,
   onClick,
+  showDot,
 }: {
   label: string;
   value: string | number;
   accent?: string;
   active?: boolean;
   onClick?: () => void;
+  showDot?: boolean;
 }) {
   const clickable = !!onClick;
   return (
@@ -621,7 +623,10 @@ function StatCard({
         clickable ? "cursor-pointer hover:bg-muted/40" : ""
       } ${active ? "ring-2 ring-primary border-primary" : ""}`}
     >
-      <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+        {showDot && accent && (
+          <span className="inline-block h-2 w-2 rounded-full" style={{ background: accent }} />
+        )}
         {label}
       </div>
       <div className="mt-1 text-xl font-bold" style={accent ? { color: accent } : undefined}>
