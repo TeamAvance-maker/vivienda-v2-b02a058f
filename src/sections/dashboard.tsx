@@ -389,19 +389,19 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumen), "Resumen");
 
     const deficit = [["Código", "Descripción", "Stock", "Demanda", "Déficit"],
-      ...detalleMateriales.deficit.map((r) => [r.mat?.code ?? "", r.mat?.description ?? "", r.stock, r.demanda, -r.deficit])];
+      ...sortMats(detalleMateriales.deficit).map((r) => [r.mat?.code ?? "", r.mat?.description ?? "", r.stock, r.demanda, -r.deficit])];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(deficit), "Déficit");
 
     const ajustados = [["Código", "Descripción", "Stock", "Demanda", "Holgura"],
-      ...detalleMateriales.ajustados.map((r) => [r.mat?.code ?? "", r.mat?.description ?? "", r.stock, r.demanda, r.stock - r.demanda])];
+      ...sortMats(detalleMateriales.ajustados).map((r) => [r.mat?.code ?? "", r.mat?.description ?? "", r.stock, r.demanda, r.stock - r.demanda])];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ajustados), "Ajustados");
 
     const tipos = [["Tipo", "Pendientes", "% del total"],
-      ...detalleSitiosPorTipo.map((r) => [r.tipo, r.n, indicador.pendingCount ? +((r.n / indicador.pendingCount) * 100).toFixed(1) : 0])];
+      ...sortTipos(detalleSitiosPorTipo).map((r) => [r.tipo, r.n, indicador.pendingCount ? +((r.n / indicador.pendingCount) * 100).toFixed(1) : 0])];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(tipos), "Sitios por tipo");
 
     const vales = [["Código", "Nombre", "Sitios incompletos"],
-      ...detalleVales.map((r) => [r.vale.code, r.vale.name, r.incompletos])];
+      ...sortVales(detalleVales).map((r) => [r.vale.code, r.vale.name, r.incompletos])];
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(vales), "Vales incompletos");
 
     XLSX.writeFile(wb, `${exportFilename()}.xlsx`);
