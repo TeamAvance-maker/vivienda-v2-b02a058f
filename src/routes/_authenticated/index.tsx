@@ -1,4 +1,4 @@
-import { createFileRoute, Navigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Toaster } from "sonner";
@@ -103,5 +103,3 @@ function Index() {
   );
 }
 
-// Evita el warning de "unused import" cuando no se usa en este archivo
-void Navigate;
