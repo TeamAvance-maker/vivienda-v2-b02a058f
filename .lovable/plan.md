@@ -1,41 +1,55 @@
-## Cambios al panel "Ver Detalle" del Dashboard
+## Qué vamos a hacer
 
-Voy a transformar el panel lateral en una **vista de pantalla completa** con botones fijos arriba y abajo.
+Agregar una **barra de progreso de un solo renglón con 3 colores** dentro del indicador principal (la tarjeta grande de arriba a la derecha del dashboard), que muestre de un vistazo cómo están repartidos los sitios totales:
 
-### 1. Panel a pantalla completa
-En `src/sections/dashboard.tsx`, cambiar el `<SheetContent side="right" className="sm:max-w-xl ...">` por uno que ocupe **toda la pantalla**:
-- `side="right"` se mantiene, pero con `className="w-screen max-w-none sm:max-w-none h-screen flex flex-col p-0"`.
-- El contenido interior se organiza en 3 zonas verticales con `flex flex-col`:
-  - **Barra superior fija** (header sticky) con título + botón **"← Volver"** a la derecha (cierra el panel, `onClick={() => setOpen(false)}`).
-  - **Zona central con scroll** (`flex-1 overflow-y-auto p-6`) que contiene todas las secciones actuales (Resumen general, Materiales con déficit, Materiales ajustados, Sitios pendientes por tipo, Vales incompletos).
-  - **Barra inferior fija** (footer sticky) con dos botones: **"Exportar a Excel"** y **"Exportar a PDF"**.
+- 🟢 **Terminados** — verde suave estilo "salvia/oliva"
+- 🟡 **En ejecución** — dorado/ámbar tipo miel
+- 🔴 **Sin iniciar** — terracota suave (rojo "tierra cocida")
 
-Los botones de arriba y abajo siempre visibles (no se mueven al hacer scroll).
+Estos tonos no serán colores puros: se ajustarán a la paleta "Boutique Café" del sitio, así que se sentirán parte del diseño (no semáforo de tránsito).   
+que sean más opacos de los que me sugeriste por favor
 
-### 2. Exportar a Excel
-- Usar la librería **`xlsx`** (SheetJS) que ya es estándar y liviana. Si no está instalada, agregarla con `bun add xlsx`.
-- Función `exportarExcel()` que arma un libro con varias hojas:
-  - **Resumen** (KPIs generales)
-  - **Materiales con déficit**
-  - **Materiales ajustados**
-  - **Sitios pendientes por tipo**
-  - **Vales incompletos**
-- Descarga el archivo como `resumen-stock-AAAA-MM-DD.xlsx`.
+### Cómo se verá
 
-### 3. Exportar a PDF
-- Usar **`jspdf`** + **`jspdf-autotable`** (también estándar y liviano) para generar un PDF con las mismas tablas.
-- Encabezado con título "Resumen detallado de stock" y fecha.
-- Una sección por cada bloque del panel, en orden.
-- Descarga como `resumen-stock-AAAA-MM-DD.pdf`.
+```text
+┌──────────────────────────────────────────────────────────┐
+│  Distribución de sitios                                   │
+│  ████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  │
+│   45%           30%                25%                    │
+│                                                           │
+│  ● Terminados 45 (45%)  ● En ejecución 30 (30%)  ● Sin iniciar 25 (25%) │
+└──────────────────────────────────────────────────────────┘
+```
 
-### 4. Memoria
-Agregar a `mem://rules/global-input-rules`:
-> Los paneles tipo "Ver Detalle" deben ocupar pantalla completa, con un botón fijo arriba "Volver" y botones fijos abajo para "Exportar a Excel" y "Exportar a PDF" cuando muestren datos tabulares.
+- Una sola barra dividida en 3 segmentos proporcionales al % de cada estado.
+- Encima/dentro de cada segmento, el **porcentaje**.
+- Debajo, una **leyenda** con el puntito de color, el nombre, la cantidad y el %.
 
-### Archivos a modificar
-- `src/sections/dashboard.tsx` — Sheet a pantalla completa, header/footer sticky, funciones `exportarExcel()` y `exportarPDF()`.
-- `package.json` (vía `bun add`) — agregar `xlsx`, `jspdf`, `jspdf-autotable` si no están.
-- `mem://rules/global-input-rules` — nueva regla del panel detalle.
+### Iconos de las etiquetas (KPIs)
 
-### Sin cambios
-- Cálculos del indicador, KPIs, lógica de v2, navegación entre secciones.
+En las tarjetitas KPI de abajo:
+
+- ✅ **Terminadas** → icono en verde salvia
+- 🔧 **En Ejecución** → icono en dorado/ámbar
+- 🕒 **Sin Iniciar** → icono en terracota
+
+Los colores serán **exactamente los mismos** que la barra, para que el usuario vincule al instante: "el verde de la barra = la tarjeta de Terminadas".
+
+## Detalles técnicos (para el agente)
+
+- Editar `src/sections/dashboard.tsx`:
+  - Dentro del `hero-card` (líneas ~566–610), agregar debajo del bloque de "Material limitante / Ver Detalle" un nuevo bloque con la barra apilada y la leyenda. Usa `siteStatusCounts.{terminado, enEjecucion, sinIniciar, total}` que ya existe.
+  - La barra: `div` con `flex h-3 w-full overflow-hidden rounded-full bg-white/10`, y 3 hijos con `style={{ width: pctX + "%" }}` y `background` de los 3 tonos.
+  - Tonos en `oklch` (boutique-café, ya disponibles como tokens):
+    - verde: `oklch(0.62 0.09 145)` (salvia / oliva tierno)
+    - amarillo: `var(--gold)` (ya existe — dorado miel)
+    - rojo: `var(--terracotta)` (ya existe — terracota)
+  - Leyenda: 3 chips con `inline-flex items-center gap-1.5` y un `span` redondo de 8px del color.
+  - En los `<KPI>` (líneas 722–744), pasar una nueva prop `iconColor` (string CSS color) y aplicarla al `<Icon>` correspondiente.
+  - Localizar el componente `KPI` (más abajo en el mismo archivo) y aceptar `iconColor?: string` → `<Icon style={{ color: iconColor }} />` cuando esté presente; si no, comportamiento actual intacto.
+
+## Lo que NO se toca
+
+- No se cambia el panel "Ver Detalle" (el que se desliza desde la derecha).
+- No se cambian los cálculos ni las exportaciones a Excel/PDF.
+- No se cambian otras secciones (Plano, Recepciones, etc.).
