@@ -608,7 +608,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
             Indicador principal
           </div>
           <h2 className="mt-2 max-w-2xl font-display text-lg font-medium text-[oklch(0.93_0.04_80)] md:text-xl">
-            Sitios que pueden completarse con el stock actual
+            Sitios que pueden Completarse con el Stock Actual
           </h2>
           <div className="mt-4 flex flex-wrap items-end gap-x-6 gap-y-2">
             <div className="num-display text-6xl text-white md:text-7xl">
