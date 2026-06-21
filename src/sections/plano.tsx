@@ -1004,8 +1004,8 @@ function DetallesValePanel({
   const ctrl = useTableControls({
     rows,
     searchKeys: ["code", "label"],
-    initialSort: { key: "pct", dir: "desc" },
-    initialPageSize: 10,
+    defaultSort: { key: "pct", dir: "desc" },
+    defaultPageSize: 10,
   });
 
   return (
@@ -1030,9 +1030,9 @@ function DetallesValePanel({
               </tr>
             </thead>
             <tbody>
-              {ctrl.pageRows.length === 0 ? (
+              {ctrl.visible.length === 0 ? (
                 <tr><td colSpan={7} className="p-4 text-center text-muted-foreground">Sin resultados</td></tr>
-              ) : ctrl.pageRows.map((r) => (
+              ) : ctrl.visible.map((r) => (
                 <tr key={r.key} className={`border-t ${r.kind === "stage" ? "bg-muted/20" : ""}`}>
                   <td className="px-2 py-1.5 font-mono text-[10.5px]">{r.code}</td>
                   <td className="px-2 py-1.5">{r.label}</td>
@@ -1080,8 +1080,8 @@ function DetallesManzanaPanel({ sites, valeTypes, maps }: { sites: Site[]; valeT
   const ctrl = useTableControls({
     rows,
     searchKeys: ["manzana"],
-    initialSort: { key: "manzana", dir: "asc" },
-    initialPageSize: 10,
+    defaultSort: { key: "manzana", dir: "asc" },
+    defaultPageSize: 10,
   });
 
   return (
@@ -1105,9 +1105,9 @@ function DetallesManzanaPanel({ sites, valeTypes, maps }: { sites: Site[]; valeT
               </tr>
             </thead>
             <tbody>
-              {ctrl.pageRows.length === 0 ? (
+              {ctrl.visible.length === 0 ? (
                 <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">Sin resultados</td></tr>
-              ) : ctrl.pageRows.map((r) => (
+              ) : ctrl.visible.map((r) => (
                 <tr key={r.manzana} className="border-t">
                   <td className="px-2 py-1.5 font-semibold">M{r.manzana}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums">{r.total}</td>
@@ -1154,8 +1154,8 @@ function DetallesTipoPanel({ sites, valeTypes, maps }: { sites: Site[]; valeType
   const ctrl = useTableControls({
     rows,
     searchKeys: ["tipo"],
-    initialSort: { key: "tipo", dir: "asc" },
-    initialPageSize: 10,
+    defaultSort: { key: "tipo", dir: "asc" },
+    defaultPageSize: 10,
   });
 
   return (
@@ -1179,9 +1179,9 @@ function DetallesTipoPanel({ sites, valeTypes, maps }: { sites: Site[]; valeType
               </tr>
             </thead>
             <tbody>
-              {ctrl.pageRows.length === 0 ? (
+              {ctrl.visible.length === 0 ? (
                 <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">Sin resultados</td></tr>
-              ) : ctrl.pageRows.map((r) => (
+              ) : ctrl.visible.map((r) => (
                 <tr key={r.tipo} className="border-t">
                   <td className="px-2 py-1.5 font-semibold">{r.tipo}</td>
                   <td className="px-2 py-1.5 text-right tabular-nums">{r.total}</td>
@@ -1223,8 +1223,8 @@ function DetallesSitioPanel({ sites, valeTypes, maps }: { sites: Site[]; valeTyp
   const ctrl = useTableControls({
     rows,
     searchKeys: ["manzana", "sitio", "tipo", "estado"],
-    initialSort: { key: "pct", dir: "desc" },
-    initialPageSize: 10,
+    defaultSort: { key: "pct", dir: "desc" },
+    defaultPageSize: 10,
   });
 
   return (
@@ -1248,9 +1248,9 @@ function DetallesSitioPanel({ sites, valeTypes, maps }: { sites: Site[]; valeTyp
               </tr>
             </thead>
             <tbody>
-              {ctrl.pageRows.length === 0 ? (
+              {ctrl.visible.length === 0 ? (
                 <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">Sin resultados</td></tr>
-              ) : ctrl.pageRows.map((r) => (
+              ) : ctrl.visible.map((r) => (
                 <tr key={r.key} className="border-t">
                   <td className="px-2 py-1.5 font-semibold">M{r.manzana}</td>
                   <td className="px-2 py-1.5 tabular-nums">{r.sitio}</td>
