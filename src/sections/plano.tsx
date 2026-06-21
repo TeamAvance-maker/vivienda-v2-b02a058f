@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Map as MapIcon } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -80,6 +80,18 @@ export function PlanoSection() {
     estado: "",
     overall: "",
   });
+
+  // Filtro inicial recibido desde otra sección (ej.: KPIs del Inicio).
+  useEffect(() => {
+    try {
+      const o = sessionStorage.getItem("plano:overall");
+      if (o === "terminado" || o === "en-ejecucion" || o === "sin-iniciar") {
+        setFilters((f) => ({ ...f, overall: o as SiteOverallStatus }));
+        sessionStorage.removeItem("plano:overall");
+      }
+    } catch {}
+  }, []);
+
   const [selected, setSelected] = useState<
     { kind: "site"; lot: PlanoLot } | { kind: "manzana"; id: string } | null
   >(null);

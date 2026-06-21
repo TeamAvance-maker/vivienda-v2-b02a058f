@@ -37,7 +37,7 @@ function Index() {
     <>
       <AppShell active={tab} onChange={setTab} projectName={cfg.data?.name ?? "Mi Obra"}>
         {tab === "plano" && <PlanoSection />}
-        {tab === "dashboard" && <DashboardSection />}
+        {tab === "dashboard" && <DashboardSection onNavigate={(t) => setTab(t)} />}
         {tab === "recepciones" && <ReceptionsSection />}
         {tab === "entregas" && <DeliveriesSection />}
         {tab === "inventario" && <InventorySection />}

@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useMemo } from "react";
-import { AlertTriangle, CheckCircle2, Clock, Grid3x3, Home, Layers, PackageCheck, TrendingUp, Wrench } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Grid3x3, Home, Layers, PackageCheck, Wrench } from "lucide-react";
 import {
   SortableTh,
   TablePagination,
@@ -11,7 +11,6 @@ import {
   useConfig,
   useHouseTypes,
   useMaterials,
-  useOverrides,
   useReqs,
   useVDelivered,
   useVExecuted,
@@ -29,7 +28,7 @@ import {
   useSiteDeliveryItems,
 } from "@/lib/sites-queries";
 import { buildMaps, cellStatus } from "@/lib/sites-compute";
-import { fmtDate, fmtNumber, housesPossible, incompleteHouses, makeMap, pendingHouses } from "@/lib/compute";
+import { fmtDate, fmtNumber, housesPossible, makeMap, pendingHouses } from "@/lib/compute";
 import { HAND_SHORT } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -40,15 +39,36 @@ function KPI({
   value,
   hint,
   tone = "default",
+  onClick,
 }: {
   icon: typeof Home;
   label: string;
   value: string | number;
   hint?: string;
   tone?: "default" | "warn" | "good";
+  onClick?: () => void;
 }) {
+  const clickable = !!onClick;
   return (
-    <div className="surface-card group relative overflow-hidden p-5">
+    <div
+      className={cn(
+        "surface-card group relative overflow-hidden p-5",
+        clickable && "cursor-pointer transition hover:-translate-y-0.5 hover:shadow-md",
+      )}
+      onClick={onClick}
+      role={clickable ? "button" : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={
+        clickable
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick?.();
+              }
+            }
+          : undefined
+      }
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           {label}
@@ -66,11 +86,16 @@ function KPI({
       </div>
       <div className="mt-3 num-display text-3xl md:text-4xl">{value}</div>
       {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
+      {clickable && (
+        <div className="pointer-events-none absolute bottom-2 right-3 text-[11px] font-medium text-muted-foreground/80 group-hover:text-primary">
+          Ver más →
+        </div>
+      )}
     </div>
   );
 }
 
-export function DashboardSection() {
+export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") => void } = {}) {
   const cfg = useConfig();
   const houseTypes = useHouseTypes();
   const materials = useMaterials();
@@ -80,7 +105,7 @@ export function DashboardSection() {
   const vStock = useVStock();
   const vRequired = useVRequired();
   const vExecuted = useVExecuted();
-  const overrides = useOverrides();
+  
 
   // V2 (sitios y vales)
   const sitesQ = useSites();
@@ -98,7 +123,6 @@ export function DashboardSection() {
   const ms = materials.data ?? [];
   const totalHouses = ht.reduce((a, b) => a + b.qty, 0);
   const executedTotal = (vExecuted.data ?? []).reduce((a, b) => a + b.qty, 0);
-  const incompleteTotal = incompleteHouses(overrides.data);
   const pending = totalHouses - executedTotal;
 
   const stockMap = makeMap(vStock.data);
@@ -214,6 +238,41 @@ export function DashboardSection() {
     return { total, completas, parciales, vacias, porManzana };
   }, [v2Maps, sitesQ.data, vtQ.data]);
 
+  // Estado por sitio (terminado / en-ejecucion / sin-iniciar) — auto.
+  const siteStatusCounts = useMemo(() => {
+    const counts = { terminado: 0, enEjecucion: 0, sinIniciar: 0, total: 0 };
+    const sites = sitesQ.data ?? [];
+    const vales = vtQ.data ?? [];
+    if (!v2Maps || sites.length === 0 || vales.length === 0) return counts;
+    for (const s of sites) {
+      counts.total++;
+      let appliesAny = false;
+      let allComplete = true;
+      let anyDelivered = false;
+      for (const v of vales) {
+        const st = cellStatus(s, v, v2Maps);
+        if (st === "na") continue;
+        appliesAny = true;
+        if (st === "complete") anyDelivered = true;
+        else if (st === "partial") { anyDelivered = true; allComplete = false; }
+        else allComplete = false;
+      }
+      if (!appliesAny) { counts.sinIniciar++; continue; }
+      if (allComplete) counts.terminado++;
+      else if (anyDelivered) counts.enEjecucion++;
+      else counts.sinIniciar++;
+    }
+    return counts;
+  }, [v2Maps, sitesQ.data, vtQ.data]);
+
+  const goPlanoWithFilter = (overall: "terminado" | "en-ejecucion" | "sin-iniciar") => {
+    try { sessionStorage.setItem("plano:overall", overall); } catch {}
+    onNavigate?.("plano");
+  };
+  const scrollToAlerts = () => {
+    document.getElementById("alertas-stock")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   // Historial completo de entregas por vale (sólo lectura)
   const historialEntregas = useMemo(() => {
     const sitesById = new Map((sitesQ.data ?? []).map((s) => [s.id, s]));
@@ -315,26 +374,35 @@ export function DashboardSection() {
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <KPI icon={Home} label="Viviendas totales" value={fmtNumber(totalHouses)} />
         <KPI
-          icon={PackageCheck}
-          label="Ejecutadas"
-          value={fmtNumber(executedTotal)}
+          icon={CheckCircle2}
+          label="Terminadas"
+          value={fmtNumber(siteStatusCounts.terminado)}
           tone="good"
-          hint={`${totalHouses ? Math.round((executedTotal / totalHouses) * 100) : 0}% del total`}
+          hint={`${siteStatusCounts.total ? Math.round((siteStatusCounts.terminado / siteStatusCounts.total) * 100) : 0}% de los sitios`}
+          onClick={() => goPlanoWithFilter("terminado")}
         />
         <KPI
           icon={Wrench}
-          label="Viviendas incompletas"
-          value={fmtNumber(incompleteTotal)}
-          tone={incompleteTotal > 0 ? "warn" : "default"}
-          hint="Abiertas manualmente"
+          label="En Ejecución"
+          value={fmtNumber(siteStatusCounts.enEjecucion)}
+          tone={siteStatusCounts.enEjecucion > 0 ? "warn" : "default"}
+          hint="Con al menos un material entregado"
+          onClick={() => goPlanoWithFilter("en-ejecucion")}
         />
-        <KPI icon={TrendingUp} label="Pendientes" value={fmtNumber(pending)} />
+        <KPI
+          icon={Clock}
+          label="Sin Iniciar"
+          value={fmtNumber(siteStatusCounts.sinIniciar)}
+          hint="Sin ningún vale entregado"
+          onClick={() => goPlanoWithFilter("sin-iniciar")}
+        />
         <KPI
           icon={AlertTriangle}
           label="Materiales críticos"
           value={fmtNumber(criticals.length)}
           tone={criticals.length ? "warn" : "default"}
           hint={`≤ ${threshold} u.`}
+          onClick={scrollToAlerts}
         />
       </div>
 
@@ -444,7 +512,9 @@ export function DashboardSection() {
 
 
       {/* Alertas */}
-      <AlertsTable rows={criticals} materials={ms} />
+      <div id="alertas-stock" className="scroll-mt-24">
+        <AlertsTable rows={criticals} materials={ms} />
+      </div>
     </div>
   );
 }
