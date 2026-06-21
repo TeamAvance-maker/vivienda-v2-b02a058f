@@ -454,7 +454,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
       });
       autoTable(doc, {
         head: [["Código", "Descripción", "Stock", "Demanda", "Holgura"]],
-        body: detalleMateriales.ajustados.map((r) => [r.mat?.code ?? "", r.mat?.description ?? "", fmtNumber(r.stock), fmtNumber(r.demanda), fmtNumber(r.stock - r.demanda)]),
+        body: sortMats(detalleMateriales.ajustados).map((r) => [r.mat?.code ?? "", r.mat?.description ?? "", fmtNumber(r.stock), fmtNumber(r.demanda), fmtNumber(r.stock - r.demanda)]),
         styles: { fontSize: 8 },
       });
     }
