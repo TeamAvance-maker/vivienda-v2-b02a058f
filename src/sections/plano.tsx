@@ -1168,9 +1168,17 @@ function DetallesTipoPanel({ sites, valeTypes, maps }: { sites: Site[]; valeType
     }));
   }, [sites, valeTypes, maps]);
 
-  const ctrl = useTableControls({
-    rows,
-    searchKeys: ["tipo"],
+  const ctrl = useTableControls<typeof rows[number]>({
+    data: rows,
+    searchFields: (r) => [r.tipo],
+    sortFns: {
+      tipo: (a, b) => a.tipo.localeCompare(b.tipo),
+      total: (a, b) => a.total - b.total,
+      terminados: (a, b) => a.terminados - b.terminados,
+      enEjecucion: (a, b) => a.enEjecucion - b.enEjecucion,
+      sinIniciar: (a, b) => a.sinIniciar - b.sinIniciar,
+      pct: (a, b) => a.pct - b.pct,
+    },
     defaultSort: { key: "tipo", dir: "asc" },
     defaultPageSize: 10,
   });
