@@ -1183,13 +1183,15 @@ function DetallesManzanaPanel({ sites, valeTypes, maps }: { sites: Site[]; valeT
 function DetallesTipoPanel({ sites, valeTypes, maps }: { sites: Site[]; valeTypes: ValeTypeV2[]; maps: Maps | null }) {
   const rows = useMemo(() => {
     if (!maps) return [];
-    const byTipo = new Map<string, { total: number; term: number; exe: number; sin: number; sumPct: number }>();
+    const byTipo = new Map<string, { total: number; term: number; exe: number; sin: number; done: number; lines: number }>();
     for (const s of sites) {
       const prog = siteProgress(s, valeTypes, maps);
+      const lc = siteLineCounts(s, maps);
       const k = s.house_type ?? "—";
-      const acc = byTipo.get(k) ?? { total: 0, term: 0, exe: 0, sin: 0, sumPct: 0 };
+      const acc = byTipo.get(k) ?? { total: 0, term: 0, exe: 0, sin: 0, done: 0, lines: 0 };
       acc.total++;
-      acc.sumPct += prog.pct;
+      acc.done += lc.done;
+      acc.lines += lc.total;
       if (prog.status === "terminado") acc.term++;
       else if (prog.status === "en-ejecucion") acc.exe++;
       else if (prog.status === "sin-iniciar") acc.sin++;
@@ -1201,9 +1203,10 @@ function DetallesTipoPanel({ sites, valeTypes, maps }: { sites: Site[]; valeType
       terminados: v.term,
       enEjecucion: v.exe,
       sinIniciar: v.sin,
-      pct: v.total === 0 ? 0 : (v.term / v.total) * 100,
+      pct: v.lines === 0 ? 0 : (v.done / v.lines) * 100,
     }));
   }, [sites, valeTypes, maps]);
+
 
   const ctrl = useTableControls<typeof rows[number]>({
     data: rows,
