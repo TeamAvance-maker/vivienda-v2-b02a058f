@@ -879,7 +879,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
       {valeKpis.porManzana.length > 0 && (
         <div className="surface-card p-5">
           <div className="mb-3 flex items-end justify-between">
-            <h3 className="font-display text-lg font-semibold">Avance por manzana</h3>
+            <h3 className="font-display text-lg font-semibold">Avance por Manzana (Materiales Entregados)</h3>
             <span className="chip">{valeKpis.porManzana.length} manzanas</span>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
