@@ -915,6 +915,30 @@ function statusTone(s: SiteOverallStatus): string {
   return s === "terminado" ? TONE_TERM : s === "en-ejecucion" ? TONE_EXE : s === "sin-iniciar" ? TONE_SIN : "var(--muted-foreground)";
 }
 
+// Cuenta de líneas de material (etapa × material) requeridas y cumplidas
+// para un sitio. Una línea está "cumplida" cuando entregado ≥ requerido.
+function siteLineCounts(
+  site: Site,
+  maps: Maps,
+  opts?: { stageIds?: Iterable<string> },
+): { done: number; total: number } {
+  let done = 0;
+  let total = 0;
+  const stageIds = opts?.stageIds ?? maps.reqsByStageHouse.keys();
+  for (const sid of stageIds) {
+    const reqs = maps.reqsByStageHouse.get(sid)?.get(site.house_type) ?? [];
+    if (reqs.length === 0) continue;
+    const delivered = maps.deliveredBySiteStageMat.get(site.id)?.get(sid) ?? new Map();
+    for (const r of reqs) {
+      total++;
+      const got = delivered.get(r.material_id) ?? 0;
+      if (got >= r.qty) done++;
+    }
+  }
+  return { done, total };
+}
+
+
 function ProgressBadge({ pct }: { pct: number }) {
   return (
     <div className="flex items-center gap-2">
