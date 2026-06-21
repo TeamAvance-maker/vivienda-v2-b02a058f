@@ -940,7 +940,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
                   />
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {p.pending} pendientes · {pct}%
+                  {p.pending} pendientes · {pctStr}%
                 </div>
               </div>
             );
