@@ -1,95 +1,84 @@
+# Plan: Indicador principal automático + panel "Ver Detalle"
 
-# Plan: Historial de cambios entendible (Configuración)
+## Problema detectado
 
-## 1. Estado de bloqueos
-- Todo el sitio queda **bloqueado** otra vez (no se aceptan cambios).
-- Se **desbloquea sólo Configuración** (`src/sections/config.tsx` y lo que use).
-- Recepciones ya cumple las reglas globales (búsqueda por tokens + sin flechitas) → no se vuelve a tocar.
-- Se actualiza `mem://index.md` con el nuevo estado de bloqueo.
+La etiqueta grande **"Indicador principal — Viviendas que pueden completarse con el stock actual"** (en `src/sections/dashboard.tsx`, líneas 341‑370) hoy usa la función vieja `housesPossible(...)` que mira:
 
-## 2. Qué se cambia (resumen para ti, sin tecnicismos)
+- `house_material_req` (requisitos v1, por tipo de vivienda completo)
+- `vExecuted` (viviendas ejecutadas v1)
+- `vStock` (stock actual)
 
-Hoy la tarjeta se llama "Bitácora de eliminaciones" y sólo guarda lo que se **borra**. Además, el usuario sólo ve códigos largos tipo `a7416506-df6a-4114-…` y nombres internos como `site_delivery_items`, así que no entiende qué se eliminó.
+Pero el resto del sitio ya funciona con **v2**: sitios reales, vales por etapa, entregas parciales (`site_deliveries` + `site_delivery_items`) y requisitos `vale_reqs` por etapa. Por eso el número y el mensaje "Stock suficiente para todas las viviendas pendientes" no coinciden con la realidad que ve el usuario en el plano.
 
-Lo que vamos a tener después:
+## 1. Cálculo nuevo del indicador (automático, basado en v2)
 
-- Nuevo nombre: **"Historial de cambios"** (en vez de "Bitácora de eliminaciones").
-- Guarda **dos cosas**: lo que se **modificó** y lo que se **eliminó** (simple o en cascada).
-- Cada línea responde 4 preguntas en lenguaje normal:
-  1. **¿Qué cosa?** — identificador humano: "Recepción guía G‑00012345 del 12‑06‑2026 — Tubo PPR 75×50", "Vale V1 · Etapa 2 — Casa A1", "Material PVC‑40 · Tubo PVC 40 mm", etc.
-  2. **¿Qué pasó?** — chip verde "Modificado" o chip rojo "Eliminado" (y si fue en cascada, un chip naranja "Eliminado en cascada").
-  3. **¿Cuándo y quién?** — fecha + hora + usuario (por ahora "superadmin").
-  4. **¿Por qué?** — motivo escrito al confirmar la acción.
-- Botón **"Ver detalle"** en cada fila que abre una ventana con:
-  - Para modificaciones: tabla comparativa **Antes → Después** sólo de los campos que cambiaron.
-  - Para eliminaciones en cascada: lista en árbol de TODO lo que se borró junto, p. ej.
-    ```text
-    Vale V1 — Casa A1
-    └─ Etapa 2 — Instalaciones
-       ├─ Requisito: Tubo PPR 75 (10 u)
-       └─ Entrega a sitio del 12‑06‑2026
-          ├─ Tubo PPR 75 (2 u)
-          └─ Codo PPR 75 (4 u)
-    ```
-  - Datos completos (JSON) plegados al final, por si se necesita.
-- Filtros arriba, **activables/desactivables** con un click:
-  - "Sólo modificaciones" / "Sólo eliminaciones" / "Todo".
-  - Tipo de registro con nombres amigables: *Recepciones, Entregas, Vales, Materiales, Casas, Conteos, Sitios…* (en vez de los nombres técnicos).
-  - Buscador que busca por identificador humano, motivo, guía/factura, código de material, etc.
-  - Rango de fechas (desde / hasta).
-- Exportar CSV sigue funcionando, pero también con las columnas amigables.
+En `dashboard.tsx`, reemplazar el uso de `housesPossible` por un `useMemo` que recorra los sitios reales:
 
-## 3. Cambios técnicos
+1. Para cada **sitio** (`sitesQ.data`) que no esté "terminado":
+   - Para cada **vale aplicable** al tipo de vivienda del sitio:
+     - Por cada **etapa** del vale, calcular `faltante = max(0, req.qty − entregado)` por material.
+2. Sumar el **faltante total por material** → `Map<material_id, faltante>` (= demanda pendiente real).
+3. Recorrer los sitios pendientes en orden y, descontando del stock actual (`vStock` mapeado por código → id de material v2), contar cuántos **sitios pueden quedar 100 % completos** y cuál es el **primer material que se agota** (limitante).
 
-### 3.1 Base de datos (migración)
-- Renombrar concepto: **mantener la tabla** `deletion_log` (no se pierden los 16 registros existentes) pero ampliarla:
-  - `action text not null default 'delete'` con valores `insert | update | delete | cascade_delete`.
-  - `changes jsonb` — diff de campos para updates (`{ campo: { antes, despues } }`).
-  - `record_label text` — etiqueta humana ya calculada al guardar.
-  - Renombrar lógicamente a "historial" sin renombrar la tabla (para no romper backups existentes). Se documenta.
-- GRANTs ya están; sólo añadimos columnas.
-- Backfill: a las 16 filas viejas se les pone `action='delete'` y `record_label` derivado del snapshot.
+Salida:
+- `sitiosCompletables` (número grande)
+- `sitiosPendientes` (total de sitios no terminados)
+- `materialLimitante` (código + descripción)
+- `faltantesPorMaterial[]` (material, faltante total, stock actual, déficit)
+- `sitiosPorTipoPendientes[]` (tipo de vivienda, total pendientes)
+- `valesIncompletos[]` (vale tipo, # sitios donde está incompleto, # materiales con déficit)
 
-### 3.2 Registro de modificaciones (nuevo)
-- En `src/lib/admin.functions.ts` → `adminMutateFn`: antes de `update`/`delete`, leer el registro original, calcular el `changes` (sólo campos que cambian) y escribir una fila en `deletion_log` con `action='update'` o `action='delete'`, `record_snapshot` (estado previo) y `record_label`.
-- En `src/lib/backup.functions.ts` → `cascadeDeleteFn`: añadir `action='cascade_delete'` al padre y a los hijos, y reutilizar `batch_id` para agruparlos en el detalle de árbol.
-- En `src/lib/material-replace.functions.ts` (reemplazo de material): también registrar la modificación masiva como un solo `batch_id` con `action='update'`.
+Todo recalculado automáticamente cuando cambien sitios / vales / etapas / requisitos / entregas / stock.
 
-### 3.3 Etiquetas humanas (`record_label`)
-Función `humanLabel(table, snapshot)` server-side que produce:
-- `receptions` → `"Recepción {guia} · {fecha} · {material}"`
-- `deliveries` / `delivery_items` / `delivery_houses` → `"Entrega del {fecha} · {casa/sitio}"`
-- `materials_v2` → `"Material {code} · {description}"`
-- `house_types` → `"Tipo casa {code} · {name}"`
-- `house_material_req` → `"Requisito {house_type} · {material} ({qty})"`
-- `vale_types_v2` / `vale_stages` / `vale_reqs` → `"Vale {code} · Etapa {n} · {material}"`
-- `sites` / `site_deliveries` / `site_delivery_items` → `"Sitio {nombre} · Entrega del {fecha}"`
-- `inventory_counts` / `inventory_adjustments` → `"Conteo de {material} ({fecha})"`
-- `house_exec_overrides` → `"Ajuste manual {casa} · {material}"`
-- `project_config` → `"Configuración del proyecto"`
+## 2. Texto del indicador
 
-### 3.4 UI nueva en Configuración
-Reemplazar `DeletionLogCard` en `src/sections/config.tsx` por `HistoryCard`:
-- Encabezado: "Historial de cambios — modificaciones y eliminaciones del sistema".
-- Barra de filtros: chips toggle "Modificaciones / Eliminaciones / Cascada", selector de tipo de registro (con etiqueta amigable), buscador (tokens), fecha desde/hasta, contador, "Exportar CSV".
-- Tabla: **Fecha y hora · Usuario · Qué pasó · Qué cosa (identificador humano) · Motivo · Detalle**.
-- Columna "Detalle" abre un `Dialog`:
-  - Modificación → tabla **Antes / Después** sólo con campos cambiados.
-  - Eliminación en cascada → árbol agrupado por `batch_id` con los hijos.
-  - Pie con JSON crudo plegable ("Ver datos completos").
-- Búsqueda y filtros con la **regla global de tokens** (igual que Recepciones); también se aplica al resto de inputs nuevos. Esto queda registrado para no re‑verificarlo: Configuración → Historial cumple las reglas globales.
+Reemplazar los dos mensajes:
 
-### 3.5 Diálogos de confirmación
-- `requestAdminMutation` (modificaciones simples): añadir campo opcional "Motivo" como ya tiene el de cascada, para que el historial muestre el "por qué".
-- `requestCascadeDelete`: el preview ya está, sólo se reusa.
+- Si **hay** material limitante:
+  > "Material limitante: {código} {desc}. Faltan {n} unidades para completar todos los sitios pendientes."
+- Si **no hay** limitante:
+  > "Stock suficiente para completar los {N} sitios pendientes."
+
+Al lado del mensaje (mismo "pill" o justo después), agregar un botón‑link **"Ver Detalle →"** que abre el panel lateral.
+
+## 3. Panel lateral "Ver Detalle"
+
+Usar `Sheet` de shadcn (ya en el proyecto) abriendo desde la derecha (`side="right"`), ancho amplio (`sm:max-w-xl`), con secciones:
+
+1. **Resumen general**
+   - Sitios totales / terminados / en ejecución / sin iniciar
+   - Vales aplicables totales / completos / parciales / sin tocar
+   - Sitios completables ahora con el stock actual / sitios pendientes
+
+2. **Materiales con déficit** (tabla, ordenada por mayor déficit)
+   - Material (código + descripción) · Stock actual · Demanda pendiente · **Déficit** (negativo en rojo)
+   - Solo los que tengan `demanda > stock`.
+
+3. **Materiales suficientes pero ajustados** (≤ 20 % de holgura)
+   - Mismo formato, para anticipar futuros faltantes.
+
+4. **Sitios pendientes por tipo de vivienda**
+   - Tipo · Total pendientes · % del total
+
+5. **Vales con más sitios incompletos**
+   - Vale tipo · # sitios incompletos · # materiales en déficit asociados
+
+Todo en solo lectura, con `fmtNumber`, sin acciones.
 
 ## 4. Memoria
-- `mem://index.md`: marcar "Sitio bloqueado salvo **Configuración** (sección Historial) y **Recepciones** desbloqueados".
-- `mem://rules/global-input-rules.md`: añadir "Módulos ya verificados: Recepciones, Configuración (Historial)".
 
-## 5. Lo que NO cambia
-- Diseño visual (estilo "Boutique Café") y resto de tarjetas de Configuración (Respaldo, Restauración, Zona peligrosa) → intactos.
-- Datos existentes en `deletion_log` se conservan.
-- Resto de módulos sigue bloqueado.
+Agregar a `mem://rules/global-input-rules` (y reflejar en el índice si aplica):
 
-¿Apruebas el plan o quieres ajustar algo (nombres de columnas amigables, orden de filtros, etiquetas humanas)?
+> Toda métrica/KPI del Dashboard debe calcularse desde datos v2 reales (sitios + vales + entregas + stock), nunca desde tablas v1 obsoletas como `house_material_req` o `houses_executed`.
+
+## Archivos a modificar
+
+- `src/sections/dashboard.tsx` — nuevo cálculo, nuevo texto, botón "Ver Detalle", `Sheet` con el resumen.
+- (posible) `src/lib/sites-compute.ts` — helper nuevo `pendingDemandByMaterial(sites, valeTypes, maps)` para mantener `dashboard.tsx` ordenado.
+- `mem://rules/global-input-rules` — nueva regla.
+
+## Sin cambios
+
+- Cálculo de Terminadas / En Ejecución / Sin Iniciar (ya es v2).
+- KPIs de vales (ya v2).
+- Sección Alertas, Plano, Tabla maestra, etc.
