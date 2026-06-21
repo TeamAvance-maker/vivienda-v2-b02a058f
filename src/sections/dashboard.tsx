@@ -96,7 +96,7 @@ function KPI({
   );
 }
 
-export function DashboardSection() {
+export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") => void } = {}) {
   const cfg = useConfig();
   const houseTypes = useHouseTypes();
   const materials = useMaterials();
