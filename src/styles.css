@@ -178,6 +178,13 @@
   }
   /* Mobile: evitar zoom en inputs */
   input, select, textarea { font-size: 16px; }
+  /* Ocultar flechitas (spinners) en inputs numéricos en TODO el sitio */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 }
 
 @utility surface-card {

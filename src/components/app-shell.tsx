@@ -17,7 +17,6 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
 import { HelpPanel } from "./help-panel";
-import { HelpFab } from "./help-fab";
 import { cn } from "@/lib/utils";
 
 export type TabKey =
@@ -351,7 +350,6 @@ export function AppShell({
         <div className="mx-auto max-w-7xl">{children}</div>
       </motion.main>
 
-      <HelpFab onClick={() => setHelpOpen(true)} />
       <HelpPanel open={helpOpen} onOpenChange={setHelpOpen} />
     </div>
   );
