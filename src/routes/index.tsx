@@ -30,7 +30,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
-  const [tab, setTab] = useState<TabKey>("plano");
+  const [tab, setTab] = useState<TabKey>("dashboard");
   const cfg = useConfig();
 
   return (
