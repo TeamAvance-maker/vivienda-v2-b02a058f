@@ -105,7 +105,7 @@ export function DashboardSection({ onNavigate }: { onNavigate?: (tab: "plano") =
   const vStock = useVStock();
   const vRequired = useVRequired();
   const vExecuted = useVExecuted();
-  const overrides = useOverrides();
+  
 
   // V2 (sitios y vales)
   const sitesQ = useSites();
