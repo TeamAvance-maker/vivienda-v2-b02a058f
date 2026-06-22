@@ -72,7 +72,7 @@ export function UsersSection() {
         count={pending.length}
       >
         {pending.length === 0 ? (
-          <Empty text="Nadie está esperando aprobación 🎉" />
+          <Empty text="Nadie está esperando aprobación" />
         ) : (
           pending.map((p) => (
             <Row
