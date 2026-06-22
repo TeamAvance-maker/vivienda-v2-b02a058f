@@ -116,14 +116,25 @@ export function UsersSection() {
               key={p.id}
               p={p}
               actions={
-                <ActionBtn
-                  color="danger"
-                  onClick={() =>
-                    updateStatus.mutate({ id: p.id, status: "rejected" })
-                  }
-                >
-                  <X className="h-4 w-4" /> Revocar
-                </ActionBtn>
+                p.email === SUPERADMIN_EMAIL || p.id === myId ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-border/70 bg-secondary px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                    <Lock className="h-3.5 w-3.5" />
+                    {p.id === myId ? "Esta es tu cuenta" : "Superadmin protegido"}
+                  </span>
+                ) : (
+                  <ActionBtn
+                    color="danger"
+                    onClick={() => {
+                      const ok = window.confirm(
+                        `¿Seguro que quieres rechazar a ${p.email}?\n\nDejará de poder ingresar al sitio hasta que la vuelvas a aprobar.`,
+                      );
+                      if (ok)
+                        updateStatus.mutate({ id: p.id, status: "rejected" });
+                    }}
+                  >
+                    <X className="h-4 w-4" /> Revocar
+                  </ActionBtn>
+                )
               }
             />
           ))
