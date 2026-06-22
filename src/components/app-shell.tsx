@@ -16,9 +16,11 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
 import { HelpPanel } from "./help-panel";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 export type TabKey =
