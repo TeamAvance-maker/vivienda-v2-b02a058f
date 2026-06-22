@@ -63,6 +63,7 @@ export function UsersSection() {
         title="Usuarios del sitio"
         description="Aprueba o rechaza el ingreso de las personas que se registran. Solo los aprobados pueden ver la obra."
       />
+      <ChangePasswordCard />
 
       {isLoading && <div className="text-sm text-muted-foreground">Cargando...</div>}
 
