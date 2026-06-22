@@ -16,9 +16,11 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Logo } from "./logo";
 import { ThemeToggle } from "./theme-toggle";
 import { HelpPanel } from "./help-panel";
+import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
 export type TabKey =
@@ -68,6 +70,7 @@ function SidebarRail({
   isSuperadmin,
   onSignOut,
   userEmail,
+  pendingUsers,
 }: {
   active: TabKey;
   onChange: (k: TabKey) => void;
@@ -79,6 +82,7 @@ function SidebarRail({
   isSuperadmin: boolean;
   onSignOut: () => void;
   userEmail: string;
+  pendingUsers: number;
 }) {
   return (
     <motion.aside
@@ -178,11 +182,12 @@ function SidebarRail({
         {[...(isSuperadmin ? [USERS_TAB] : []), CONFIG_TAB].map((t) => {
           const Icon = t.icon;
           const isActive = active === t.key;
+          const showBadge = t.key === "usuarios" && pendingUsers > 0;
           return (
             <button
               key={t.key}
               onClick={() => onChange(t.key)}
-              title={t.label}
+              title={showBadge ? `${t.label} (${pendingUsers} esperando)` : t.label}
               className={cn(
                 "group relative mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                 isActive
@@ -190,7 +195,14 @@ function SidebarRail({
                   : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
               )}
             >
-              <Icon className="h-5 w-5 shrink-0" />
+              <span className="relative shrink-0">
+                <Icon className="h-5 w-5" />
+                {showBadge && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground ring-2 ring-sidebar">
+                    {pendingUsers > 9 ? "9+" : pendingUsers}
+                  </span>
+                )}
+              </span>
               <AnimatePresence>
                 {expanded && (
                   <motion.span
@@ -198,12 +210,17 @@ function SidebarRail({
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -6 }}
                     transition={{ duration: 0.15 }}
-                    className="truncate"
+                    className="flex-1 truncate text-left"
                   >
                     {t.label}
                   </motion.span>
                 )}
               </AnimatePresence>
+              {expanded && showBadge && (
+                <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold leading-none text-destructive-foreground">
+                  {pendingUsers}
+                </span>
+              )}
             </button>
           );
         })}
@@ -255,6 +272,21 @@ export function AppShell({
   const [helpOpen, setHelpOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Cuenta usuarios esperando aprobación (solo para superadmin)
+  const { data: pendingUsers = 0 } = useQuery({
+    queryKey: ["pending-users-count"],
+    enabled: isSuperadmin,
+    refetchInterval: 20000,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending");
+      if (error) return 0;
+      return count ?? 0;
+    },
+  });
+
   function onEnter() {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setExpanded(true);
@@ -281,6 +313,7 @@ export function AppShell({
         isSuperadmin={isSuperadmin}
         onSignOut={onSignOut ?? (() => {})}
         userEmail={userEmail}
+        pendingUsers={pendingUsers}
       />
 
       {/* Header móvil */}
@@ -370,7 +403,12 @@ export function AppShell({
                     )}
                   >
                     <USERS_TAB.icon className="h-5 w-5 shrink-0" />
-                    <span>{USERS_TAB.label}</span>
+                    <span className="flex-1 text-left">{USERS_TAB.label}</span>
+                    {pendingUsers > 0 && (
+                      <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold leading-none text-destructive-foreground">
+                        {pendingUsers}
+                      </span>
+                    )}
                   </button>
                 )}
                 <button
