@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { SectionHeader } from "@/components/app-shell";
-import { Check, X, Clock, Shield, Lock } from "lucide-react";
+import { Check, X, Clock, Shield, Lock, KeyRound, Eye, EyeOff } from "lucide-react";
 
 const SUPERADMIN_EMAIL = "superadmin.controlobra@gmail.com";
 
@@ -63,6 +63,7 @@ export function UsersSection() {
         title="Usuarios del sitio"
         description="Aprueba o rechaza el ingreso de las personas que se registran. Solo los aprobados pueden ver la obra."
       />
+      <ChangePasswordCard />
 
       {isLoading && <div className="text-sm text-muted-foreground">Cargando...</div>}
 
@@ -238,5 +239,83 @@ function Empty({ text }: { text: string }) {
     <div className="rounded-xl border border-dashed border-border/70 p-6 text-center text-sm text-muted-foreground">
       {text}
     </div>
+  );
+}
+
+function ChangePasswordCard() {
+  const [pwd, setPwd] = useState("");
+  const [pwd2, setPwd2] = useState("");
+  const [show, setShow] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pwd.length < 8) {
+      toast.error("La contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+    if (pwd !== pwd2) {
+      toast.error("Las contraseñas no coinciden");
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.updateUser({ password: pwd });
+    setLoading(false);
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    toast.success("✅ Contraseña actualizada. Anótala en un lugar seguro.");
+    setPwd("");
+    setPwd2("");
+  };
+
+  return (
+    <section className="rounded-2xl border border-border/70 bg-card p-5">
+      <h3 className="mb-1 flex items-center gap-2 font-display text-lg font-semibold">
+        <KeyRound className="h-4 w-4 text-primary" /> Cambiar mi contraseña
+      </h3>
+      <p className="mb-4 text-sm text-muted-foreground">
+        Escribe una nueva contraseña para tu cuenta. Mínimo 8 caracteres. Te recomendamos anotarla antes de guardar.
+      </p>
+      <form onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
+        <div className="relative">
+          <input
+            type={show ? "text" : "password"}
+            value={pwd}
+            onChange={(e) => setPwd(e.target.value)}
+            placeholder="Nueva contraseña"
+            autoComplete="new-password"
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 pr-10 text-sm"
+          />
+          <button
+            type="button"
+            onClick={() => setShow((s) => !s)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            aria-label={show ? "Ocultar" : "Mostrar"}
+          >
+            {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
+        <input
+          type={show ? "text" : "password"}
+          value={pwd2}
+          onChange={(e) => setPwd2(e.target.value)}
+          placeholder="Repite la contraseña"
+          autoComplete="new-password"
+          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
+        />
+        <div className="sm:col-span-2">
+          <button
+            type="submit"
+            disabled={loading || !pwd || !pwd2}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+          >
+            <KeyRound className="h-4 w-4" />
+            {loading ? "Guardando..." : "Guardar nueva contraseña"}
+          </button>
+        </div>
+      </form>
+    </section>
   );
 }
