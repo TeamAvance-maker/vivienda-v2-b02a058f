@@ -403,7 +403,12 @@ export function AppShell({
                     )}
                   >
                     <USERS_TAB.icon className="h-5 w-5 shrink-0" />
-                    <span>{USERS_TAB.label}</span>
+                    <span className="flex-1 text-left">{USERS_TAB.label}</span>
+                    {pendingUsers > 0 && (
+                      <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold leading-none text-destructive-foreground">
+                        {pendingUsers}
+                      </span>
+                    )}
                   </button>
                 )}
                 <button
