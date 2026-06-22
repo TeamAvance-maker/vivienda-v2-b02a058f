@@ -70,6 +70,7 @@ function SidebarRail({
   isSuperadmin,
   onSignOut,
   userEmail,
+  pendingUsers,
 }: {
   active: TabKey;
   onChange: (k: TabKey) => void;
@@ -81,6 +82,7 @@ function SidebarRail({
   isSuperadmin: boolean;
   onSignOut: () => void;
   userEmail: string;
+  pendingUsers: number;
 }) {
   return (
     <motion.aside
