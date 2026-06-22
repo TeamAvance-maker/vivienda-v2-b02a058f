@@ -182,11 +182,12 @@ function SidebarRail({
         {[...(isSuperadmin ? [USERS_TAB] : []), CONFIG_TAB].map((t) => {
           const Icon = t.icon;
           const isActive = active === t.key;
+          const showBadge = t.key === "usuarios" && pendingUsers > 0;
           return (
             <button
               key={t.key}
               onClick={() => onChange(t.key)}
-              title={t.label}
+              title={showBadge ? `${t.label} (${pendingUsers} esperando)` : t.label}
               className={cn(
                 "group relative mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                 isActive
@@ -194,7 +195,14 @@ function SidebarRail({
                   : "text-muted-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-foreground",
               )}
             >
-              <Icon className="h-5 w-5 shrink-0" />
+              <span className="relative shrink-0">
+                <Icon className="h-5 w-5" />
+                {showBadge && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground ring-2 ring-sidebar">
+                    {pendingUsers > 9 ? "9+" : pendingUsers}
+                  </span>
+                )}
+              </span>
               <AnimatePresence>
                 {expanded && (
                   <motion.span
@@ -202,12 +210,17 @@ function SidebarRail({
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -6 }}
                     transition={{ duration: 0.15 }}
-                    className="truncate"
+                    className="flex-1 truncate text-left"
                   >
                     {t.label}
                   </motion.span>
                 )}
               </AnimatePresence>
+              {expanded && showBadge && (
+                <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-bold leading-none text-destructive-foreground">
+                  {pendingUsers}
+                </span>
+              )}
             </button>
           );
         })}
