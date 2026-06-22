@@ -272,6 +272,21 @@ export function AppShell({
   const [helpOpen, setHelpOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Cuenta usuarios esperando aprobación (solo para superadmin)
+  const { data: pendingUsers = 0 } = useQuery({
+    queryKey: ["pending-users-count"],
+    enabled: isSuperadmin,
+    refetchInterval: 20000,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("profiles")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending");
+      if (error) return 0;
+      return count ?? 0;
+    },
+  });
+
   function onEnter() {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setExpanded(true);
@@ -298,6 +313,7 @@ export function AppShell({
         isSuperadmin={isSuperadmin}
         onSignOut={onSignOut ?? (() => {})}
         userEmail={userEmail}
+        pendingUsers={pendingUsers}
       />
 
       {/* Header móvil */}
