@@ -1,8 +1,11 @@
+import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { SectionHeader } from "@/components/app-shell";
-import { Check, X, Clock, Shield } from "lucide-react";
+import { Check, X, Clock, Shield, Lock } from "lucide-react";
+
+const SUPERADMIN_EMAIL = "superadmin.controlobra@gmail.com";
 
 type Profile = {
   id: string;
