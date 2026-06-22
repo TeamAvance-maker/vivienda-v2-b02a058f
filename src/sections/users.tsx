@@ -17,6 +17,11 @@ type Profile = {
 
 export function UsersSection() {
   const qc = useQueryClient();
+  const [myId, setMyId] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setMyId(data.user?.id ?? null));
+  }, []);
 
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ["all-profiles"],
