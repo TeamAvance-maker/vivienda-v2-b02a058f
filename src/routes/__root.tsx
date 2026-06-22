@@ -125,6 +125,21 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
+  useEffect(() => {
+    // Cerrar sesión cuando se abre una pestaña nueva del navegador
+    // (sessionStorage se borra al cerrar la pestaña, localStorage no).
+    // Así, si alguien deja la pestaña abierta en un cyber y la cierra,
+    // la próxima persona que abra el sitio NO entra con su cuenta.
+    if (typeof window === "undefined") return;
+    if (sessionStorage.getItem("tab-session-active")) return;
+    sessionStorage.setItem("tab-session-active", "1");
+    import("@/integrations/supabase/client").then(({ supabase }) => {
+      supabase.auth.getSession().then(({ data }) => {
+        if (data.session) supabase.auth.signOut();
+      });
+    });
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
