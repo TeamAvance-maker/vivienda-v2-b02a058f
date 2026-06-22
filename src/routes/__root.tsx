@@ -133,11 +133,17 @@ function RootComponent() {
     if (typeof window === "undefined") return;
     if (sessionStorage.getItem("tab-session-active")) return;
     sessionStorage.setItem("tab-session-active", "1");
-    import("@/integrations/supabase/client").then(({ supabase }) => {
-      supabase.auth.getSession().then(({ data }) => {
-        if (data.session) supabase.auth.signOut();
-      });
-    });
+    (async () => {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data } = await supabase.auth.getSession();
+      if (!data.session) return;
+      await supabase.auth.signOut();
+      // Forzar redirección a la pantalla de ingreso para que no quede
+      // atrapada en "Cargando..." dentro del área protegida.
+      if (window.location.pathname !== "/auth") {
+        window.location.replace("/auth");
+      }
+    })();
   }, []);
 
   return (
