@@ -78,6 +78,26 @@ function AuthPage() {
     }
   }
 
+  async function handleForgotPassword() {
+    if (!email) {
+      toast.error("Escribe tu correo arriba primero.");
+      return;
+    }
+    const redirectTo =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/reset-password`
+        : undefined;
+    const { error } = await supabase.auth.resetPasswordForEmail(
+      email.trim().toLowerCase(),
+      { redirectTo },
+    );
+    if (error) toast.error(error.message);
+    else
+      toast.success(
+        "Te enviamos un correo. Ábrelo y haz clic en el enlace para elegir una nueva contraseña.",
+      );
+  }
+
   async function handleResend() {
     if (!email) {
       toast.error("Escribe tu correo arriba primero.");
@@ -177,6 +197,17 @@ function AuthPage() {
               ? "¿No tienes cuenta? Regístrate"
               : "¿Ya tienes cuenta? Ingresa"}
           </button>
+          {mode === "login" && (
+            <div>
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="text-xs text-primary hover:underline"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
+          )}
           <div>
             <button
               type="button"
