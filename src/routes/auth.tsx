@@ -194,17 +194,32 @@ function AuthPage() {
 }
 
 // Asegura que exista una fila en profiles para este usuario.
+// Si la fila ya existe pero sin nombre, lo copia desde el registro original.
 async function ensureProfile(userId: string, email: string, fullName: string) {
+  // Lee el nombre que se guardó al registrarse (user_metadata.full_name)
+  const { data: userData } = await supabase.auth.getUser();
+  const metaName =
+    (userData.user?.user_metadata as { full_name?: string } | null)?.full_name ?? "";
+  const finalName = (fullName || metaName || "").trim();
+
   const { data: existing } = await supabase
     .from("profiles")
-    .select("id")
+    .select("id, full_name")
     .eq("id", userId)
     .maybeSingle();
+
   if (!existing) {
     await supabase.from("profiles").insert({
       id: userId,
       email: email.toLowerCase(),
-      full_name: fullName || null,
+      full_name: finalName || null,
     });
+  } else if ((!existing.full_name || existing.full_name === "") && finalName) {
+    // Rellena el nombre si quedó vacío de antes
+    await supabase
+      .from("profiles")
+      .update({ full_name: finalName })
+      .eq("id", userId);
   }
 }
+
