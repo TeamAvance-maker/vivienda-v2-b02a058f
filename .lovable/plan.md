@@ -1,68 +1,102 @@
-## Objetivo
+## 🧠 Análisis de V3 — listo para el remix
 
-Desbloquear todo el sitio y hacer dos cambios globales:
+Leí los dos documentos completos (PDF + prompt). Esto es lo que vamos a hacer **en el proyecto remix**, no acá. V2 queda intacta para que tus amigos sigan testeando.
 
-1. Aplicar las reglas globales (búsqueda por tokens, ocultar flechitas en inputs numéricos, paginación por defecto 10, métricas auto-actualizadas, "Ver más →" en esquina inferior derecha de KPIs con onClick) en TODO el sitio.
-2. Quitar el botón flotante de ayuda (el círculo en la esquina inferior derecha), dejando solo la entrada "Ayuda" del menú lateral.
+---
 
-## Paso 1 — Desbloqueo
+## ✅ Lo que está claro del PDF y tu prompt
 
-- Actualizar `mem://index.md` para marcar el sitio como totalmente desbloqueado y permitir trabajar en todos los módulos.
+- **Una constructora, varias obras** separadas (sitios, vales, recepciones, entregas, inventario, reportes y stock por obra).
+- **7 fases** estrictas, una a la vez. No se avanza a la siguiente sin terminar la anterior.
+- **Único usuario inicial:** `superadmin.controlobra@gmail.com` (tú). Nadie más entra a V3.
+- **5 roles** (Superadmin Técnico / Admin General / Admin de Obra / Operador / Consulta).
+- **Sin registro público.** Solo invitación desde la app.
+- **RLS en todo**, validación servidor + base de datos.
+- **Stock único por obra** + interruptor global "permitir negativo" (apagado por defecto).
+- **Operaciones transaccionales** (todo o nada), pero que avise si es nada.
+- **Historial real, respaldos, e "Inicializar obra"** ultra-protegida.
+- **Limpieza de secretos**: `.env` fuera del repo, `.env.example` limpio.
 
-## Paso 2 — Quitar el botón flotante de ayuda
+---
 
-- En `src/components/app-shell.tsx`: eliminar el `<HelpFab />` y su import. El menú lateral "Ayuda" sigue funcionando igual que ahora.
-- Dejar el archivo `src/components/help-fab.tsx` en el proyecto por si se quiere recuperar luego (no se borra, solo no se usa).
+## 📋 Prompt extendido para usar en el remix V3
 
-## Paso 3 — Auditoría de reglas globales
-
-Revisar cada sección y aplicar lo que falte. Recorrido:
-
-- `src/sections/dashboard.tsx` (Inicio)
-- `src/sections/plano.tsx` (Plano)
-- `src/sections/materials.tsx`
-- `src/sections/receptions.tsx`
-- `src/sections/deliveries.tsx`
-- `src/sections/casas.tsx`
-- `src/sections/house-types.tsx`
-- `src/sections/sites.tsx`
-- `src/sections/inventory.tsx`
-- `src/sections/reports.tsx`
-- `src/sections/config.tsx`
-- `src/sections/vale-tipo.tsx`
-- Componentes compartidos: `src/components/data-table.tsx`, `src/components/searchable-select.tsx`.
-
-Para cada uno verificar y corregir:
-
-- **Búsqueda por tokens**: cualquier input de búsqueda (filtros de tabla, buscador de materiales, etc.) debe filtrar verificando que la fila contenga TODOS los términos separados por espacio (no coincidencia exacta ni "empieza por"). Centralizar como helper si conviene.
-- **Inputs numéricos sin flechitas**: ocultar los spinners nativos (CSS `appearance: none` + `::-webkit-inner-spin-button`) en todos los `<Input type="number">`. Aplicarlo a nivel global en `src/styles.css` para que cubra todo el sitio de una vez.
-- **Paginación por defecto 10**: en `data-table.tsx` y donde se use, dejar tamaño de página inicial = 10.
-- **KPIs con onClick**: cualquier tarjeta/etiqueta de métrica clickeable debe mostrar el texto **"Ver más →"** en la esquina **inferior derecha** de la tarjeta.
-- **Métricas automáticas**: confirmar que todos los contadores/porcentajes se recalculan cuando cambian los datos (sin necesidad de recargar). Revisar `useMemo`/`useQuery` y que no haya valores cacheados que se queden viejos.
-
-## Paso 4 — Verificación
-
-- Recorrer visualmente con Playwright las secciones principales (Inicio, Plano, Materiales, Recepciones, Entregas, Inventario, Reportes, Configuración) tomando capturas para confirmar:
-  - No aparece el círculo flotante de ayuda.
-  - Los inputs numéricos no muestran flechitas.
-  - Las búsquedas filtran por tokens.
-  - Las tarjetas KPI clickeables muestran "Ver más →" abajo a la derecha.
-
-## Notas técnicas
-
-- El CSS global de los spinners se añade una sola vez en `src/styles.css`:
+Cuando hagas el remix y abras chat conmigo allá, pégame este bloque tal cual:
 
 ```text
-input[type="number"]::-webkit-outer-spin-button,
-input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-input[type="number"] { -moz-appearance: textfield; }
+Soy el Superadmin Técnico (superadmin.controlobra@gmail.com).
+Trabajaremos V3 siguiendo el "Informe de cierre por fases V3" y el "prompt v3"
+que ya analizaste en V2. Reglas:
+
+1. SOLO YO uso V3. Mis amigos siguen en V2.
+2. Trabajo estrictamente por fases (1 → 7). No saltar.
+3. Antes de cada fase: plan detallado con tablas, archivos, migraciones,
+   riesgos y pruebas. Apruebo o corrijo. Recién ahí construyes.
+4. Al terminar cada fase: resumen, archivos modificados, migraciones,
+   riesgos pendientes, pruebas y resultados.
+5. Idioma español, explicación nivel niño de 5 años, soy de los 90.
+6. Nunca contraseñas ni correos hardcodeados como condición de acceso.
+7. Mantener look & feel "Boutique Café" claro/oscuro de V2 salvo cuando
+   haya que corregir por seguridad, datos o cálculos.
+
+TE FALTO INDICAR LAS REGLAS QUE HEMOS CREADO A LO LARGO DE ESTE CHAT
 ```
 
-- El helper de búsqueda por tokens vive en `src/lib/utils.ts` y se reutiliza desde cada sección/tabla:
+---
 
-```text
-matchesTokens(haystack, query) →
-  haystack.toLowerCase() contiene cada token de query.toLowerCase().split(/\s+/)
-```
+## ⚠️ Cosas que NO están explícitas en el PDF/prompt y que conviene decidir antes de empezar Fase 1
 
-- No se tocan migraciones ni esquema. Solo frontend/presentación en absolutamente todo el sitio, que no quede nada del frontend sin revisar.
+Estas son las "dudas razonables" que el informe no resuelve. Para Fase 1 algunas son urgentes, otras pueden esperar:
+
+### 🔴 Urgentes (decidir antes de Fase 1)
+
+1. **¿Catálogo de materiales global o por obra?**
+  - El informe dice "catálogo general, stock por obra". Hay que confirmar: ¿los precios/unidades son iguales entre obras o cada obra puede tener su propio precio del mismo material? LOS MATERIALES SON POR OBRA, NO HAY PRECIOS POR AHORA, TODO DEPENDE SI ME LO PIDE LA EMPRESA, ESTO ESTA TOTALMENTE ENFOCADO A BODEGA
+2. **¿Qué hacer con la tabla actual `materials_v2`?**
+  - Hoy es global. ¿La dejamos global y solo el stock se separa por obra? (recomendado y coincide con el informe). TODO ES POR OBRA, DEJA UNA OPCION EN SUPERUSUARIO PARA COPIAR O TRASPASAR SOLO LOS MATERIALES DE UNA OBRA A OTRA SIN STOCK
+3. **Datos huérfanos al migrar.**
+  - Si en V2 hay filas sin dueño claro (ej. recepciones de pruebas de tus amigos), ¿se migran todas a la "Obra inicial" o las marcamos para revisar? SE MIGRAN TODAS OBRA INICIAL
+4. **¿Borramos la passphrase compartida actual de una?**
+  - V2 usa contraseña de obra. En V3 ya no existe. Hay que sacarla del código apenas migremos al nuevo login. SI. TODAS LAS CONTRASEÑAS LAS DARE YO COMO SUPERUSUARIO, (sin contraseñas: agregar, consultar, modificar)
+
+### 🟡 Importantes (decidir en Fase 2)
+
+5. **MFA / 2FA en tu cuenta Superadmin.**
+  - El informe lo recomienda. ¿Lo activamos desde el día 1 o más adelante? MAS ADELANTE
+6. **Reautenticación reciente: ¿cuánto es "reciente"?**
+  - El informe la exige para acciones destructivas. Propongo 5 minutos. OK CON POSIBILIDAD DE CAMBIAR POR EL SUPERUSUARIO
+7. **Invitaciones por correo.**
+  - ¿El sistema envía correo de invitación con link, o tú generas un usuario y entregas la contraseña inicial a mano? NOS E COMO FUNCIONA ESO, DEBERAS EXPLICARME COMO FUNCIONAN AMBAS PARA TOMAR UNA DESICION
+
+### 🟢 Para más adelante (Fases 4-7)
+
+8. **Stock negativo: ¿alerta también por correo o solo en pantalla? PANTALLA**
+9. **Respaldos: ¿automáticos cada cuánto, o solo manuales del Superadmin? ESTO TRABAJA EN LA NUBE CIERTO? PODRÍA SER TODOS LOS DIAS A LAS 3 AM HORA CHILE, SINO ES ASÍ LO DEJAMOS PARA MAS ADELANTE, HABRIA QUE VER LO MAS RECOMENDABLE**
+10. **Historial: ¿hasta cuántos meses se guarda? ¿se purga alguna vez? NORMALMENTE UNA CONSTRUCCION DE ESTE INDOLE ES DE UNA DURACION DE 1 AÑO Y 6 MESES, HABRIA QUE VER QUE ES LO MAS RECOMENDABLE**
+11. **Reportes exportables: ¿PDF, Excel, ambos? SI**
+12. **Selector de obra: ¿persiste entre sesiones o se elige cada vez que entras? SE ELIGE CUANDO INGRESO, DDEBO TENER UN DASHBOARD PARA MI Y DESDE AHI SELECCIONAR LA OBRA.**
+
+### 🛡️ Seguridad extra que el PDF no menciona pero conviene
+
+13. **Rate limiting** en login (para que nadie haga ataques de fuerza bruta). SI
+14. **Política de contraseñas:** mínimo 12 caracteres + HIBP (chequeo de contraseñas filtradas — Lovable Cloud lo soporta nativo). SI
+15. **Logs de sesión:** quién entró, desde dónde, cuándo. SI
+16. **Bloqueo automático** de sesión tras X minutos sin actividad. SI, BLOQUEO EN 10 MIN
+
+---
+
+## 🚦 Estado actual
+
+- **No tocaré nada** en V2 ahora.
+- V2 sigue funcionando para tus amigos testers.
+- Cuando hagas el remix de V3 y me escribas allá, arrancamos con la **Fase 1: Base de obras y migración de datos** — y antes de tocar la base de datos te muestro el plan detallado para aprobar.
+
+---
+
+## 📝 Pasos para ti (en orden)
+
+1. Lee este análisis y dime si algo está mal entendido o falta.
+2. Decide al menos las 4 preguntas 🔴 urgentes (puedes responderlas acá).
+3. Ve a Lovable → menú del proyecto → "Remix" → nombre sugerido: **"Control de Obra V3"**.
+4. Abre el chat del nuevo proyecto V3 y pega el prompt extendido de arriba.
+5. Allá te pediré las decisiones que falten y te mostraré el plan de Fase 1.
