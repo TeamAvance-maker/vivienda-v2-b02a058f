@@ -319,11 +319,12 @@ export const createSiteDeliveriesBatchFn = createServerFn({ method: "POST" })
 
 // Copia los materiales (vale_reqs) de una etapa+tipo de casa origen a uno o
 // varios tipos de casa destino. Omite los que ya existan (no sobreescribe).
+const HOUSE_TYPES_ENUM = z.enum(["A1", "A2", "B", "C"]);
 const copyValeStageSchema = z.object({
   passphrase: z.string().min(1),
   vale_stage_id: z.string().uuid(),
-  source_house_type: z.string().min(1),
-  target_house_types: z.array(z.string().min(1)).min(1),
+  source_house_type: HOUSE_TYPES_ENUM,
+  target_house_types: z.array(HOUSE_TYPES_ENUM).min(1),
   overwrite: z.boolean().optional(),
 });
 
