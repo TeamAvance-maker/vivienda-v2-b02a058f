@@ -407,3 +407,111 @@ export const copyValeStageToHouseTypesFn = createServerFn({ method: "POST" })
     return { ok: true, results };
   });
 
+// Copia TODOS los materiales (vale_reqs) de TODAS las etapas de un vale tipo,
+// desde un tipo de casa origen a uno o varios tipos de casa destino.
+const copyValeTypeSchema = z.object({
+  passphrase: z.string().min(1),
+  vale_type_id: z.string().uuid(),
+  source_house_type: HOUSE_TYPES_ENUM,
+  target_house_types: z.array(HOUSE_TYPES_ENUM).min(1),
+  overwrite: z.boolean().optional(),
+});
+
+export const copyValeTypeToHouseTypesFn = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => copyValeTypeSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { checkPassphrase } = await import("./admin.server");
+    checkPassphrase(data.passphrase);
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+
+    // 1) Etapas del vale tipo
+    const { data: stages, error: stErr } = await supabaseAdmin
+      .from("vale_stages")
+      .select("id")
+      .eq("vale_type_id", data.vale_type_id);
+    if (stErr) throw new Error(stErr.message);
+    if (!stages || stages.length === 0) {
+      throw new Error("El vale tipo no tiene etapas.");
+    }
+    const stageIds = stages.map((s: any) => s.id as string);
+
+    // 2) Reqs de origen para todas las etapas
+    const { data: source, error: srcErr } = await supabaseAdmin
+      .from("vale_reqs")
+      .select("vale_stage_id, material_id, qty")
+      .in("vale_stage_id", stageIds)
+      .eq("house_type", data.source_house_type);
+    if (srcErr) throw new Error(srcErr.message);
+    if (!source || source.length === 0) {
+      throw new Error("El tipo de casa de origen no tiene materiales en este vale.");
+    }
+
+    const results: { house_type: string; inserted: number; updated: number; skipped: number }[] = [];
+
+    for (const target of data.target_house_types) {
+      if (target === data.source_house_type) {
+        results.push({ house_type: target, inserted: 0, updated: 0, skipped: source.length });
+        continue;
+      }
+
+      const { data: existing, error: exErr } = await supabaseAdmin
+        .from("vale_reqs")
+        .select("vale_stage_id, material_id")
+        .in("vale_stage_id", stageIds)
+        .eq("house_type", target);
+      if (exErr) throw new Error(exErr.message);
+      const existingSet = new Set(
+        (existing ?? []).map((r: any) => `${r.vale_stage_id}::${r.material_id}`),
+      );
+
+      const toInsert = source
+        .filter((r: any) => !existingSet.has(`${r.vale_stage_id}::${r.material_id}`))
+        .map((r: any) => ({
+          vale_stage_id: r.vale_stage_id,
+          house_type: target,
+          material_id: r.material_id,
+          qty: r.qty,
+        }));
+
+      let updated = 0;
+      let skipped = 0;
+      if (data.overwrite) {
+        for (const r of source) {
+          const key = `${(r as any).vale_stage_id}::${(r as any).material_id}`;
+          if (!existingSet.has(key)) continue;
+          const { error: upErr } = await supabaseAdmin
+            .from("vale_reqs")
+            .update({ qty: (r as any).qty } as any)
+            .eq("vale_stage_id", (r as any).vale_stage_id)
+            .eq("house_type", target)
+            .eq("material_id", (r as any).material_id);
+          if (upErr) throw new Error(upErr.message);
+          updated++;
+        }
+      } else {
+        skipped = source.filter((r: any) =>
+          existingSet.has(`${r.vale_stage_id}::${r.material_id}`),
+        ).length;
+      }
+
+      if (toInsert.length > 0) {
+        const { error: insErr } = await supabaseAdmin
+          .from("vale_reqs")
+          .insert(toInsert as any);
+        if (insErr) throw new Error(insErr.message);
+      }
+
+      results.push({
+        house_type: target,
+        inserted: toInsert.length,
+        updated,
+        skipped,
+      });
+    }
+
+    return { ok: true, results, stages: stages.length, source_count: source.length };
+  });
+
+
