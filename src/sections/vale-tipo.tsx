@@ -57,7 +57,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { adminMutateFn } from "@/lib/admin.functions";
+import { adminMutateFn, copyValeStageToHouseTypesFn } from "@/lib/admin.functions";
 import { MaterialQuickCreate } from "@/components/material-quick-create";
 import {
   useInvalidateSitesV2,
@@ -93,6 +93,41 @@ export function ValeTipoSection() {
   const [editing, setEditing] = useState<ValeReq | null>(null);
   const [editQty, setEditQty] = useState<number>(0);
   const [editPass, setEditPass] = useState("");
+
+  // Copy-to-other-house-types dialog
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyTargets, setCopyTargets] = useState<HouseTypeV2[]>([]);
+  const [copyOverwrite, setCopyOverwrite] = useState(false);
+  const [copyPass, setCopyPass] = useState("");
+  const copyFn = useServerFn(copyValeStageToHouseTypesFn);
+  const copyMut = useMutation({
+    mutationFn: async () => {
+      if (!stageId) throw new Error("Selecciona una etapa");
+      if (copyTargets.length === 0) throw new Error("Selecciona al menos un tipo destino");
+      if (!copyPass) throw new Error("Contraseña requerida");
+      return copyFn({
+        data: {
+          passphrase: copyPass,
+          vale_stage_id: stageId,
+          source_house_type: houseType,
+          target_house_types: copyTargets,
+          overwrite: copyOverwrite,
+        },
+      });
+    },
+    onSuccess: (res: any) => {
+      const summary = (res?.results ?? [])
+        .map((r: any) => `${r.house_type}: +${r.inserted}${r.updated ? ` ~${r.updated}` : ""}${r.skipped ? ` (omitidos ${r.skipped})` : ""}`)
+        .join(" · ");
+      toast.success(`Copiado. ${summary}`);
+      setCopyOpen(false);
+      setCopyTargets([]);
+      setCopyOverwrite(false);
+      setCopyPass("");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Error"),
+  });
 
   const sortedValeTypes = useMemo(
     () =>
@@ -293,9 +328,26 @@ export function ValeTipoSection() {
       {stageId ? (
         <>
           <div className="surface-card p-5">
-            <h3 className="mb-3 font-display text-base font-semibold">
-              Agregar material a {houseType} · {selectedVT?.code} · Etapa {selectedStage?.stage_number}
-            </h3>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-display text-base font-semibold">
+                Agregar material a {houseType} · {selectedVT?.code} · Etapa {selectedStage?.stage_number}
+              </h3>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={filteredReqs.length === 0}
+                onClick={() => {
+                  setCopyTargets([]);
+                  setCopyOverwrite(false);
+                  setCopyPass("");
+                  setCopyOpen(true);
+                }}
+              >
+                <Repeat2 className="mr-1 h-4 w-4" />
+                Copiar a otro tipo de casa
+              </Button>
+            </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
               <div className="md:col-span-2">
                 <Label>Material</Label>
@@ -503,6 +555,78 @@ export function ValeTipoSection() {
               }}
             >
               {editMut.isPending ? "Guardando…" : "Guardar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Copiar a otro tipo de casa */}
+      <AlertDialog open={copyOpen} onOpenChange={(o) => !copyMut.isPending && setCopyOpen(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Copiar materiales a otro tipo de casa</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              Origen: <strong>{houseType}</strong> · {selectedVT?.code} · Etapa {selectedStage?.stage_number}
+              <br />
+              Se copiarán <strong>{filteredReqs.length}</strong> materiales a los tipos seleccionados.
+            </div>
+            <div>
+              <Label>Tipos de casa destino</Label>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {HOUSE_TYPES.filter((h) => h !== houseType).map((h) => {
+                  const checked = copyTargets.includes(h);
+                  return (
+                    <label
+                      key={h}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm",
+                        checked ? "border-primary bg-primary/5" : "border-border",
+                      )}
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          setCopyTargets((prev) =>
+                            v ? [...prev, h] : prev.filter((x) => x !== h),
+                          );
+                        }}
+                      />
+                      <span className="font-medium">{h}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <Checkbox
+                checked={copyOverwrite}
+                onCheckedChange={(v) => setCopyOverwrite(!!v)}
+              />
+              Sobrescribir cantidades si el material ya existe en el destino
+              <span className="text-xs text-muted-foreground">(si no, se omite)</span>
+            </label>
+            <div>
+              <Label>Contraseña de obra</Label>
+              <Input
+                type="password"
+                value={copyPass}
+                onChange={(e) => setCopyPass(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={copyMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!copyPass || copyTargets.length === 0 || copyMut.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                copyMut.mutate();
+              }}
+            >
+              {copyMut.isPending ? "Copiando…" : "Copiar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
