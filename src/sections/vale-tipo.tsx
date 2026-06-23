@@ -94,6 +94,41 @@ export function ValeTipoSection() {
   const [editQty, setEditQty] = useState<number>(0);
   const [editPass, setEditPass] = useState("");
 
+  // Copy-to-other-house-types dialog
+  const [copyOpen, setCopyOpen] = useState(false);
+  const [copyTargets, setCopyTargets] = useState<HouseTypeV2[]>([]);
+  const [copyOverwrite, setCopyOverwrite] = useState(false);
+  const [copyPass, setCopyPass] = useState("");
+  const copyFn = useServerFn(copyValeStageToHouseTypesFn);
+  const copyMut = useMutation({
+    mutationFn: async () => {
+      if (!stageId) throw new Error("Selecciona una etapa");
+      if (copyTargets.length === 0) throw new Error("Selecciona al menos un tipo destino");
+      if (!copyPass) throw new Error("Contraseña requerida");
+      return copyFn({
+        data: {
+          passphrase: copyPass,
+          vale_stage_id: stageId,
+          source_house_type: houseType,
+          target_house_types: copyTargets,
+          overwrite: copyOverwrite,
+        },
+      });
+    },
+    onSuccess: (res: any) => {
+      const summary = (res?.results ?? [])
+        .map((r: any) => `${r.house_type}: +${r.inserted}${r.updated ? ` ~${r.updated}` : ""}${r.skipped ? ` (omitidos ${r.skipped})` : ""}`)
+        .join(" · ");
+      toast.success(`Copiado. ${summary}`);
+      setCopyOpen(false);
+      setCopyTargets([]);
+      setCopyOverwrite(false);
+      setCopyPass("");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Error"),
+  });
+
   const sortedValeTypes = useMemo(
     () =>
       [...(valeTypes.data ?? [])].sort(
