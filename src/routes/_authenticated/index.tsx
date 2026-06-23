@@ -13,6 +13,7 @@ import { InventorySection } from "@/sections/inventory";
 import { MaterialsSection } from "@/sections/materials";
 import { ReceptionsSection } from "@/sections/receptions";
 import { ReportsSection } from "@/sections/reports";
+import { SimulatorSection } from "@/sections/simulator";
 import { PlanoSection } from "@/sections/plano";
 import { UsersSection } from "@/sections/users";
 import { useConfig } from "@/lib/queries";
@@ -78,6 +79,7 @@ function Index() {
         {effectiveTab === "casas" && <CasasSection />}
         {effectiveTab === "materiales" && <MaterialsSection />}
         {effectiveTab === "reportes" && <ReportsSection />}
+        {effectiveTab === "simulador" && <SimulatorSection />}
         {effectiveTab === "config" && <ConfigSection />}
         {effectiveTab === "usuarios" && isSuperadmin && <UsersSection />}
       </AppShell>
