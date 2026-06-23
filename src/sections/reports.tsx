@@ -98,11 +98,10 @@ export function ReportsSection() {
 
   const ctrl = useTableControls<MasterRow>({
     data: allRows,
-    searchFields: (r) => [r.code, r.description, HAND_SHORT[r.hand as keyof typeof HAND_SHORT]],
+    searchFields: (r) => [r.code, r.description],
     sortFns: {
       code: (a, b) => a.code.localeCompare(b.code, "es", { numeric: true }),
       description: (a, b) => a.description.localeCompare(b.description, "es"),
-      hand: (a, b) => String(a.hand).localeCompare(String(b.hand)),
       required: (a, b) => a.required - b.required,
       received: (a, b) => a.received - b.received,
       delivered: (a, b) => a.delivered - b.delivered,
@@ -121,6 +120,7 @@ export function ReportsSection() {
     defaultSort: { key: "code", dir: "asc" },
     defaultPageSize: 50,
   });
+
 
   // Filtrados (todos los registros que pasan filtros, ignorando paginación) — para exportar lo que ve
   const visibleRows = ctrl.filtered;
