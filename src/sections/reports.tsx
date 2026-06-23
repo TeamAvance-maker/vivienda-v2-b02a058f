@@ -240,16 +240,26 @@ export function ReportsSection() {
             { key: "pct", label: "% Cumpl." },
           ]}
           rightSlot={
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9"
-              onClick={() => {
-                required.refetch(); received.refetch(); delivered.refetch(); stock.refetch(); materials.refetch();
-              }}
-            >
-              Actualizar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                className="h-9 gap-1.5 bg-[oklch(0.55_0.12_140)] text-white hover:bg-[oklch(0.5_0.12_140)]"
+                onClick={exportExcel}
+              >
+                <Table2 className="h-4 w-4" />
+                Excel
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9"
+                onClick={() => {
+                  required.refetch(); received.refetch(); delivered.refetch(); stock.refetch(); materials.refetch();
+                }}
+              >
+                Actualizar
+              </Button>
+            </div>
           }
         />
         <div className="max-h-[65vh] overflow-auto">
