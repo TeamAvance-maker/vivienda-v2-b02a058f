@@ -146,11 +146,11 @@ export function ReportsSection() {
 
 
   function exportCsv() {
-    const header = ["Código","Descripción","Sentido","Necesario","Recepcionado","Entregado","Saldo","Pend. comprar","% Cumpl."];
+    const header = ["Código","Descripción","Necesario","Recepcionado","Entregado","Saldo","Pend. comprar","% Cumpl."];
     const csv = [
       header.join(","),
       ...visibleRows.map((r) =>
-        [r.code, `"${r.description.replace(/"/g, '""')}"`, HAND_SHORT[r.hand as keyof typeof HAND_SHORT], r.required, r.received, r.delivered, r.saldo, r.pendienteRecep, r.pct].join(","),
+        [r.code, `"${r.description.replace(/"/g, '""')}"`, r.required, r.received, r.delivered, r.saldo, r.pendienteRecep, r.pct].join(","),
       ),
     ].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -176,11 +176,10 @@ export function ReportsSection() {
     doc.text(`Generado: ${fmtDate(new Date().toISOString())}`, 40, 84);
     autoTable(doc, {
       startY: 110,
-      head: [["Código", "Descripción", "Sentido", "Necesario", "Recep.", "Entreg.", "Saldo", "Pend.", "%"]],
+      head: [["Código", "Descripción", "Necesario", "Recep.", "Entreg.", "Saldo", "Pend.", "%"]],
       body: visibleRows.map((r) => [
         r.code,
         r.description,
-        HAND_SHORT[r.hand as keyof typeof HAND_SHORT],
         r.required,
         r.received,
         r.delivered,
@@ -195,6 +194,7 @@ export function ReportsSection() {
     });
     doc.save(`tabla-maestra-${new Date().toISOString().slice(0, 10)}.pdf`);
   }
+
 
   return (
     <div className="space-y-6">
