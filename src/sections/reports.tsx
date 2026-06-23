@@ -131,7 +131,6 @@ export function ReportsSection() {
     const data = visibleRows.map((r) => ({
       Código: r.code,
       Descripción: r.description,
-      Sentido: HAND_SHORT[r.hand as keyof typeof HAND_SHORT],
       Necesario: r.required,
       Recepcionado: r.received,
       Entregado: r.delivered,
@@ -144,6 +143,7 @@ export function ReportsSection() {
     XLSX.utils.book_append_sheet(wb, ws, "Tabla maestra");
     XLSX.writeFile(wb, `tabla-maestra-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
+
 
   function exportCsv() {
     const header = ["Código","Descripción","Sentido","Necesario","Recepcionado","Entregado","Saldo","Pend. comprar","% Cumpl."];
