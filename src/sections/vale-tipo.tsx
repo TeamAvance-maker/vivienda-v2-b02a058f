@@ -360,6 +360,29 @@ export function ValeTipoSection() {
         </div>
       </div>
 
+      {/* Acciones a nivel vale tipo */}
+      {valeTypeId && (
+        <div className="surface-card flex flex-wrap items-center justify-between gap-3 p-4">
+          <div className="text-sm text-muted-foreground">
+            Vale completo: <strong className="text-foreground">{selectedVT?.code}</strong> · {stagesForType.length} etapa{stagesForType.length === 1 ? "" : "s"} · origen <strong className="text-foreground">{houseType}</strong>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setCopyTypeTargets([]);
+              setCopyTypeOverwrite(false);
+              setCopyTypePass("");
+              setCopyTypeOpen(true);
+            }}
+          >
+            <Repeat2 className="mr-1 h-4 w-4" />
+            Copiar VALE COMPLETO a otros tipos de casa
+          </Button>
+        </div>
+      )}
+
       {/* Lista de materiales */}
       {stageId ? (
         <>
