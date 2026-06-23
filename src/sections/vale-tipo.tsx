@@ -560,6 +560,78 @@ export function ValeTipoSection() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Copiar a otro tipo de casa */}
+      <AlertDialog open={copyOpen} onOpenChange={(o) => !copyMut.isPending && setCopyOpen(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Copiar materiales a otro tipo de casa</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              Origen: <strong>{houseType}</strong> · {selectedVT?.code} · Etapa {selectedStage?.stage_number}
+              <br />
+              Se copiarán <strong>{filteredReqs.length}</strong> materiales a los tipos seleccionados.
+            </div>
+            <div>
+              <Label>Tipos de casa destino</Label>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {HOUSE_TYPES.filter((h) => h !== houseType).map((h) => {
+                  const checked = copyTargets.includes(h);
+                  return (
+                    <label
+                      key={h}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm",
+                        checked ? "border-primary bg-primary/5" : "border-border",
+                      )}
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          setCopyTargets((prev) =>
+                            v ? [...prev, h] : prev.filter((x) => x !== h),
+                          );
+                        }}
+                      />
+                      <span className="font-medium">{h}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <Checkbox
+                checked={copyOverwrite}
+                onCheckedChange={(v) => setCopyOverwrite(!!v)}
+              />
+              Sobrescribir cantidades si el material ya existe en el destino
+              <span className="text-xs text-muted-foreground">(si no, se omite)</span>
+            </label>
+            <div>
+              <Label>Contraseña de obra</Label>
+              <Input
+                type="password"
+                value={copyPass}
+                onChange={(e) => setCopyPass(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={copyMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!copyPass || copyTargets.length === 0 || copyMut.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                copyMut.mutate();
+              }}
+            >
+              {copyMut.isPending ? "Copiando…" : "Copiar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <MaterialQuickCreate
         open={quickCreate}
         onOpenChange={setQuickCreate}
