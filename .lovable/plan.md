@@ -1,77 +1,43 @@
-## Qué encontré
+## Qué entendí ahora
 
-Al revisar la base de datos de la obra, descubrí **una sola causa raíz que explica las dos cosas que ves**:
+No quieres copiar UNA etapa de un vale a otro tipo de casa (eso es lo que armamos antes). Quieres tomar un **vale tipo completo** (por ejemplo "Acometida", que hoy tiene materiales cargados para A1 y A2) y **clonar todos sus materiales — de todas sus etapas — para los tipos de casa B y C**, sin generar entregas.
 
-Cuando la última vez recreé las "vistas" `v_required` (Necesario) y `v_delivered` (Entregado), se me quedó pegada **una opción de seguridad que SÍ tienen las otras vistas** (`v_received`, `v_stock`, `v_houses_executed`).
+El vale tipo en sí (Acometida) ya existe y es uno solo para toda la obra. Lo que falta son las filas de `vale_reqs` (los materiales por etapa) para los tipos de casa que aún no lo tienen.
 
-Esa opción se llama `security_invoker=on`. En lenguaje simple:
+## Cómo va a funcionar para ti
 
-- **CON la opción puesta** → la vista respeta los permisos del usuario que la consulta. El navegador del superadmin (y los amigos que apruebes) puede leerla normalmente.
-- **SIN la opción puesta** → la vista se comporta como si la consultara "el dueño de la base", lo cual:
-  1. Hace que el escáner de seguridad de Lovable la marque como **"Security Definer View" Critical** (el error que viste).
-  2. Hace que el navegador, al pedirla, reciba los datos pero a veces como vacíos o sin que se apliquen los GRANT correctos → por eso publicaste y "no se aplicaron los cambios".
+En la pantalla **Vale Tipo**, además del botón actual "Copiar a otro tipo de casa" (que copia solo la etapa que estás viendo), agrego un **segundo botón** al lado del selector de Vale tipo:
 
-Confirmación con consulta a la base:
+**🔁 Copiar VALE COMPLETO a otros tipos de casa**
 
-```text
-viewname            opts
-v_received          {security_invoker=on}    ✓
-v_stock             {security_invoker=on}    ✓
-v_houses_executed   {security_invoker=on}    ✓
-v_required          (vacío)                  ✗  ← falta
-v_delivered         (vacío)                  ✗  ← falta
-```
+Al apretarlo se abre una ventanita que muestra:
 
-Los datos en la base SÍ están bien: hay 1.593.473 unidades necesarias, 384.343 recepcionadas, 6.350 entregadas y 377.993 en stock. El cálculo es correcto, lo que falla es **el permiso para mostrarlos**.
+1. **Origen**: el vale tipo seleccionado (ej. "Acometida") + el tipo de casa origen (ej. A1).
+2. **Resumen**: "Se copiarán X materiales repartidos en Y etapas".
+3. **Tipos de casa destino**: casillitas A1/A2/B/C (sin el origen). Puedes marcar varios a la vez.
+4. **Sobrescribir si ya existe** (apagado por defecto): si en el destino ya hay materiales para alguna etapa, los respeta. Si lo enciendes, actualiza las cantidades.
+5. **Contraseña de obra**.
+6. Botón **Copiar**.
 
-## Qué voy a hacer
+Al terminar te muestra un resumen tipo: `B: +24 nuevos · C: +24 nuevos (omitidos 0)`.
 
-**Una sola migración pequeña** que:
+**Importante**: solo crea/actualiza filas en `vale_reqs` (la "plantilla"). **No genera ninguna entrega ni mueve inventario**, igual que pediste.
 
-1. Vuelve a crear las vistas `v_required` y `v_delivered` con la opción `security_invoker=on` (igual que las otras tres).
-2. Les da los permisos de lectura a los roles que usa el sitio (`anon`, `authenticated`, `service_role`).
-3. No cambia ninguna fórmula. Las cuentas siguen siendo:
-   - **Necesario** = cantidad por vale × número de sitios de ese tipo de casa.
-   - **Entregado** = suma de lo entregado en cada sitio (tabla `site_delivery_items`).
+## Detalle técnico
 
-No toco código del frontend porque ya está bien (el último cambio quedó aplicado, solo no se veía por el permiso bloqueado).
+- **Nueva función servidor** en `src/lib/admin.functions.ts`: `copyValeTypeToHouseTypesFn`.
+  - Input: `passphrase`, `vale_type_id`, `source_house_type`, `target_house_types[]`, `overwrite?`.
+  - Lee todas las `vale_stages` del `vale_type_id`.
+  - Para cada etapa, replica la lógica de `copyValeStageToHouseTypesFn` (lee `vale_reqs` de la etapa+origen, inserta los que no existen, opcionalmente sobrescribe los que existen).
+  - Devuelve `{ results: [{ house_type, inserted, updated, skipped }] }` agregado por tipo de casa destino.
+- **UI en `src/sections/vale-tipo.tsx`**:
+  - Nuevo botón en la fila de selectores, al lado del selector "Vale tipo" (visible solo cuando hay `valeTypeId` elegido).
+  - Nuevo `AlertDialog` con checkboxes de tipos de casa destino, checkbox de sobrescribir y campo de contraseña.
+  - Usa el mismo `houseType` actual como origen.
+  - Invalida queries al terminar para que las tablas se refresquen.
 
-## Seguridad
+## Lo que NO cambia
 
-Esta misma migración **resuelve el hallazgo "Critical: Security Definer View"** del escáner. Después de aplicarla volveré a correr el escáner para confirmar que el aviso crítico desapareció.
-
-El otro aviso que mencionaste — *"Signed-In Users Can Execute SECURITY DEFINER Function"* — ya está marcado como **Ignored** y es esperable: es la función `has_role` que necesita ese modo para evitar bucles infinitos al consultar roles (es el patrón recomendado por Lovable Cloud). No lo toco.
-
-## Cómo verificarlo tú
-
-Después de aplicar la migración:
-
-1. Refresca la página de la obra con **F5**.
-2. Anda a **Reportes → Tabla maestra**: verás los números en *Necesario*, *Pendiente comprar* y *% Cumplimiento*.
-3. Si quieres publicar para tus amigos, dale al botón **Publicar** y espera ~1 minuto.
-
-## Detalle técnico (para el registro)
-
-```sql
-DROP VIEW IF EXISTS public.v_required;
-CREATE VIEW public.v_required WITH (security_invoker=on) AS
-  SELECT m.code AS material_code, 'none'::handedness AS handedness,
-         (SUM(vr.qty * s.cnt))::int AS qty
-  FROM vale_reqs vr
-  JOIN materials_v2 m ON m.id = vr.material_id
-  JOIN (SELECT house_type::text AS ht, COUNT(*)::int AS cnt
-        FROM sites GROUP BY house_type) s ON s.ht = vr.house_type::text
-  GROUP BY m.code;
-GRANT SELECT ON public.v_required TO anon, authenticated;
-GRANT ALL ON public.v_required TO service_role;
-
-DROP VIEW IF EXISTS public.v_delivered;
-CREATE VIEW public.v_delivered WITH (security_invoker=on) AS
-  SELECT m.code AS material_code, 'none'::handedness AS handedness,
-         (SUM(sdi.qty))::int AS qty
-  FROM site_delivery_items sdi
-  JOIN materials_v2 m ON m.id = sdi.material_id
-  GROUP BY m.code;
-GRANT SELECT ON public.v_delivered TO anon, authenticated;
-GRANT ALL ON public.v_delivered TO service_role;
-```
+- El botón existente "Copiar a otro tipo de casa" (por etapa) se queda igual, por si quieres copiar solo una etapa puntual.
+- No se tocan entregas (`site_deliveries`), ni inventario, ni recepciones.
+- El historial registra estos cambios solo si activas `adminMutateFn`; te puedo agregar el log en el historial si me dices que sí cuando lo implementemos.

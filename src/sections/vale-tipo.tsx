@@ -57,7 +57,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { adminMutateFn, copyValeStageToHouseTypesFn } from "@/lib/admin.functions";
+import { adminMutateFn, copyValeStageToHouseTypesFn, copyValeTypeToHouseTypesFn } from "@/lib/admin.functions";
 import { MaterialQuickCreate } from "@/components/material-quick-create";
 import {
   useInvalidateSitesV2,
@@ -128,6 +128,42 @@ export function ValeTipoSection() {
     },
     onError: (e: any) => toast.error(e?.message ?? "Error"),
   });
+
+  // Copy WHOLE vale type (all stages) to other house types
+  const [copyTypeOpen, setCopyTypeOpen] = useState(false);
+  const [copyTypeTargets, setCopyTypeTargets] = useState<HouseTypeV2[]>([]);
+  const [copyTypeOverwrite, setCopyTypeOverwrite] = useState(false);
+  const [copyTypePass, setCopyTypePass] = useState("");
+  const copyTypeFn = useServerFn(copyValeTypeToHouseTypesFn);
+  const copyTypeMut = useMutation({
+    mutationFn: async () => {
+      if (!valeTypeId) throw new Error("Selecciona un vale tipo");
+      if (copyTypeTargets.length === 0) throw new Error("Selecciona al menos un tipo destino");
+      if (!copyTypePass) throw new Error("Contraseña requerida");
+      return copyTypeFn({
+        data: {
+          passphrase: copyTypePass,
+          vale_type_id: valeTypeId,
+          source_house_type: houseType,
+          target_house_types: copyTypeTargets,
+          overwrite: copyTypeOverwrite,
+        },
+      });
+    },
+    onSuccess: (res: any) => {
+      const summary = (res?.results ?? [])
+        .map((r: any) => `${r.house_type}: +${r.inserted}${r.updated ? ` ~${r.updated}` : ""}${r.skipped ? ` (omitidos ${r.skipped})` : ""}`)
+        .join(" · ");
+      toast.success(`Vale copiado. ${summary}`);
+      setCopyTypeOpen(false);
+      setCopyTypeTargets([]);
+      setCopyTypeOverwrite(false);
+      setCopyTypePass("");
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Error"),
+  });
+
 
   const sortedValeTypes = useMemo(
     () =>
@@ -323,6 +359,29 @@ export function ValeTipoSection() {
           </Select>
         </div>
       </div>
+
+      {/* Acciones a nivel vale tipo */}
+      {valeTypeId && (
+        <div className="surface-card flex flex-wrap items-center justify-between gap-3 p-4">
+          <div className="text-sm text-muted-foreground">
+            Vale completo: <strong className="text-foreground">{selectedVT?.code}</strong> · {stagesForType.length} etapa{stagesForType.length === 1 ? "" : "s"} · origen <strong className="text-foreground">{houseType}</strong>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setCopyTypeTargets([]);
+              setCopyTypeOverwrite(false);
+              setCopyTypePass("");
+              setCopyTypeOpen(true);
+            }}
+          >
+            <Repeat2 className="mr-1 h-4 w-4" />
+            Copiar VALE COMPLETO a otros tipos de casa
+          </Button>
+        </div>
+      )}
 
       {/* Lista de materiales */}
       {stageId ? (
@@ -627,6 +686,90 @@ export function ValeTipoSection() {
               }}
             >
               {copyMut.isPending ? "Copiando…" : "Copiar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Copiar VALE COMPLETO a otros tipos de casa */}
+      <AlertDialog open={copyTypeOpen} onOpenChange={(o) => !copyTypeMut.isPending && setCopyTypeOpen(o)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Copiar vale completo a otros tipos de casa</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            {(() => {
+              const stageIds = new Set(stagesForType.map((s) => s.id));
+              const sourceCount = (reqs.data ?? []).filter(
+                (r) => r.house_type === houseType && stageIds.has(r.vale_stage_id),
+              ).length;
+              return (
+                <div className="text-sm text-muted-foreground">
+                  Vale: <strong className="text-foreground">{selectedVT?.code} · {selectedVT?.name}</strong>
+                  <br />
+                  Origen: <strong className="text-foreground">{houseType}</strong> ·{" "}
+                  <strong className="text-foreground">{stagesForType.length}</strong> etapa(s) ·{" "}
+                  <strong className="text-foreground">{sourceCount}</strong> materiales totales.
+                  <br />
+                  Solo se copia la "plantilla" del vale. No se generan entregas ni se mueve inventario.
+                </div>
+              );
+            })()}
+            <div>
+              <Label>Tipos de casa destino</Label>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {HOUSE_TYPES.filter((h) => h !== houseType).map((h) => {
+                  const checked = copyTypeTargets.includes(h);
+                  return (
+                    <label
+                      key={h}
+                      className={cn(
+                        "flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm",
+                        checked ? "border-primary bg-primary/5" : "border-border",
+                      )}
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          setCopyTypeTargets((prev) =>
+                            v ? [...prev, h] : prev.filter((x) => x !== h),
+                          );
+                        }}
+                      />
+                      <span className="font-medium">{h}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <Checkbox
+                checked={copyTypeOverwrite}
+                onCheckedChange={(v) => setCopyTypeOverwrite(!!v)}
+              />
+              Sobrescribir cantidades si el material ya existe en el destino
+              <span className="text-xs text-muted-foreground">(si no, se omite)</span>
+            </label>
+            <div>
+              <Label>Contraseña de obra</Label>
+              <Input
+                type="password"
+                value={copyTypePass}
+                onChange={(e) => setCopyTypePass(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={copyTypeMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!copyTypePass || copyTypeTargets.length === 0 || copyTypeMut.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                copyTypeMut.mutate();
+              }}
+            >
+              {copyTypeMut.isPending ? "Copiando…" : "Copiar vale completo"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
