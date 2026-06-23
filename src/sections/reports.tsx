@@ -19,7 +19,6 @@ import {
   useVRequired,
   useVStock,
 } from "@/lib/queries";
-import { HAND_SHORT } from "@/lib/types";
 import { fmtDate } from "@/lib/compute";
 
 function buildMasterRows(opts: {
@@ -29,26 +28,37 @@ function buildMasterRows(opts: {
   stock: any[];
   materials: any[];
 }) {
-  const keys = new Set<string>();
-  for (const r of opts.required) keys.add(`${r.material_code}__${r.handedness}`);
-  for (const r of opts.received) keys.add(`${r.material_code}__${r.handedness}`);
-  for (const r of opts.delivered) keys.add(`${r.material_code}__${r.handedness}`);
-  for (const r of opts.stock) keys.add(`${r.material_code}__${r.handedness}`);
-  return [...keys]
-    .map((k) => {
-      const [code, hand] = k.split("__");
-      const f = (arr: any[]) =>
-        arr.find((x) => `${x.material_code}__${x.handedness}` === k)?.qty ?? 0;
-      const required = f(opts.required);
-      const received = f(opts.received);
-      const delivered = f(opts.delivered);
+  // Agrupar por material_code únicamente (sumamos a través de "sentido" / handedness)
+  const sumByCode = (arr: any[]) => {
+    const m = new Map<string, number>();
+    for (const r of arr) {
+      m.set(r.material_code, (m.get(r.material_code) ?? 0) + Number(r.qty ?? 0));
+    }
+    return m;
+  };
+  const reqMap = sumByCode(opts.required);
+  const recMap = sumByCode(opts.received);
+  const delMap = sumByCode(opts.delivered);
+  const stkMap = sumByCode(opts.stock);
+
+  const codes = new Set<string>([
+    ...reqMap.keys(),
+    ...recMap.keys(),
+    ...delMap.keys(),
+    ...stkMap.keys(),
+  ]);
+
+  return [...codes]
+    .map((code) => {
+      const required = reqMap.get(code) ?? 0;
+      const received = recMap.get(code) ?? 0;
+      const delivered = delMap.get(code) ?? 0;
       const saldo = received - delivered;
       const pendienteRecep = Math.max(0, required - received);
       const pct = required > 0 ? Math.min(100, Math.round((received / required) * 100)) : 0;
       const m = opts.materials.find((x) => x.code === code);
       return {
         code,
-        hand,
         description: m?.description ?? "",
         required,
         received,
@@ -58,8 +68,9 @@ function buildMasterRows(opts: {
         pct,
       };
     })
-    .sort((a, b) => a.code.localeCompare(b.code));
+    .sort((a, b) => a.code.localeCompare(b.code, "es", { numeric: true }));
 }
+
 
 type MasterRow = ReturnType<typeof buildMasterRows>[number];
 
@@ -87,11 +98,10 @@ export function ReportsSection() {
 
   const ctrl = useTableControls<MasterRow>({
     data: allRows,
-    searchFields: (r) => [r.code, r.description, HAND_SHORT[r.hand as keyof typeof HAND_SHORT]],
+    searchFields: (r) => [r.code, r.description],
     sortFns: {
       code: (a, b) => a.code.localeCompare(b.code, "es", { numeric: true }),
       description: (a, b) => a.description.localeCompare(b.description, "es"),
-      hand: (a, b) => String(a.hand).localeCompare(String(b.hand)),
       required: (a, b) => a.required - b.required,
       received: (a, b) => a.received - b.received,
       delivered: (a, b) => a.delivered - b.delivered,
@@ -111,6 +121,7 @@ export function ReportsSection() {
     defaultPageSize: 50,
   });
 
+
   // Filtrados (todos los registros que pasan filtros, ignorando paginación) — para exportar lo que ve
   const visibleRows = ctrl.filtered;
 
@@ -120,7 +131,6 @@ export function ReportsSection() {
     const data = visibleRows.map((r) => ({
       Código: r.code,
       Descripción: r.description,
-      Sentido: HAND_SHORT[r.hand as keyof typeof HAND_SHORT],
       Necesario: r.required,
       Recepcionado: r.received,
       Entregado: r.delivered,
@@ -134,12 +144,13 @@ export function ReportsSection() {
     XLSX.writeFile(wb, `tabla-maestra-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
+
   function exportCsv() {
-    const header = ["Código","Descripción","Sentido","Necesario","Recepcionado","Entregado","Saldo","Pend. comprar","% Cumpl."];
+    const header = ["Código","Descripción","Necesario","Recepcionado","Entregado","Saldo","Pend. comprar","% Cumpl."];
     const csv = [
       header.join(","),
       ...visibleRows.map((r) =>
-        [r.code, `"${r.description.replace(/"/g, '""')}"`, HAND_SHORT[r.hand as keyof typeof HAND_SHORT], r.required, r.received, r.delivered, r.saldo, r.pendienteRecep, r.pct].join(","),
+        [r.code, `"${r.description.replace(/"/g, '""')}"`, r.required, r.received, r.delivered, r.saldo, r.pendienteRecep, r.pct].join(","),
       ),
     ].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -165,11 +176,10 @@ export function ReportsSection() {
     doc.text(`Generado: ${fmtDate(new Date().toISOString())}`, 40, 84);
     autoTable(doc, {
       startY: 110,
-      head: [["Código", "Descripción", "Sentido", "Necesario", "Recep.", "Entreg.", "Saldo", "Pend.", "%"]],
+      head: [["Código", "Descripción", "Necesario", "Recep.", "Entreg.", "Saldo", "Pend.", "%"]],
       body: visibleRows.map((r) => [
         r.code,
         r.description,
-        HAND_SHORT[r.hand as keyof typeof HAND_SHORT],
         r.required,
         r.received,
         r.delivered,
@@ -184,6 +194,7 @@ export function ReportsSection() {
     });
     doc.save(`tabla-maestra-${new Date().toISOString().slice(0, 10)}.pdf`);
   }
+
 
   return (
     <div className="space-y-6">
@@ -247,7 +258,6 @@ export function ReportsSection() {
               <tr>
                 <SortableTh ctrl={ctrl} sortKey="code">Código</SortableTh>
                 <SortableTh ctrl={ctrl} sortKey="description">Descripción</SortableTh>
-                <SortableTh ctrl={ctrl} sortKey="hand">Sentido</SortableTh>
                 <SortableTh ctrl={ctrl} sortKey="required" align="right">Necesario</SortableTh>
                 <SortableTh ctrl={ctrl} sortKey="received" align="right">Recep.</SortableTh>
                 <SortableTh ctrl={ctrl} sortKey="delivered" align="right">Entreg.</SortableTh>
@@ -258,10 +268,9 @@ export function ReportsSection() {
             </thead>
             <tbody>
               {ctrl.visible.map((r) => (
-                <tr key={`${r.code}-${r.hand}`} className="border-t border-border/50">
+                <tr key={r.code} className="border-t border-border/50">
                   <td className="px-4 py-2 font-mono text-xs">{r.code}</td>
                   <td className="px-4 py-2">{r.description}</td>
-                  <td className="px-4 py-2">{HAND_SHORT[r.hand as keyof typeof HAND_SHORT]}</td>
                   <td className="px-4 py-2 text-right num-display">{r.required}</td>
                   <td className="px-4 py-2 text-right num-display">{r.received}</td>
                   <td className="px-4 py-2 text-right num-display">{r.delivered}</td>
@@ -271,9 +280,10 @@ export function ReportsSection() {
                 </tr>
               ))}
               {ctrl.visible.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">Sin filas que coincidan con los filtros.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Sin filas que coincidan con los filtros.</td></tr>
               )}
             </tbody>
+
           </table>
         </div>
         <TablePagination ctrl={ctrl} />

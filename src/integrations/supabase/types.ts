@@ -169,6 +169,20 @@ export type Database = {
             referencedRelation: "materials_v2"
             referencedColumns: ["code"]
           },
+          {
+            foreignKeyName: "delivery_items_material_code_fkey"
+            columns: ["material_code"]
+            isOneToOne: false
+            referencedRelation: "v_delivered"
+            referencedColumns: ["material_code"]
+          },
+          {
+            foreignKeyName: "delivery_items_material_code_fkey"
+            columns: ["material_code"]
+            isOneToOne: false
+            referencedRelation: "v_required"
+            referencedColumns: ["material_code"]
+          },
         ]
       }
       house_exec_overrides: {
@@ -331,6 +345,20 @@ export type Database = {
             referencedRelation: "materials_v2"
             referencedColumns: ["code"]
           },
+          {
+            foreignKeyName: "inventory_adjustments_material_code_fkey"
+            columns: ["material_code"]
+            isOneToOne: false
+            referencedRelation: "v_delivered"
+            referencedColumns: ["material_code"]
+          },
+          {
+            foreignKeyName: "inventory_adjustments_material_code_fkey"
+            columns: ["material_code"]
+            isOneToOne: false
+            referencedRelation: "v_required"
+            referencedColumns: ["material_code"]
+          },
         ]
       }
       inventory_counts: {
@@ -371,6 +399,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "materials_v2"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "inventory_counts_material_code_fkey"
+            columns: ["material_code"]
+            isOneToOne: false
+            referencedRelation: "v_delivered"
+            referencedColumns: ["material_code"]
+          },
+          {
+            foreignKeyName: "inventory_counts_material_code_fkey"
+            columns: ["material_code"]
+            isOneToOne: false
+            referencedRelation: "v_required"
+            referencedColumns: ["material_code"]
           },
         ]
       }
@@ -493,6 +535,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "materials_v2"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "receptions_material_code_fkey"
+            columns: ["material_code"]
+            isOneToOne: false
+            referencedRelation: "v_delivered"
+            referencedColumns: ["material_code"]
+          },
+          {
+            foreignKeyName: "receptions_material_code_fkey"
+            columns: ["material_code"]
+            isOneToOne: false
+            referencedRelation: "v_required"
+            referencedColumns: ["material_code"]
           },
         ]
       }
@@ -740,15 +796,7 @@ export type Database = {
           material_code: string | null
           qty: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "delivery_items_material_code_fkey"
-            columns: ["material_code"]
-            isOneToOne: false
-            referencedRelation: "materials_v2"
-            referencedColumns: ["code"]
-          },
-        ]
+        Relationships: []
       }
       v_houses_executed: {
         Row: {
@@ -770,6 +818,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "materials_v2"
             referencedColumns: ["code"]
+          },
+          {
+            foreignKeyName: "receptions_material_code_fkey"
+            columns: ["material_code"]
+            isOneToOne: false
+            referencedRelation: "v_delivered"
+            referencedColumns: ["material_code"]
+          },
+          {
+            foreignKeyName: "receptions_material_code_fkey"
+            columns: ["material_code"]
+            isOneToOne: false
+            referencedRelation: "v_required"
+            referencedColumns: ["material_code"]
           },
         ]
       }
