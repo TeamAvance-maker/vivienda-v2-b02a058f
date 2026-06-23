@@ -328,9 +328,26 @@ export function ValeTipoSection() {
       {stageId ? (
         <>
           <div className="surface-card p-5">
-            <h3 className="mb-3 font-display text-base font-semibold">
-              Agregar material a {houseType} · {selectedVT?.code} · Etapa {selectedStage?.stage_number}
-            </h3>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-display text-base font-semibold">
+                Agregar material a {houseType} · {selectedVT?.code} · Etapa {selectedStage?.stage_number}
+              </h3>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={filteredReqs.length === 0}
+                onClick={() => {
+                  setCopyTargets([]);
+                  setCopyOverwrite(false);
+                  setCopyPass("");
+                  setCopyOpen(true);
+                }}
+              >
+                <Repeat2 className="mr-1 h-4 w-4" />
+                Copiar a otro tipo de casa
+              </Button>
+            </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
               <div className="md:col-span-2">
                 <Label>Material</Label>
