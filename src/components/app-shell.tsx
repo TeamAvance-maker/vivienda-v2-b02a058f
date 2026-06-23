@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Boxes,
+  Calculator,
   ClipboardCheck,
   FileSpreadsheet,
   HelpCircle,
@@ -32,6 +33,7 @@ export type TabKey =
   | "materiales"
   | "inventario"
   | "reportes"
+  | "simulador"
   | "config"
   | "usuarios";
 
@@ -44,6 +46,7 @@ export const TABS: { key: TabKey; label: string; icon: typeof Home }[] = [
   { key: "casas", label: "Casas", icon: HousePlus },
   { key: "inventario", label: "Inventario", icon: ClipboardCheck },
   { key: "reportes", label: "Reportes", icon: FileSpreadsheet },
+  { key: "simulador", label: "Simulador", icon: Calculator },
 ];
 
 const CONFIG_TAB: { key: TabKey; label: string; icon: typeof Home } = {
