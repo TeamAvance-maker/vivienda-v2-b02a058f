@@ -317,3 +317,92 @@ export const createSiteDeliveriesBatchFn = createServerFn({ method: "POST" })
   });
 
 
+// Copia los materiales (vale_reqs) de una etapa+tipo de casa origen a uno o
+// varios tipos de casa destino. Omite los que ya existan (no sobreescribe).
+const copyValeStageSchema = z.object({
+  passphrase: z.string().min(1),
+  vale_stage_id: z.string().uuid(),
+  source_house_type: z.string().min(1),
+  target_house_types: z.array(z.string().min(1)).min(1),
+  overwrite: z.boolean().optional(),
+});
+
+export const copyValeStageToHouseTypesFn = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) => copyValeStageSchema.parse(input))
+  .handler(async ({ data }) => {
+    const { checkPassphrase } = await import("./admin.server");
+    checkPassphrase(data.passphrase);
+    const { supabaseAdmin } = await import(
+      "@/integrations/supabase/client.server"
+    );
+
+    const { data: source, error: srcErr } = await supabaseAdmin
+      .from("vale_reqs")
+      .select("material_id, qty")
+      .eq("vale_stage_id", data.vale_stage_id)
+      .eq("house_type", data.source_house_type);
+    if (srcErr) throw new Error(srcErr.message);
+    if (!source || source.length === 0) {
+      throw new Error("La etapa de origen no tiene materiales para copiar.");
+    }
+
+    const results: { house_type: string; inserted: number; updated: number; skipped: number }[] = [];
+
+    for (const target of data.target_house_types) {
+      if (target === data.source_house_type) {
+        results.push({ house_type: target, inserted: 0, updated: 0, skipped: source.length });
+        continue;
+      }
+      const { data: existing, error: exErr } = await supabaseAdmin
+        .from("vale_reqs")
+        .select("material_id")
+        .eq("vale_stage_id", data.vale_stage_id)
+        .eq("house_type", target);
+      if (exErr) throw new Error(exErr.message);
+      const existingSet = new Set((existing ?? []).map((r: any) => r.material_id));
+
+      const toInsert = source
+        .filter((r: any) => !existingSet.has(r.material_id))
+        .map((r: any) => ({
+          vale_stage_id: data.vale_stage_id,
+          house_type: target,
+          material_id: r.material_id,
+          qty: r.qty,
+        }));
+
+      let updated = 0;
+      let skipped = 0;
+      if (data.overwrite) {
+        for (const r of source) {
+          if (!existingSet.has((r as any).material_id)) continue;
+          const { error: upErr } = await supabaseAdmin
+            .from("vale_reqs")
+            .update({ qty: (r as any).qty } as any)
+            .eq("vale_stage_id", data.vale_stage_id)
+            .eq("house_type", target)
+            .eq("material_id", (r as any).material_id);
+          if (upErr) throw new Error(upErr.message);
+          updated++;
+        }
+      } else {
+        skipped = existingSet.size > 0 ? source.filter((r: any) => existingSet.has(r.material_id)).length : 0;
+      }
+
+      if (toInsert.length > 0) {
+        const { error: insErr } = await supabaseAdmin
+          .from("vale_reqs")
+          .insert(toInsert as any);
+        if (insErr) throw new Error(insErr.message);
+      }
+
+      results.push({
+        house_type: target,
+        inserted: toInsert.length,
+        updated,
+        skipped,
+      });
+    }
+
+    return { ok: true, results };
+  });
+
