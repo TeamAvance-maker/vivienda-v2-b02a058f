@@ -258,7 +258,6 @@ export function ReportsSection() {
               <tr>
                 <SortableTh ctrl={ctrl} sortKey="code">Código</SortableTh>
                 <SortableTh ctrl={ctrl} sortKey="description">Descripción</SortableTh>
-                <SortableTh ctrl={ctrl} sortKey="hand">Sentido</SortableTh>
                 <SortableTh ctrl={ctrl} sortKey="required" align="right">Necesario</SortableTh>
                 <SortableTh ctrl={ctrl} sortKey="received" align="right">Recep.</SortableTh>
                 <SortableTh ctrl={ctrl} sortKey="delivered" align="right">Entreg.</SortableTh>
@@ -269,10 +268,9 @@ export function ReportsSection() {
             </thead>
             <tbody>
               {ctrl.visible.map((r) => (
-                <tr key={`${r.code}-${r.hand}`} className="border-t border-border/50">
+                <tr key={r.code} className="border-t border-border/50">
                   <td className="px-4 py-2 font-mono text-xs">{r.code}</td>
                   <td className="px-4 py-2">{r.description}</td>
-                  <td className="px-4 py-2">{HAND_SHORT[r.hand as keyof typeof HAND_SHORT]}</td>
                   <td className="px-4 py-2 text-right num-display">{r.required}</td>
                   <td className="px-4 py-2 text-right num-display">{r.received}</td>
                   <td className="px-4 py-2 text-right num-display">{r.delivered}</td>
@@ -282,9 +280,10 @@ export function ReportsSection() {
                 </tr>
               ))}
               {ctrl.visible.length === 0 && (
-                <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">Sin filas que coincidan con los filtros.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Sin filas que coincidan con los filtros.</td></tr>
               )}
             </tbody>
+
           </table>
         </div>
         <TablePagination ctrl={ctrl} />
