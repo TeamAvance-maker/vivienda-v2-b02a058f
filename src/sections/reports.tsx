@@ -19,7 +19,6 @@ import {
   useVRequired,
   useVStock,
 } from "@/lib/queries";
-import { HAND_SHORT } from "@/lib/types";
 import { fmtDate } from "@/lib/compute";
 
 function buildMasterRows(opts: {
@@ -29,26 +28,37 @@ function buildMasterRows(opts: {
   stock: any[];
   materials: any[];
 }) {
-  const keys = new Set<string>();
-  for (const r of opts.required) keys.add(`${r.material_code}__${r.handedness}`);
-  for (const r of opts.received) keys.add(`${r.material_code}__${r.handedness}`);
-  for (const r of opts.delivered) keys.add(`${r.material_code}__${r.handedness}`);
-  for (const r of opts.stock) keys.add(`${r.material_code}__${r.handedness}`);
-  return [...keys]
-    .map((k) => {
-      const [code, hand] = k.split("__");
-      const f = (arr: any[]) =>
-        arr.find((x) => `${x.material_code}__${x.handedness}` === k)?.qty ?? 0;
-      const required = f(opts.required);
-      const received = f(opts.received);
-      const delivered = f(opts.delivered);
+  // Agrupar por material_code únicamente (sumamos a través de "sentido" / handedness)
+  const sumByCode = (arr: any[]) => {
+    const m = new Map<string, number>();
+    for (const r of arr) {
+      m.set(r.material_code, (m.get(r.material_code) ?? 0) + Number(r.qty ?? 0));
+    }
+    return m;
+  };
+  const reqMap = sumByCode(opts.required);
+  const recMap = sumByCode(opts.received);
+  const delMap = sumByCode(opts.delivered);
+  const stkMap = sumByCode(opts.stock);
+
+  const codes = new Set<string>([
+    ...reqMap.keys(),
+    ...recMap.keys(),
+    ...delMap.keys(),
+    ...stkMap.keys(),
+  ]);
+
+  return [...codes]
+    .map((code) => {
+      const required = reqMap.get(code) ?? 0;
+      const received = recMap.get(code) ?? 0;
+      const delivered = delMap.get(code) ?? 0;
       const saldo = received - delivered;
       const pendienteRecep = Math.max(0, required - received);
       const pct = required > 0 ? Math.min(100, Math.round((received / required) * 100)) : 0;
       const m = opts.materials.find((x) => x.code === code);
       return {
         code,
-        hand,
         description: m?.description ?? "",
         required,
         received,
@@ -58,8 +68,9 @@ function buildMasterRows(opts: {
         pct,
       };
     })
-    .sort((a, b) => a.code.localeCompare(b.code));
+    .sort((a, b) => a.code.localeCompare(b.code, "es", { numeric: true }));
 }
+
 
 type MasterRow = ReturnType<typeof buildMasterRows>[number];
 
