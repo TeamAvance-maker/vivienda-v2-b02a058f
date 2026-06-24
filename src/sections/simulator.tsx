@@ -19,7 +19,7 @@ import {
   useValeStages,
   useValeTypes,
 } from "@/lib/sites-queries";
-import { useConfig, useVStock } from "@/lib/queries";
+import { useConfig, useVReceived, useVStock } from "@/lib/queries";
 import { fmtDate } from "@/lib/compute";
 import type { HouseTypeV2 } from "@/lib/sites-types";
 
@@ -31,6 +31,8 @@ interface ResultRow {
   description: string;
   unit: string;
   needed: number;
+  received: number;
+  pending: number;
   stock: number;
   missing: number;
 }
@@ -42,6 +44,10 @@ export function SimulatorSection() {
   const valeReqsQ = useValeReqs();
   const materialsQ = useMaterialsV2();
   const stockQ = useVStock();
+  const receivedQ = useVReceived();
+
+  const [customTitle, setCustomTitle] = useState<string>("");
+  const [snapshotTitle, setSnapshotTitle] = useState<string>("");
 
   // Cantidades de casas por tipo
   const [counts, setCounts] = useState<Record<HouseTypeV2, number>>({
@@ -102,12 +108,18 @@ export function SimulatorSection() {
     return m;
   }, [stockQ.data]);
 
+  const receivedByCode = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of receivedQ.data ?? [])
+      m.set(r.material_code, (m.get(r.material_code) ?? 0) + Number(r.qty ?? 0));
+    return m;
+  }, [receivedQ.data]);
+
   const results: ResultRow[] = useMemo(() => {
     if (!snapshot) return [];
     const need = new Map<string, number>();
     const reqs = valeReqsQ.data ?? [];
     for (const r of reqs) {
-      // ¿el vale-stage de este req está incluido en la selección?
       const stage = (valeStagesQ.data ?? []).find((s) => s.id === r.vale_stage_id);
       if (!stage) continue;
       const sel = snapshot.valeSel[stage.vale_type_id];
@@ -127,12 +139,15 @@ export function SimulatorSection() {
       const m = matById.get(mid);
       if (!m) continue;
       const stock = stockByCode.get(m.code) ?? 0;
+      const received = receivedByCode.get(m.code) ?? 0;
       rows.push({
         material_id: mid,
         code: m.code,
         description: m.description,
         unit: m.unit,
         needed: qty,
+        received,
+        pending: Math.max(0, qty - received),
         stock,
         missing: Math.max(0, qty - stock),
       });
@@ -140,7 +155,7 @@ export function SimulatorSection() {
     return rows.sort((a, b) =>
       a.code.localeCompare(b.code, "es", { numeric: true }),
     );
-  }, [snapshot, valeReqsQ.data, valeStagesQ.data, materialsQ.data, stockByCode]);
+  }, [snapshot, valeReqsQ.data, valeStagesQ.data, materialsQ.data, stockByCode, receivedByCode]);
 
   const ctrl = useTableControls<ResultRow>({
     data: results,
@@ -149,11 +164,15 @@ export function SimulatorSection() {
       code: (a, b) => a.code.localeCompare(b.code, "es", { numeric: true }),
       description: (a, b) => a.description.localeCompare(b.description, "es"),
       needed: (a, b) => a.needed - b.needed,
+      received: (a, b) => a.received - b.received,
+      pending: (a, b) => a.pending - b.pending,
       stock: (a, b) => a.stock - b.stock,
       missing: (a, b) => a.missing - b.missing,
     },
     numericFilters: [
       { key: "needed", label: "Necesario", accessor: (r) => r.needed },
+      { key: "received", label: "Recepcionado", accessor: (r) => r.received },
+      { key: "pending", label: "Pendiente", accessor: (r) => r.pending },
       { key: "stock", label: "Stock", accessor: (r) => r.stock },
       { key: "missing", label: "Faltante", accessor: (r) => r.missing },
     ],
@@ -184,10 +203,10 @@ export function SimulatorSection() {
   }
 
   function calcular() {
-    // clonar Sets para que el snapshot sea independiente
     const cloned: Record<string, Set<string>> = {};
     for (const [k, v] of Object.entries(valeSel)) cloned[k] = new Set(v);
     setSnapshot({ counts: { ...counts }, valeSel: cloned });
+    setSnapshotTitle(customTitle.trim());
   }
 
   function exportExcel() {
@@ -196,13 +215,16 @@ export function SimulatorSection() {
       Descripción: r.description,
       Unidad: r.unit,
       Necesario: r.needed,
+      Recepcionado: r.received,
+      Pendiente: r.pending,
       Stock: r.stock,
       Faltante: r.missing,
     }));
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Simulador");
-    XLSX.writeFile(wb, `simulador-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    const fname = (snapshotTitle || "simulador").replace(/[^a-zA-Z0-9\-_]+/g, "_").slice(0, 60);
+    XLSX.writeFile(wb, `${fname}-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   function exportPdf() {
@@ -210,23 +232,26 @@ export function SimulatorSection() {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.setTextColor(60, 40, 25);
-    doc.text("Informe dinámico de materiales", 40, 46);
+    const headerTitle = snapshotTitle || "Informe dinámico de materiales";
+    doc.text(headerTitle, 40, 46);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.text(cfg.data?.name ?? "Mi Obra", 40, 62);
     doc.setTextColor(120, 100, 80);
-    const title = scenarioTitle();
-    const wrapped = doc.splitTextToSize(`Escenario: ${title}`, 515);
+    const escTitle = scenarioTitle();
+    const wrapped = doc.splitTextToSize(`Escenario: ${escTitle}`, 515);
     doc.text(wrapped, 40, 78);
     doc.text(`Generado: ${fmtDate(new Date().toISOString())}`, 40, 78 + wrapped.length * 12);
     autoTable(doc, {
       startY: 78 + wrapped.length * 12 + 18,
-      head: [["Código", "Descripción", "Unidad", "Necesario", "Stock", "Faltante"]],
+      head: [["Código", "Descripción", "Unidad", "Necesario", "Recep.", "Pend.", "Stock", "Falt."]],
       body: ctrl.filtered.map((r) => [
         r.code,
         r.description,
         r.unit,
         r.needed,
+        r.received,
+        r.pending,
         r.stock,
         r.missing,
       ]),
@@ -235,7 +260,8 @@ export function SimulatorSection() {
       alternateRowStyles: { fillColor: [250, 244, 230] },
       theme: "grid",
     });
-    doc.save(`simulador-${new Date().toISOString().slice(0, 10)}.pdf`);
+    const fname = (snapshotTitle || "simulador").replace(/[^a-zA-Z0-9\-_]+/g, "_").slice(0, 60);
+    doc.save(`${fname}-${new Date().toISOString().slice(0, 10)}.pdf`);
   }
 
   const totalHouses = HOUSE_TYPES.reduce((a, h) => a + (counts[h] || 0), 0);
@@ -350,7 +376,23 @@ export function SimulatorSection() {
         </div>
       </div>
 
-      {/* Paso 3: calcular */}
+      {/* Paso 3: título del simulacro */}
+      <div className="surface-card p-5">
+        <div className="mb-3 font-display text-base font-semibold">
+          3) Título del simulacro
+        </div>
+        <Input
+          placeholder="Ej: Avance Marzo — 29 casas A1 + 1 B (agua + acometida)"
+          value={customTitle}
+          onChange={(e) => setCustomTitle(e.target.value)}
+          maxLength={120}
+        />
+        <div className="mt-2 text-xs text-muted-foreground">
+          Se mostrará en la cabecera del informe y en el nombre del archivo exportado.
+        </div>
+      </div>
+
+      {/* Paso 4: calcular */}
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={calcular} disabled={!canCalc} className="gap-2">
           <Calculator className="h-4 w-4" />
@@ -371,12 +413,23 @@ export function SimulatorSection() {
       {/* Resultados */}
       {snapshot && (
         <div className="surface-card overflow-hidden">
+          {snapshotTitle && (
+            <div className="border-b border-border/50 bg-primary/5 px-5 py-3">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Simulacro
+              </div>
+              <div className="font-display text-lg font-semibold">{snapshotTitle}</div>
+              <div className="text-xs text-muted-foreground">{scenarioTitle()}</div>
+            </div>
+          )}
           <TableToolbar
             ctrl={ctrl}
             title="Materiales necesarios"
             searchPlaceholder="Buscar por código o descripción…"
             numericFilters={[
               { key: "needed", label: "Necesario" },
+              { key: "received", label: "Recepcionado" },
+              { key: "pending", label: "Pendiente" },
               { key: "stock", label: "Stock" },
               { key: "missing", label: "Faltante" },
             ]}
@@ -410,6 +463,8 @@ export function SimulatorSection() {
                   <SortableTh ctrl={ctrl} sortKey="description">Descripción</SortableTh>
                   <th className="px-4 py-2">Unidad</th>
                   <SortableTh ctrl={ctrl} sortKey="needed" align="right">Necesario</SortableTh>
+                  <SortableTh ctrl={ctrl} sortKey="received" align="right">Recepcionado</SortableTh>
+                  <SortableTh ctrl={ctrl} sortKey="pending" align="right">Pendiente</SortableTh>
                   <SortableTh ctrl={ctrl} sortKey="stock" align="right">Stock</SortableTh>
                   <SortableTh ctrl={ctrl} sortKey="missing" align="right">Faltante</SortableTh>
                 </tr>
@@ -421,6 +476,15 @@ export function SimulatorSection() {
                     <td className="px-4 py-2">{r.description}</td>
                     <td className="px-4 py-2 text-xs text-muted-foreground">{r.unit}</td>
                     <td className="px-4 py-2 text-right num-display font-semibold">{r.needed}</td>
+                    <td className="px-4 py-2 text-right num-display">{r.received}</td>
+                    <td
+                      className={
+                        "px-4 py-2 text-right num-display font-semibold " +
+                        (r.pending > 0 ? "text-amber-600" : "text-emerald-600")
+                      }
+                    >
+                      {r.pending}
+                    </td>
                     <td className="px-4 py-2 text-right num-display">{r.stock}</td>
                     <td
                       className={
@@ -434,7 +498,7 @@ export function SimulatorSection() {
                 ))}
                 {ctrl.visible.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                       No hay materiales requeridos para este escenario.
                     </td>
                   </tr>
@@ -445,8 +509,10 @@ export function SimulatorSection() {
           <TablePagination ctrl={ctrl} />
           <div className="border-t border-border/50 px-4 py-3 text-xs text-muted-foreground">
             <FileDown className="mr-1 inline h-3.5 w-3.5" />
-            Los totales suman: cantidad por casa × número de casas, en todos los
-            vales y etapas seleccionados. No descuenta entregas hechas.
+            <strong>Necesario</strong>: total = cantidad por casa × número de casas. ·{" "}
+            <strong>Recepcionado</strong>: total recibido en bodega (todas las recepciones). ·{" "}
+            <strong>Pendiente</strong>: necesario − recepcionado (lo que falta comprar/recibir). ·{" "}
+            <strong>Stock</strong>: existencia actual. · <strong>Faltante</strong>: necesario − stock.
           </div>
         </div>
       )}
