@@ -15,12 +15,22 @@ import {
 } from "@/components/data-table";
 import {
   useMaterialsV2,
+  useSiteDeliveries,
+  useSiteDeliveryItems,
+  useSites,
   useValeReqs,
   useValeStages,
   useValeTypes,
 } from "@/lib/sites-queries";
-import { useConfig, useVReceived, useVStock } from "@/lib/queries";
+import { useConfig, useReceptions, useVReceived, useVStock } from "@/lib/queries";
 import { fmtDate } from "@/lib/compute";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { HouseTypeV2 } from "@/lib/sites-types";
 
 const HOUSE_TYPES: HouseTypeV2[] = ["A1", "A2", "B", "C"];
@@ -45,9 +55,14 @@ export function SimulatorSection() {
   const materialsQ = useMaterialsV2();
   const stockQ = useVStock();
   const receivedQ = useVReceived();
+  const receptionsQ = useReceptions();
+  const siteDeliveriesQ = useSiteDeliveries();
+  const siteDeliveryItemsQ = useSiteDeliveryItems();
+  const sitesQ = useSites();
 
   const [customTitle, setCustomTitle] = useState<string>("");
   const [snapshotTitle, setSnapshotTitle] = useState<string>("");
+  const [detailRow, setDetailRow] = useState<ResultRow | null>(null);
 
   // Cantidades de casas por tipo
   const [counts, setCounts] = useState<Record<HouseTypeV2, number>>({
@@ -471,7 +486,12 @@ export function SimulatorSection() {
               </thead>
               <tbody>
                 {ctrl.visible.map((r) => (
-                  <tr key={r.material_id} className="border-t border-border/50">
+                  <tr
+                    key={r.material_id}
+                    className="cursor-pointer border-t border-border/50 transition hover:bg-primary/5"
+                    onClick={() => setDetailRow(r)}
+                    title="Click para ver detalle de recepciones y entregas"
+                  >
                     <td className="px-4 py-2 font-mono text-xs">{r.code}</td>
                     <td className="px-4 py-2">{r.description}</td>
                     <td className="px-4 py-2 text-xs text-muted-foreground">{r.unit}</td>
@@ -516,6 +536,184 @@ export function SimulatorSection() {
           </div>
         </div>
       )}
+
+      <MaterialDetailDialog
+        row={detailRow}
+        onClose={() => setDetailRow(null)}
+        receptions={receptionsQ.data ?? []}
+        siteDeliveries={siteDeliveriesQ.data ?? []}
+        siteDeliveryItems={siteDeliveryItemsQ.data ?? []}
+        sites={sitesQ.data ?? []}
+        valeStages={valeStagesQ.data ?? []}
+        valeTypes={valeTypesQ.data ?? []}
+      />
+    </div>
+  );
+}
+
+function MaterialDetailDialog({
+  row,
+  onClose,
+  receptions,
+  siteDeliveries,
+  siteDeliveryItems,
+  sites,
+  valeStages,
+  valeTypes,
+}: {
+  row: ResultRow | null;
+  onClose: () => void;
+  receptions: import("@/lib/types").Reception[];
+  siteDeliveries: import("@/lib/sites-types").SiteDelivery[];
+  siteDeliveryItems: import("@/lib/sites-types").SiteDeliveryItem[];
+  sites: import("@/lib/sites-types").Site[];
+  valeStages: import("@/lib/sites-types").ValeStage[];
+  valeTypes: import("@/lib/sites-types").ValeTypeV2[];
+}) {
+  const open = !!row;
+
+  const matReceptions = useMemo(() => {
+    if (!row) return [];
+    return receptions
+      .filter((r) => r.material_code === row.code)
+      .slice()
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  }, [row, receptions]);
+
+  const matDeliveries = useMemo(() => {
+    if (!row) return [];
+    const sitesById = new Map(sites.map((s) => [s.id, s]));
+    const stagesById = new Map(valeStages.map((s) => [s.id, s]));
+    const valesById = new Map(valeTypes.map((v) => [v.id, v]));
+    const delivById = new Map(siteDeliveries.map((d) => [d.id, d]));
+    const items = siteDeliveryItems.filter((it) => it.material_id === row.material_id);
+    const rows = items.map((it) => {
+      const d = delivById.get(it.delivery_id);
+      const site = d ? sitesById.get(d.site_id) : undefined;
+      const stage = d ? stagesById.get(d.vale_stage_id) : undefined;
+      const vale = stage ? valesById.get(stage.vale_type_id) : undefined;
+      return {
+        id: it.id,
+        date: d?.date ?? "",
+        site_label: site ? `M${site.manzana} · S${site.sitio} (${site.house_type})` : "—",
+        vale_label: vale && stage ? `${vale.name} · E${stage.stage_number}` : "—",
+        qty: Number(it.qty) || 0,
+      };
+    });
+    return rows.sort((a, b) => b.date.localeCompare(a.date));
+  }, [row, siteDeliveryItems, siteDeliveries, sites, valeStages, valeTypes]);
+
+  const totalRec = matReceptions.reduce((a, r) => a + Number(r.qty || 0), 0);
+  const totalDel = matDeliveries.reduce((a, r) => a + r.qty, 0);
+
+  return (
+    <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle className="font-display">
+            {row ? `${row.code} — ${row.description}` : ""}
+          </DialogTitle>
+          <DialogDescription>
+            Detalle de movimientos de este material ({row?.unit}).
+          </DialogDescription>
+        </DialogHeader>
+
+        {row && (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Kpi label="Necesario" value={row.needed} />
+            <Kpi label="Recepcionado" value={row.received} accent="text-foreground" />
+            <Kpi label="Pendiente" value={row.pending} accent={row.pending > 0 ? "text-amber-600" : "text-emerald-600"} />
+            <Kpi label="Stock" value={row.stock} />
+          </div>
+        )}
+
+        <div className="mt-4 max-h-[55vh] space-y-5 overflow-auto pr-1">
+          <section>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="font-display text-sm font-semibold">
+                📥 Recepciones ({matReceptions.length})
+              </h3>
+              <span className="text-xs text-muted-foreground">
+                Total: <span className="num-display font-semibold">{totalRec}</span>
+              </span>
+            </div>
+            {matReceptions.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border/60 p-4 text-center text-xs text-muted-foreground">
+                Sin recepciones registradas para este material.
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-border/50">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-secondary/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2">Fecha</th>
+                      <th className="px-3 py-2">Guía</th>
+                      <th className="px-3 py-2 text-right">Cantidad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {matReceptions.map((r) => (
+                      <tr key={r.id} className="border-t border-border/40">
+                        <td className="px-3 py-1.5 text-xs">{fmtDate(r.date)}</td>
+                        <td className="px-3 py-1.5 font-mono text-xs">{r.guia}</td>
+                        <td className="px-3 py-1.5 text-right num-display">{r.qty}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+
+          <section>
+            <div className="mb-2 flex items-center justify-between">
+              <h3 className="font-display text-sm font-semibold">
+                📤 Entregas a sitios ({matDeliveries.length})
+              </h3>
+              <span className="text-xs text-muted-foreground">
+                Total: <span className="num-display font-semibold">{totalDel}</span>
+              </span>
+            </div>
+            {matDeliveries.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-border/60 p-4 text-center text-xs text-muted-foreground">
+                Sin entregas registradas para este material.
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-lg border border-border/50">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-secondary/60 text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2">Fecha</th>
+                      <th className="px-3 py-2">Sitio</th>
+                      <th className="px-3 py-2">Vale · Etapa</th>
+                      <th className="px-3 py-2 text-right">Cantidad</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {matDeliveries.map((r) => (
+                      <tr key={r.id} className="border-t border-border/40">
+                        <td className="px-3 py-1.5 text-xs">{r.date ? fmtDate(r.date) : "—"}</td>
+                        <td className="px-3 py-1.5 text-xs">{r.site_label}</td>
+                        <td className="px-3 py-1.5 text-xs">{r.vale_label}</td>
+                        <td className="px-3 py-1.5 text-right num-display">{r.qty}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Kpi({ label, value, accent }: { label: string; value: number; accent?: string }) {
+  return (
+    <div className="rounded-lg border border-border/50 bg-secondary/30 px-3 py-2">
+      <div className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={"num-display text-lg font-semibold " + (accent ?? "")}>{value}</div>
     </div>
   );
 }
