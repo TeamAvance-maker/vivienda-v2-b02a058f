@@ -227,43 +227,31 @@ export function SimulatorSection() {
     XLSX.writeFile(wb, `${fname}-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
-  function exportExcel() {
-    const data = ctrl.filtered.map((r) => ({
-      Código: r.code,
-      Descripción: r.description,
-      Unidad: r.unit,
-      Necesario: r.needed,
-      Stock: r.stock,
-      Faltante: r.missing,
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Simulador");
-    XLSX.writeFile(wb, `simulador-${new Date().toISOString().slice(0, 10)}.xlsx`);
-  }
-
   function exportPdf() {
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.setTextColor(60, 40, 25);
-    doc.text("Informe dinámico de materiales", 40, 46);
+    const headerTitle = snapshotTitle || "Informe dinámico de materiales";
+    doc.text(headerTitle, 40, 46);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.text(cfg.data?.name ?? "Mi Obra", 40, 62);
     doc.setTextColor(120, 100, 80);
-    const title = scenarioTitle();
-    const wrapped = doc.splitTextToSize(`Escenario: ${title}`, 515);
+    const escTitle = scenarioTitle();
+    const wrapped = doc.splitTextToSize(`Escenario: ${escTitle}`, 515);
     doc.text(wrapped, 40, 78);
     doc.text(`Generado: ${fmtDate(new Date().toISOString())}`, 40, 78 + wrapped.length * 12);
     autoTable(doc, {
       startY: 78 + wrapped.length * 12 + 18,
-      head: [["Código", "Descripción", "Unidad", "Necesario", "Stock", "Faltante"]],
+      head: [["Código", "Descripción", "Unidad", "Necesario", "Recep.", "Pend.", "Stock", "Falt."]],
       body: ctrl.filtered.map((r) => [
         r.code,
         r.description,
         r.unit,
         r.needed,
+        r.received,
+        r.pending,
         r.stock,
         r.missing,
       ]),
@@ -272,7 +260,8 @@ export function SimulatorSection() {
       alternateRowStyles: { fillColor: [250, 244, 230] },
       theme: "grid",
     });
-    doc.save(`simulador-${new Date().toISOString().slice(0, 10)}.pdf`);
+    const fname = (snapshotTitle || "simulador").replace(/[^a-zA-Z0-9\-_]+/g, "_").slice(0, 60);
+    doc.save(`${fname}-${new Date().toISOString().slice(0, 10)}.pdf`);
   }
 
   const totalHouses = HOUSE_TYPES.reduce((a, h) => a + (counts[h] || 0), 0);
