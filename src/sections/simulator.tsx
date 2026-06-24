@@ -46,7 +46,8 @@ export function SimulatorSection() {
   const stockQ = useVStock();
   const receivedQ = useVReceived();
 
-  const [title, setTitle] = useState<string>("");
+  const [customTitle, setCustomTitle] = useState<string>("");
+  const [snapshotTitle, setSnapshotTitle] = useState<string>("");
 
   // Cantidades de casas por tipo
   const [counts, setCounts] = useState<Record<HouseTypeV2, number>>({
