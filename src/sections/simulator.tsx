@@ -413,12 +413,23 @@ export function SimulatorSection() {
       {/* Resultados */}
       {snapshot && (
         <div className="surface-card overflow-hidden">
+          {snapshotTitle && (
+            <div className="border-b border-border/50 bg-primary/5 px-5 py-3">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                Simulacro
+              </div>
+              <div className="font-display text-lg font-semibold">{snapshotTitle}</div>
+              <div className="text-xs text-muted-foreground">{scenarioTitle()}</div>
+            </div>
+          )}
           <TableToolbar
             ctrl={ctrl}
             title="Materiales necesarios"
             searchPlaceholder="Buscar por código o descripción…"
             numericFilters={[
               { key: "needed", label: "Necesario" },
+              { key: "received", label: "Recepcionado" },
+              { key: "pending", label: "Pendiente" },
               { key: "stock", label: "Stock" },
               { key: "missing", label: "Faltante" },
             ]}
@@ -452,6 +463,8 @@ export function SimulatorSection() {
                   <SortableTh ctrl={ctrl} sortKey="description">Descripción</SortableTh>
                   <th className="px-4 py-2">Unidad</th>
                   <SortableTh ctrl={ctrl} sortKey="needed" align="right">Necesario</SortableTh>
+                  <SortableTh ctrl={ctrl} sortKey="received" align="right">Recepcionado</SortableTh>
+                  <SortableTh ctrl={ctrl} sortKey="pending" align="right">Pendiente</SortableTh>
                   <SortableTh ctrl={ctrl} sortKey="stock" align="right">Stock</SortableTh>
                   <SortableTh ctrl={ctrl} sortKey="missing" align="right">Faltante</SortableTh>
                 </tr>
@@ -463,6 +476,15 @@ export function SimulatorSection() {
                     <td className="px-4 py-2">{r.description}</td>
                     <td className="px-4 py-2 text-xs text-muted-foreground">{r.unit}</td>
                     <td className="px-4 py-2 text-right num-display font-semibold">{r.needed}</td>
+                    <td className="px-4 py-2 text-right num-display">{r.received}</td>
+                    <td
+                      className={
+                        "px-4 py-2 text-right num-display font-semibold " +
+                        (r.pending > 0 ? "text-amber-600" : "text-emerald-600")
+                      }
+                    >
+                      {r.pending}
+                    </td>
                     <td className="px-4 py-2 text-right num-display">{r.stock}</td>
                     <td
                       className={
@@ -476,7 +498,7 @@ export function SimulatorSection() {
                 ))}
                 {ctrl.visible.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">
                       No hay materiales requeridos para este escenario.
                     </td>
                   </tr>
@@ -487,8 +509,10 @@ export function SimulatorSection() {
           <TablePagination ctrl={ctrl} />
           <div className="border-t border-border/50 px-4 py-3 text-xs text-muted-foreground">
             <FileDown className="mr-1 inline h-3.5 w-3.5" />
-            Los totales suman: cantidad por casa × número de casas, en todos los
-            vales y etapas seleccionados. No descuenta entregas hechas.
+            <strong>Necesario</strong>: total = cantidad por casa × número de casas. ·{" "}
+            <strong>Recepcionado</strong>: total recibido en bodega (todas las recepciones). ·{" "}
+            <strong>Pendiente</strong>: necesario − recepcionado (lo que falta comprar/recibir). ·{" "}
+            <strong>Stock</strong>: existencia actual. · <strong>Faltante</strong>: necesario − stock.
           </div>
         </div>
       )}
