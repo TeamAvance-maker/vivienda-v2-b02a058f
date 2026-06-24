@@ -44,6 +44,9 @@ export function SimulatorSection() {
   const valeReqsQ = useValeReqs();
   const materialsQ = useMaterialsV2();
   const stockQ = useVStock();
+  const receivedQ = useVReceived();
+
+  const [title, setTitle] = useState<string>("");
 
   // Cantidades de casas por tipo
   const [counts, setCounts] = useState<Record<HouseTypeV2, number>>({
