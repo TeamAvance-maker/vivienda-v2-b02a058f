@@ -107,12 +107,18 @@ export function SimulatorSection() {
     return m;
   }, [stockQ.data]);
 
+  const receivedByCode = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of receivedQ.data ?? [])
+      m.set(r.material_code, (m.get(r.material_code) ?? 0) + Number(r.qty ?? 0));
+    return m;
+  }, [receivedQ.data]);
+
   const results: ResultRow[] = useMemo(() => {
     if (!snapshot) return [];
     const need = new Map<string, number>();
     const reqs = valeReqsQ.data ?? [];
     for (const r of reqs) {
-      // ¿el vale-stage de este req está incluido en la selección?
       const stage = (valeStagesQ.data ?? []).find((s) => s.id === r.vale_stage_id);
       if (!stage) continue;
       const sel = snapshot.valeSel[stage.vale_type_id];
@@ -132,12 +138,15 @@ export function SimulatorSection() {
       const m = matById.get(mid);
       if (!m) continue;
       const stock = stockByCode.get(m.code) ?? 0;
+      const received = receivedByCode.get(m.code) ?? 0;
       rows.push({
         material_id: mid,
         code: m.code,
         description: m.description,
         unit: m.unit,
         needed: qty,
+        received,
+        pending: Math.max(0, qty - received),
         stock,
         missing: Math.max(0, qty - stock),
       });
@@ -145,7 +154,7 @@ export function SimulatorSection() {
     return rows.sort((a, b) =>
       a.code.localeCompare(b.code, "es", { numeric: true }),
     );
-  }, [snapshot, valeReqsQ.data, valeStagesQ.data, materialsQ.data, stockByCode]);
+  }, [snapshot, valeReqsQ.data, valeStagesQ.data, materialsQ.data, stockByCode, receivedByCode]);
 
   const ctrl = useTableControls<ResultRow>({
     data: results,
