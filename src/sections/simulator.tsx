@@ -55,9 +55,14 @@ export function SimulatorSection() {
   const materialsQ = useMaterialsV2();
   const stockQ = useVStock();
   const receivedQ = useVReceived();
+  const receptionsQ = useReceptions();
+  const siteDeliveriesQ = useSiteDeliveries();
+  const siteDeliveryItemsQ = useSiteDeliveryItems();
+  const sitesQ = useSites();
 
   const [customTitle, setCustomTitle] = useState<string>("");
   const [snapshotTitle, setSnapshotTitle] = useState<string>("");
+  const [detailRow, setDetailRow] = useState<ResultRow | null>(null);
 
   // Cantidades de casas por tipo
   const [counts, setCounts] = useState<Record<HouseTypeV2, number>>({
