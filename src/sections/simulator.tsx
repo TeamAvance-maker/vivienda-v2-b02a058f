@@ -19,7 +19,7 @@ import {
   useValeStages,
   useValeTypes,
 } from "@/lib/sites-queries";
-import { useConfig, useVStock } from "@/lib/queries";
+import { useConfig, useVReceived, useVStock } from "@/lib/queries";
 import { fmtDate } from "@/lib/compute";
 import type { HouseTypeV2 } from "@/lib/sites-types";
 
