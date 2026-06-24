@@ -486,7 +486,12 @@ export function SimulatorSection() {
               </thead>
               <tbody>
                 {ctrl.visible.map((r) => (
-                  <tr key={r.material_id} className="border-t border-border/50">
+                  <tr
+                    key={r.material_id}
+                    className="cursor-pointer border-t border-border/50 transition hover:bg-primary/5"
+                    onClick={() => setDetailRow(r)}
+                    title="Click para ver detalle de recepciones y entregas"
+                  >
                     <td className="px-4 py-2 font-mono text-xs">{r.code}</td>
                     <td className="px-4 py-2">{r.description}</td>
                     <td className="px-4 py-2 text-xs text-muted-foreground">{r.unit}</td>
