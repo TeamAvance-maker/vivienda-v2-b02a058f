@@ -376,7 +376,23 @@ export function SimulatorSection() {
         </div>
       </div>
 
-      {/* Paso 3: calcular */}
+      {/* Paso 3: título del simulacro */}
+      <div className="surface-card p-5">
+        <div className="mb-3 font-display text-base font-semibold">
+          3) Título del simulacro
+        </div>
+        <Input
+          placeholder="Ej: Avance Marzo — 29 casas A1 + 1 B (agua + acometida)"
+          value={customTitle}
+          onChange={(e) => setCustomTitle(e.target.value)}
+          maxLength={120}
+        />
+        <div className="mt-2 text-xs text-muted-foreground">
+          Se mostrará en la cabecera del informe y en el nombre del archivo exportado.
+        </div>
+      </div>
+
+      {/* Paso 4: calcular */}
       <div className="flex flex-wrap items-center gap-2">
         <Button onClick={calcular} disabled={!canCalc} className="gap-2">
           <Calculator className="h-4 w-4" />
