@@ -31,6 +31,8 @@ interface ResultRow {
   description: string;
   unit: string;
   needed: number;
+  received: number;
+  pending: number;
   stock: number;
   missing: number;
 }
