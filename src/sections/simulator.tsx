@@ -203,10 +203,28 @@ export function SimulatorSection() {
   }
 
   function calcular() {
-    // clonar Sets para que el snapshot sea independiente
     const cloned: Record<string, Set<string>> = {};
     for (const [k, v] of Object.entries(valeSel)) cloned[k] = new Set(v);
     setSnapshot({ counts: { ...counts }, valeSel: cloned });
+    setSnapshotTitle(customTitle.trim());
+  }
+
+  function exportExcel() {
+    const data = ctrl.filtered.map((r) => ({
+      Código: r.code,
+      Descripción: r.description,
+      Unidad: r.unit,
+      Necesario: r.needed,
+      Recepcionado: r.received,
+      Pendiente: r.pending,
+      Stock: r.stock,
+      Faltante: r.missing,
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Simulador");
+    const fname = (snapshotTitle || "simulador").replace(/[^a-zA-Z0-9\-_]+/g, "_").slice(0, 60);
+    XLSX.writeFile(wb, `${fname}-${new Date().toISOString().slice(0, 10)}.xlsx`);
   }
 
   function exportExcel() {
