@@ -606,6 +606,95 @@ function MaterialDetailDialog({
   const totalRec = matReceptions.reduce((a, r) => a + Number(r.qty || 0), 0);
   const totalDel = matDeliveries.reduce((a, r) => a + r.qty, 0);
 
+  function exportDetailExcel() {
+    if (!row) return;
+    const wb = XLSX.utils.book_new();
+    const resumen = [
+      ["Material", `${row.code} — ${row.description}`],
+      ["Unidad", row.unit],
+      ["Necesario", row.needed],
+      ["Recepcionado", row.received],
+      ["Pendiente", row.pending],
+      ["Stock", row.stock],
+      ["Faltante", row.missing],
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(resumen), "Resumen");
+    const recData = matReceptions.map((r) => ({
+      Fecha: r.date,
+      Guía: r.guia,
+      Cantidad: r.qty,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(recData), "Recepciones");
+    const delData = matDeliveries.map((r) => ({
+      Fecha: r.date,
+      Sitio: r.site_label,
+      "Vale · Etapa": r.vale_label,
+      Cantidad: r.qty,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(delData), "Entregas");
+    const safe = row.code.replace(/[^a-zA-Z0-9\-_]+/g, "_");
+    XLSX.writeFile(wb, `detalle-${safe}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+  }
+
+  function exportDetailPdf() {
+    if (!row) return;
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(60, 40, 25);
+    doc.text(`Detalle de material: ${row.code}`, 40, 46);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const desc = doc.splitTextToSize(row.description, 515);
+    doc.text(desc, 40, 62);
+    let y = 62 + desc.length * 12 + 8;
+    doc.setTextColor(120, 100, 80);
+    doc.text(`Unidad: ${row.unit}  ·  Generado: ${fmtDate(new Date().toISOString())}`, 40, y);
+    y += 14;
+    autoTable(doc, {
+      startY: y,
+      head: [["Necesario", "Recepcionado", "Pendiente", "Stock", "Faltante"]],
+      body: [[row.needed, row.received, row.pending, row.stock, row.missing]],
+      styles: { font: "helvetica", fontSize: 10, cellPadding: 6, textColor: [60, 40, 25], halign: "right" },
+      headStyles: { fillColor: [70, 45, 30], textColor: [250, 244, 230], halign: "right" },
+      theme: "grid",
+    });
+    let cursor = (doc as any).lastAutoTable.finalY + 18;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(60, 40, 25);
+    doc.text(`Recepciones (${matReceptions.length}) · Total: ${totalRec}`, 40, cursor);
+    cursor += 6;
+    autoTable(doc, {
+      startY: cursor,
+      head: [["Fecha", "Guía", "Cantidad"]],
+      body: matReceptions.length
+        ? matReceptions.map((r) => [fmtDate(r.date), r.guia, r.qty])
+        : [["—", "Sin recepciones", "—"]],
+      styles: { font: "helvetica", fontSize: 9, cellPadding: 5, textColor: [60, 40, 25] },
+      headStyles: { fillColor: [70, 45, 30], textColor: [250, 244, 230] },
+      alternateRowStyles: { fillColor: [250, 244, 230] },
+      theme: "grid",
+    });
+    cursor = (doc as any).lastAutoTable.finalY + 18;
+    doc.setFont("helvetica", "bold");
+    doc.text(`Entregas a sitios (${matDeliveries.length}) · Total: ${totalDel}`, 40, cursor);
+    cursor += 6;
+    autoTable(doc, {
+      startY: cursor,
+      head: [["Fecha", "Sitio", "Vale · Etapa", "Cantidad"]],
+      body: matDeliveries.length
+        ? matDeliveries.map((r) => [r.date ? fmtDate(r.date) : "—", r.site_label, r.vale_label, r.qty])
+        : [["—", "Sin entregas", "—", "—"]],
+      styles: { font: "helvetica", fontSize: 9, cellPadding: 5, textColor: [60, 40, 25] },
+      headStyles: { fillColor: [70, 45, 30], textColor: [250, 244, 230] },
+      alternateRowStyles: { fillColor: [250, 244, 230] },
+      theme: "grid",
+    });
+    const safe = row.code.replace(/[^a-zA-Z0-9\-_]+/g, "_");
+    doc.save(`detalle-${safe}-${new Date().toISOString().slice(0, 10)}.pdf`);
+  }
+
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-3xl">
@@ -619,12 +708,28 @@ function MaterialDetailDialog({
         </DialogHeader>
 
         {row && (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <Kpi label="Necesario" value={row.needed} />
-            <Kpi label="Recepcionado" value={row.received} accent="text-foreground" />
-            <Kpi label="Pendiente" value={row.pending} accent={row.pending > 0 ? "text-amber-600" : "text-emerald-600"} />
-            <Kpi label="Stock" value={row.stock} />
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <Kpi label="Necesario" value={row.needed} />
+              <Kpi label="Recepcionado" value={row.received} accent="text-foreground" />
+              <Kpi label="Pendiente" value={row.pending} accent={row.pending > 0 ? "text-amber-600" : "text-emerald-600"} />
+              <Kpi label="Stock" value={row.stock} />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                className="h-8 gap-1.5 bg-[oklch(0.55_0.12_140)] text-white hover:bg-[oklch(0.5_0.12_140)]"
+                onClick={exportDetailExcel}
+              >
+                <Table2 className="h-4 w-4" />
+                Excel
+              </Button>
+              <Button size="sm" variant="outline" className="h-8 gap-1.5" onClick={exportDetailPdf}>
+                <FileText className="h-4 w-4" />
+                PDF
+              </Button>
+            </div>
+          </>
         )}
 
         <div className="mt-4 max-h-[55vh] space-y-5 overflow-auto pr-1">
