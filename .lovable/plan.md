@@ -1,31 +1,27 @@
-## Qué voy a hacer
+## Plan: Respaldo completo de la base de datos V2
 
-Te voy a entregar el **código SQL completo** y muy detallado de tu base de datos, como si fuera una receta para que cualquier programador pueda volver a construirla idéntica.
+### Objetivo
+Extraer todos los registros de todas las tablas del proyecto actual (V2) y entregártelos en archivos CSV listos para abrir en Excel, Google Sheets o cualquier hoja de cálculo. Incluiremos IDs y llaves foráneas tal como las pides.
 
-## Pasos
+### Qué haremos
+1. **Listar las tablas** del proyecto actual que pertenecen a tu app (tablas `public`), excluyendo las tablas internas del sistema de Lovable/Supabase que no son tuyas.
+2. **Contar registros** de cada tabla para que sepas qué tamaño tiene tu respaldo.
+3. **Exportar cada tabla a un CSV** separado, con todos sus campos y todas sus filas, sin cortar nada.
+4. **Comprimir todo en un ZIP** y dejarlo en la carpeta de documentos para que lo descargues.
+5. **Entregarte un resumen** con la lista de tablas, cantidad de registros y el nombre de cada archivo.
 
-1. **Leer la base de datos** (solo lectura, no toco nada) para sacar:
-  - Todas las tablas (`CREATE TABLE`) con sus columnas, tipos, valores por defecto y claves.
-  - Las relaciones entre tablas (`FOREIGN KEY`).
-  - Los permisos (`GRANT`).
-  - La seguridad fila por fila (`RLS` y `POLICY`).
-  - Las funciones de la base de datos (`has_role`, `is_approved`, etc.).
-  - Los tipos personalizados (como `app_role`).
-  - Los índices.
-2. **Armar un archivo SQL** ordenado por bloques:
-  - Tipos (enums)
-  - Tablas (todas las 20: `sites`, `house_types`, `materials_v2`, `vale_types_v2`, `vale_stages`, `vale_reqs`, `receptions`, `site_deliveries`, `site_delivery_items`, `deliveries`, `delivery_items`, `delivery_houses`, `inventory_counts`, `inventory_adjustments`, `house_material_req`, `house_exec_overrides`, `project_config`, `profiles`, `user_roles`, `deletion_log`)
-  - Funciones
-  - Permisos (GRANT)
-  - Seguridad (RLS + POLICY)
-3. **Guardar dos versiones** en `/mnt/documents/`:
-  - `schema_completo.sql` — listo para ejecutar en otra base de datos.
-  - `schema_completo.md` — el mismo SQL pero con explicaciones cortas al lado de cada tabla (qué guarda y para qué sirve), por si el ingeniero lo quiere leer como documento.
+### Tablas incluidas (ejemplos, confirmaremos al exportar)
+Tablas operacionales del proyecto: materiales, vales, etapas, casas, sitios, entregas, recepciones, ajustes de inventario, perfiles de usuario, roles, configuración, etc.
 
-## Lo que NO voy a hacer
+### Lo que NO podemos hacer
+- Darte una URL de Supabase para abrir con navegador.
+- Hacer un "dump" completo de la base de datos en formato SQL (eso no está permitido por Lovable Cloud).
+- Revelar ni escribir en el chat la clave de servicio ni credenciales internas.
 
-- No voy a modificar ninguna tabla ni dato.
-- No voy a incluir los datos (solo la estructura). Si quieres también los datos, dímelo y los exporto en CSV aparte.
-- No voy a exponer claves secretas ni contraseñas.
+### Entregables
+- Carpeta `/mnt/documents/backup_v2/` con un CSV por tabla.
+- Archivo `backup_v2.zip` con todo junto.
+- Resumen en texto simple con nombres de tablas y cantidad de registros.
 
-¿Le doy?
+### Tiempo estimado
+Unos minutos, dependiendo de cuántos registros tengas.
