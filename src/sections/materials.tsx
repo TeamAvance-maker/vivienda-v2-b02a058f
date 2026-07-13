@@ -48,6 +48,9 @@ export function MaterialsSection() {
     unit: "un",
     tracks_handedness: false,
   });
+  const [addPass, setAddPass] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
+
   const [saving, setSaving] = useState(false);
   // Filtro/orden/paginación gestionados por useTableControls (más abajo)
 

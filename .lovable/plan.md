@@ -1,38 +1,33 @@
-## Plan: Agregar "Nuevo vale tipo" en la pestaña Vales tipo
+## Problema
 
-### Sobre el menú Casas
-Revisé el código y el menú **Casas** ya está **desbloqueado** y funcionando (aparece en el sidebar y abre las pestañas *Tipos / Manzanas-Sitios / Vales tipo*). No hay nada que "abrir": ya puedes entrar. Si al hacer clic no lo ves, cuéntame qué te aparece y lo miro.
+En la sección **Materiales**, al presionar "Agregar material" sale el error rojo:
+`new row violates row-level security policy for table "materials_v2"`
 
-### Lo que voy a agregar
-Dentro de **Casas → pestaña "Vales tipo"**, al principio del panel (arriba de los selectores) sumaré una fila nueva con un botón grande:
+### Por qué pasa (explicado simple)
 
-> **➕ Nuevo vale tipo**
+Piensa en la base de datos como una caja fuerte 🔐. Cuando activamos la seguridad (RLS) hace unas semanas, le dijimos: *"solo deja **mirar** los materiales a usuarios aprobados"*. Pero **no le dimos permiso para meter materiales nuevos** desde el navegador.
 
-Al hacer clic se abre un diálogo pequeño que pide **solo un dato**:
+El formulario de "Agregar material" hoy escribe **directamente** desde el navegador (sin la contraseña de obra), y la caja fuerte lo rechaza. En cambio, el botón "Editar" sí funciona porque usa la ruta segura del servidor (`adminMutateFn`) con contraseña.
 
-- **Nombre del vale** (ej: "PINTURA EXTERIOR TERRAZA")
+## Solución propuesta
 
-Y opcionalmente:
-- **Sección** (texto libre — el campo ya existe en la base para agrupar; lo dejo opcional)
+Cambiar el botón "Agregar material" para que use la **misma ruta segura** que ya usa "Editar":
 
-### Cómo se genera el código automáticamente
-- Miro todos los códigos actuales (V01, V02… V49).
-- Tomo el número más alto y le sumo 1 → siguiente = **V50**, luego V51, etc.
-- Siempre con la letra **V** y **2 dígitos** con cero adelante (V07, V50, V123 si algún día crecen).
-- Si en el futuro hay un hueco (por ejemplo se borró V10), igual se usa el siguiente al máximo, para no reciclar códigos ya usados en históricos.
+1. En `src/sections/materials.tsx`, reemplazar el `supabase.from(...).insert(...)` directo por una llamada a `adminMutateFn` (server function que ya existe y ya bypasea RLS de forma controlada).
+2. Pedir la **contraseña de obra** en un pequeño diálogo antes de crear el material (igual que hoy pide para editar/borrar), para no dejar la creación abierta a cualquiera.
+3. Al terminar, refrescar la lista automáticamente.
 
-El usuario **no ve ni edita** el código: aparece pintado como "vista previa" dentro del diálogo (ej: *"Se creará como V50"*), y al guardar se inserta con ese código.
+**No** vamos a abrir la política RLS de `materials_v2` a INSERT desde el navegador — sería un agujero de seguridad (cualquier usuario aprobado podría inyectar materiales sin control). La ruta con contraseña es coherente con el resto del sitio.
 
-### Cómo se guarda
-- Uso el flujo administrativo existente (`adminMutateFn` con `action: "insert"` sobre `vale_types_v2`), así queda registrado en el **historial** igual que las demás modificaciones y pide la **contraseña de obra** como el resto de acciones sensibles.
-- `sort_order` = siguiente al máximo actual, para que aparezca al final de la lista ordenada.
-- Después de crear, se selecciona automáticamente el nuevo vale en el selector para que puedas empezar a agregarle **etapas** y **materiales** enseguida.
+## Alcance
 
-### Lo que NO cambia
-- Los vales existentes, sus etapas, materiales y códigos se mantienen intactos.
-- Nada más de la sección se toca (los botones actuales de imprimir, copiar vale, etc. siguen igual).
+- Un solo archivo tocado: `src/sections/materials.tsx`.
+- Sin cambios en la base de datos, sin nuevas migraciones, sin tocar otras secciones.
 
-### Duda mínima
-¿Quieres que también pida la **sección** (agrupador), o simplemente lo dejamos vacío y lo editas después si hace falta? Por defecto voy con **solo el nombre** para que sea rápido.
+## Detalles técnicos
 
-¿Confirmas y avanzo?
+- Usar `useServerFn(adminMutateFn)` con `{ table: "materials_v2", action: "insert", values: {...} }`.
+- Añadir estado local `addPass` y un `AlertDialog` reutilizando el patrón del diálogo de edición ya existente en el mismo archivo.
+- `sort_order` y `code` (autogenerado con `nextCode`) se calculan igual que ahora.
+
+¿Le damos? 🚀
