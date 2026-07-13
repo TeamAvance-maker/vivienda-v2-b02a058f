@@ -1471,67 +1471,6 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
           invalidate();
         }}
       />
-
-      {/* Nuevo vale tipo */}
-      <AlertDialog
-        open={newValeOpen}
-        onOpenChange={(o) => !createValeMut.isPending && setNewValeOpen(o)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Nuevo vale tipo</AlertDialogTitle>
-          </AlertDialogHeader>
-          <div className="space-y-3">
-            <div className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-sm">
-              Se creará como <span className="font-mono font-semibold">{nextValeCode}</span>.
-              El código se asigna automáticamente.
-            </div>
-            <div>
-              <Label>Nombre del vale *</Label>
-              <Input
-                autoFocus
-                value={newValeName}
-                onChange={(e) => setNewValeName(e.target.value)}
-                placeholder="Ej: PINTURA EXTERIOR TERRAZA"
-                disabled={createValeMut.isPending}
-              />
-            </div>
-            <div>
-              <Label>Sección (opcional)</Label>
-              <Input
-                value={newValeSection}
-                onChange={(e) => setNewValeSection(e.target.value)}
-                placeholder="Agrupador opcional (ej: PINTURAS)"
-                disabled={createValeMut.isPending}
-              />
-            </div>
-            <div>
-              <Label>Contraseña de obra</Label>
-              <Input
-                type="password"
-                value={newValePass}
-                onChange={(e) => setNewValePass(e.target.value)}
-                disabled={createValeMut.isPending}
-              />
-            </div>
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={createValeMut.isPending}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => {
-                e.preventDefault();
-                createValeMut.mutate();
-              }}
-              disabled={createValeMut.isPending}
-            >
-              {createValeMut.isPending ? "Creando…" : "Crear vale tipo"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
   );
 }
 
