@@ -216,6 +216,10 @@ export function ValeTipoSection() {
       const name = newValeName.trim();
       if (!name) throw new Error("Nombre requerido");
       if (!newValePass) throw new Error("Contraseña requerida");
+      const stageNum = Number(newValeStageNumber);
+      if (!Number.isFinite(stageNum) || stageNum < 1) {
+        throw new Error("Número de etapa inválido (debe ser 1 o mayor)");
+      }
       const dup = (valeTypes.data ?? []).find(
         (v) => v.code.toLowerCase() === nextValeCode.toLowerCase(),
       );
@@ -235,23 +239,46 @@ export function ValeTipoSection() {
           values,
         },
       });
-      return { code: nextValeCode };
+      // Recuperar el vale recién creado para conocer su id
+      const { data: freshVT } = await valeTypes.refetch();
+      const created = (freshVT ?? []).find((v) => v.code === nextValeCode);
+      if (!created) throw new Error("No se pudo recuperar el vale recién creado");
+      // Crear la primera etapa
+      const stageName = newValeStageName.trim() || `Etapa ${stageNum}`;
+      await adminMutate({
+        data: {
+          passphrase: newValePass,
+          table: "vale_stages",
+          action: "insert",
+          values: {
+            vale_type_id: created.id,
+            stage_number: stageNum,
+            name: stageName,
+            sort_order: stageNum,
+          },
+        },
+      });
+      return { code: nextValeCode, valeId: created.id };
     },
     onSuccess: async (res) => {
-      toast.success(`Vale tipo ${res.code} creado`);
+      toast.success(`Vale tipo ${res.code} creado con Etapa ${newValeStageNumber}`);
       setNewValeOpen(false);
       setNewValeName("");
       setNewValeSection("");
       setNewValePass("");
       const chosenType = newValeHouseType;
-      const { data: fresh } = await valeTypes.refetch();
+      await valeStages.refetch();
       invalidate();
-      const created = (fresh ?? []).find((v) => v.code === res.code);
-      if (created) {
-        setValeTypeId(created.id);
-        setStageId("");
-        setHouseType(chosenType);
-      }
+      setValeTypeId(res.valeId);
+      setHouseType(chosenType);
+      // Preseleccionar la etapa recién creada
+      const { data: freshStages } = await valeStages.refetch();
+      const createdStage = (freshStages ?? []).find(
+        (s) => s.vale_type_id === res.valeId,
+      );
+      setStageId(createdStage?.id ?? "");
+      setNewValeStageNumber(1);
+      setNewValeStageName("");
     },
     onError: (e: any) => toast.error(e?.message ?? "Error"),
   });
