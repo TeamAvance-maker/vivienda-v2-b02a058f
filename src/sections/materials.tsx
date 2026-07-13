@@ -193,9 +193,19 @@ export function MaterialsSection() {
           <p className="text-xs text-muted-foreground">
             El código se inventará automático (próximo: <b>{nextCode(materials.data ?? [])}</b>).
           </p>
-          <Button onClick={add} disabled={saving}>
+          <Button
+            onClick={() => {
+              if (!form.description.trim()) {
+                toast.error("La descripción es requerida");
+                return;
+              }
+              setAddOpen(true);
+            }}
+            disabled={saving}
+          >
             {saving ? "Guardando…" : "Agregar material"}
           </Button>
+
         </div>
       </div>
 
