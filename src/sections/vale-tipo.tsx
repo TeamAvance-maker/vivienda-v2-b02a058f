@@ -1,6 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowRight, Check, ChevronsUpDown, Pencil, Plus, Repeat2, Search, Trash2 } from "lucide-react";
+import { ArrowRight, Check, ChevronsUpDown, Pencil, Plus, Printer, Repeat2, Search, Trash2 } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { useConfig } from "@/lib/queries";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   SortableTh,
