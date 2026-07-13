@@ -944,6 +944,64 @@ export function ValeTipoSection() {
         </AlertDialogContent>
       </AlertDialog>
 
+      {/* Imprimir / Exportar vale a PDF */}
+      <AlertDialog open={printOpen} onOpenChange={setPrintOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Imprimir vale</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              <strong className="text-foreground">CASA TIPO "{houseType} - ETAPA {selectedStage?.stage_number}"</strong>
+              <br />
+              {selectedVT?.name} · {filteredReqs.length} material{filteredReqs.length === 1 ? "" : "es"}
+            </div>
+            <div>
+              <Label>Número de copias</Label>
+              <Input
+                type="number"
+                min={1}
+                max={20}
+                value={printCopies}
+                onChange={(e) => setPrintCopies(Number(e.target.value))}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Se genera una hoja idéntica por cada copia (máx. 20).
+              </p>
+            </div>
+            <div>
+              <Label>¿Qué quieres hacer?</Label>
+              <RadioGroup
+                value={printMode}
+                onValueChange={(v) => setPrintMode(v as "print" | "download")}
+                className="mt-2 space-y-2"
+              >
+                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                  <RadioGroupItem value="print" />
+                  <span><strong>Imprimir ahora</strong> — abre el cuadro de imprimir de tu navegador.</span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                  <RadioGroupItem value="download" />
+                  <span><strong>Descargar PDF</strong> — guarda el archivo en tu computador.</span>
+                </label>
+              </RadioGroup>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handlePrintVale();
+              }}
+            >
+              <Printer className="mr-1 h-4 w-4" />
+              {printMode === "print" ? "Imprimir" : "Descargar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <MaterialQuickCreate
         open={quickCreate}
         onOpenChange={setQuickCreate}
