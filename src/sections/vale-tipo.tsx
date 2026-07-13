@@ -1109,9 +1109,33 @@ export function ValeTipoSection() {
             <AlertDialogTitle>Nuevo vale tipo</AlertDialogTitle>
           </AlertDialogHeader>
           <div className="space-y-3">
-            <div className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-sm">
-              Se creará como <span className="font-mono font-semibold">{nextValeCode}</span>.
-              El código se asigna automáticamente.
+            <div className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-sm space-y-1">
+              <div>
+                Se creará como <span className="font-mono font-semibold">{nextValeCode}</span>.
+                El código se asigna automáticamente.
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Fecha de creación: {new Date().toLocaleDateString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" })}
+              </div>
+            </div>
+            <div>
+              <Label>Tipo de casa inicial *</Label>
+              <Select
+                value={newValeHouseType}
+                onValueChange={(v) => setNewValeHouseType(v as HouseTypeV2)}
+                disabled={createValeMut.isPending}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {HOUSE_TYPES.map((h) => (
+                    <SelectItem key={h} value={h}>{h}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">
+                El vale es compartido: podrás agregar materiales para otros tipos (A1/A2/B/C) después.
+                Esto sólo abre el vale ya seleccionado en este tipo de casa.
+              </p>
             </div>
             <div>
               <Label>Nombre del vale *</Label>
