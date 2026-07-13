@@ -1176,6 +1176,15 @@ export function ValeTipoSection() {
                 disabled={createValeMut.isPending}
               />
             </div>
+            <div>
+              <Label>Sección (opcional)</Label>
+              <Input
+                value={newValeSection}
+                onChange={(e) => setNewValeSection(e.target.value)}
+                placeholder="Agrupador opcional (ej: PINTURAS)"
+                disabled={createValeMut.isPending}
+              />
+            </div>
             <div className="grid grid-cols-[110px_1fr] gap-2">
               <div>
                 <Label>Etapa Nº *</Label>
