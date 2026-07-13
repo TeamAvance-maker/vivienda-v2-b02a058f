@@ -191,6 +191,76 @@ export function ValeTipoSection() {
   const [newValeStageNumber, setNewValeStageNumber] = useState<number>(1);
   const [newValeStageName, setNewValeStageName] = useState<string>("");
 
+  // ------------- CRUD panel (Administrar vales tipo) -------------
+  const [manageOpen, setManageOpen] = useState(false);
+  const [manageSearch, setManageSearch] = useState("");
+  const [managePage, setManagePage] = useState(1);
+  const managePageSize = 10;
+
+  // ------------- Editar vale tipo -------------
+  const [editVale, setEditVale] = useState<ValeTypeV2 | null>(null);
+  const [editValeName, setEditValeName] = useState("");
+  const [editValeSection, setEditValeSection] = useState("");
+  const [editValePass, setEditValePass] = useState("");
+
+  const editValeMut = useMutation({
+    mutationFn: async () => {
+      if (!editVale) throw new Error("Sin vale seleccionado");
+      const name = editValeName.trim();
+      if (!name) throw new Error("Nombre requerido");
+      if (!editValePass) throw new Error("Contraseña requerida");
+      await adminMutate({
+        data: {
+          passphrase: editValePass,
+          table: "vale_types_v2",
+          action: "update",
+          match: { id: editVale.id },
+          values: {
+            name: name.toUpperCase(),
+            section: editValeSection.trim() || null,
+          },
+        },
+      });
+    },
+    onSuccess: async () => {
+      toast.success("Vale tipo actualizado");
+      setEditVale(null);
+      setEditValePass("");
+      await valeTypes.refetch();
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Error"),
+  });
+
+  // Conteo de etapas por vale (para columna en el panel)
+  const stagesCountByVale = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of valeStages.data ?? []) {
+      m.set(s.vale_type_id, (m.get(s.vale_type_id) ?? 0) + 1);
+    }
+    return m;
+  }, [valeStages.data]);
+
+  const manageFiltered = useMemo(() => {
+    const tokens = manageSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return sortedValeTypes.filter((vt) => {
+      if (tokens.length === 0) return true;
+      const hay = `${vt.code} ${vt.name} ${vt.section ?? ""}`.toLowerCase();
+      return tokens.every((t) => hay.includes(t));
+    });
+  }, [sortedValeTypes, manageSearch]);
+
+  const manageTotalPages = Math.max(1, Math.ceil(manageFiltered.length / managePageSize));
+  const managePageSafe = Math.min(managePage, manageTotalPages);
+  const manageRows = manageFiltered.slice(
+    (managePageSafe - 1) * managePageSize,
+    managePageSafe * managePageSize,
+  );
+
+  useEffect(() => {
+    setManagePage(1);
+  }, [manageSearch]);
+
   // Próximo código: V## siguiente al máximo actual (crece a 3+ si hace falta).
   const nextValeCode = useMemo(() => {
     let maxNum = 0;
@@ -557,9 +627,14 @@ export function ValeTipoSection() {
             (próximo: <span className="font-mono font-semibold text-foreground">{nextValeCode}</span>).
           </div>
         </div>
-        <Button onClick={() => setNewValeOpen(true)} className="shrink-0">
-          <Plus className="mr-2 h-4 w-4" /> Nuevo vale tipo
-        </Button>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <Button variant="outline" onClick={() => setManageOpen(true)}>
+            <Pencil className="mr-2 h-4 w-4" /> Administrar vales tipo
+          </Button>
+          <Button onClick={() => setNewValeOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Nuevo vale tipo
+          </Button>
+        </div>
       </div>
 
 
@@ -1114,6 +1189,207 @@ export function ValeTipoSection() {
             >
               <Printer className="mr-1 h-4 w-4" />
               {printMode === "print" ? "Imprimir" : "Descargar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Administrar vales tipo (CRUD) */}
+      <AlertDialog open={manageOpen} onOpenChange={setManageOpen}>
+        <AlertDialogContent className="max-w-4xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Administrar vales tipo</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[220px] flex-1">
+                <Search className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-8"
+                  placeholder="Buscar por código, nombre o sección…"
+                  value={manageSearch}
+                  onChange={(e) => setManageSearch(e.target.value)}
+                />
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {manageFiltered.length} de {sortedValeTypes.length}
+              </div>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setManageOpen(false);
+                  setNewValeOpen(true);
+                }}
+              >
+                <Plus className="mr-1 h-4 w-4" /> Nuevo
+              </Button>
+            </div>
+
+            <div className="max-h-[55vh] overflow-auto rounded-lg border border-border/60">
+              <table className="w-full text-sm">
+                <thead className="bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                  <tr>
+                    <th className="px-3 py-2">Código</th>
+                    <th className="px-3 py-2">Nombre</th>
+                    <th className="px-3 py-2">Sección</th>
+                    <th className="px-3 py-2 text-center">Etapas</th>
+                    <th className="px-3 py-2">Creado</th>
+                    <th className="px-3 py-2 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {manageRows.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
+                        Sin resultados.
+                      </td>
+                    </tr>
+                  )}
+                  {manageRows.map((vt) => (
+                    <tr key={vt.id} className="border-t border-border/50">
+                      <td className="px-3 py-2 font-mono font-semibold">{vt.code}</td>
+                      <td className="px-3 py-2">{vt.name}</td>
+                      <td className="px-3 py-2 text-muted-foreground">{vt.section ?? "—"}</td>
+                      <td className="px-3 py-2 text-center">{stagesCountByVale.get(vt.id) ?? 0}</td>
+                      <td className="px-3 py-2 text-xs text-muted-foreground">
+                        {(vt as any).created_at
+                          ? new Date((vt as any).created_at).toLocaleDateString("es-CL", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                            })
+                          : "—"}
+                      </td>
+                      <td className="px-3 py-2">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setEditVale(vt);
+                              setEditValeName(vt.name);
+                              setEditValeSection(vt.section ?? "");
+                              setEditValePass("");
+                            }}
+                          >
+                            <Pencil className="mr-1 h-3.5 w-3.5" /> Editar
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => {
+                              requestCascadeDelete({
+                                table: "vale_types_v2",
+                                id: vt.id,
+                                label: `Vale ${vt.code} · ${vt.name}`,
+                                context:
+                                  "Se eliminarán también todas las etapas del vale y sus materiales asignados.",
+                                onSuccess: () => {
+                                  if (valeTypeId === vt.id) {
+                                    setValeTypeId("");
+                                    setStageId("");
+                                  }
+                                  valeTypes.refetch();
+                                  invalidate();
+                                },
+                              });
+                            }}
+                          >
+                            <Trash2 className="mr-1 h-3.5 w-3.5" /> Eliminar
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="flex items-center justify-between text-xs">
+              <div className="text-muted-foreground">
+                Página {managePageSafe} de {manageTotalPages}
+              </div>
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={managePageSafe <= 1}
+                  onClick={() => setManagePage((p) => Math.max(1, p - 1))}
+                >
+                  Anterior
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={managePageSafe >= manageTotalPages}
+                  onClick={() => setManagePage((p) => Math.min(manageTotalPages, p + 1))}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cerrar</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Editar vale tipo */}
+      <AlertDialog
+        open={!!editVale}
+        onOpenChange={(o) => !editValeMut.isPending && !o && setEditVale(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Editar vale tipo</AlertDialogTitle>
+          </AlertDialogHeader>
+          {editVale && (
+            <div className="space-y-3">
+              <div className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-sm">
+                Código: <span className="font-mono font-semibold">{editVale.code}</span>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  El código no se puede modificar (hay datos ligados a él).
+                </div>
+              </div>
+              <div>
+                <Label>Nombre *</Label>
+                <Input
+                  autoFocus
+                  value={editValeName}
+                  onChange={(e) => setEditValeName(e.target.value)}
+                  disabled={editValeMut.isPending}
+                />
+              </div>
+              <div>
+                <Label>Sección (opcional)</Label>
+                <Input
+                  value={editValeSection}
+                  onChange={(e) => setEditValeSection(e.target.value)}
+                  disabled={editValeMut.isPending}
+                />
+              </div>
+              <div>
+                <Label>Contraseña de obra</Label>
+                <Input
+                  type="password"
+                  value={editValePass}
+                  onChange={(e) => setEditValePass(e.target.value)}
+                  disabled={editValeMut.isPending}
+                />
+              </div>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={editValeMut.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                editValeMut.mutate();
+              }}
+              disabled={editValeMut.isPending}
+            >
+              {editValeMut.isPending ? "Guardando…" : "Guardar cambios"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
