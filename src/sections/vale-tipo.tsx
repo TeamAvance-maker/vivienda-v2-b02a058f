@@ -241,12 +241,14 @@ export function ValeTipoSection() {
       setNewValeName("");
       setNewValeSection("");
       setNewValePass("");
+      const chosenType = newValeHouseType;
       const { data: fresh } = await valeTypes.refetch();
       invalidate();
       const created = (fresh ?? []).find((v) => v.code === res.code);
       if (created) {
         setValeTypeId(created.id);
         setStageId("");
+        setHouseType(chosenType);
       }
     },
     onError: (e: any) => toast.error(e?.message ?? "Error"),
