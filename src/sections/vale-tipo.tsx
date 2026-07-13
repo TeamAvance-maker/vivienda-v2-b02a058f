@@ -294,6 +294,150 @@ export function ValeTipoSection() {
     }, 50);
   }
 
+  function buildValePdf(copies: number): jsPDF {
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 12;
+    const contentW = pageW - margin * 2;
+    const projectName = (cfg.data?.name ?? "").toUpperCase();
+    const today = new Date();
+    const fecha = `${today.getDate()}-${today.getMonth() + 1}-${today.getFullYear()}`;
+    const houseTitle = `CASA TIPO "${houseType}- ETAPA ${selectedStage?.stage_number ?? ""}"`;
+    const valeName = (selectedVT?.name ?? "").toUpperCase();
+    const items = filteredReqs.map((r) => {
+      const m = materialsById.get(r.material_id);
+      return { qty: r.qty, unit: m?.unit ?? "", desc: m?.description ?? "?" };
+    });
+
+    for (let c = 0; c < copies; c++) {
+      if (c > 0) doc.addPage();
+      let y = margin;
+
+      // Título casa
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.3);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.rect(margin, y, contentW, 8);
+      doc.text(houseTitle, pageW / 2, y + 5.5, { align: "center" });
+      y += 8;
+
+      // Nombre vale
+      doc.setFillColor(230, 230, 230);
+      doc.rect(margin, y, contentW, 6, "FD");
+      doc.setFontSize(10);
+      doc.text(valeName, pageW / 2, y + 4.2, { align: "center" });
+      y += 6;
+
+      // Fecha
+      doc.rect(margin, y, contentW, 6);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.text("FECHA", margin + 2, y + 4);
+      doc.setFont("helvetica", "normal");
+      doc.text(fecha, margin + 20, y + 4);
+      y += 6;
+
+      // Proyecto
+      doc.rect(margin, y, contentW, 8);
+      doc.setFont("helvetica", "bold");
+      doc.text("PROYE", margin + 2, y + 5);
+      doc.setFontSize(11);
+      doc.text(projectName, pageW / 2, y + 5.2, { align: "center" });
+      y += 8;
+
+      // Fecha solicitud / Solicitado por
+      doc.rect(margin, y, contentW, 7);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.text("FECHA SOLICITUD:", margin + 2, y + 4.5);
+      doc.text("SOLICITADO POR:", margin + contentW / 2, y + 4.5);
+      y += 7;
+
+      // Cant / Sitio / Manzana
+      doc.rect(margin, y, contentW, 7);
+      doc.text("CANT.", margin + 2, y + 4.5);
+      doc.setFont("helvetica", "normal");
+      doc.text("1", margin + 20, y + 4.5);
+      doc.setFont("helvetica", "bold");
+      doc.text("SITIO:", margin + 55, y + 4.5);
+      doc.text("MANZANA:", margin + contentW / 2 + 10, y + 4.5);
+      y += 7;
+
+      // Tabla materiales
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        head: [["CANT.", "UNI.", "DESCRIPCIÓN"]],
+        body: [
+          ...items.map((it) => [String(it.qty), it.unit, it.desc]),
+          ...Array.from({ length: Math.max(0, 18 - items.length) }, () => ["", "", ""]),
+        ],
+        theme: "grid",
+        styles: { fontSize: 9, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.2, textColor: 0 },
+        headStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: "bold", halign: "center" },
+        columnStyles: {
+          0: { cellWidth: 18, halign: "center" },
+          1: { cellWidth: 18, halign: "center" },
+          2: { cellWidth: contentW - 36 },
+        },
+      });
+
+      const afterY = (doc as any).lastAutoTable.finalY as number;
+      let fy = Math.min(afterY + 2, pageH - 50);
+
+      // Partida / Cod.
+      doc.rect(margin, fy, contentW, 7);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.text("PARTIDA", margin + 2, fy + 4.5);
+      doc.text("COD.", margin + contentW / 2 + 10, fy + 4.5);
+      fy += 7;
+
+      const rows = [
+        ["RECIBIDO POR", "FECHA"],
+        ["DESPACHADO POR", "FECHA"],
+        ["INGRESADO AL SISTEMA POR", "FECHA"],
+        ["OBSERVACIONES", ""],
+      ];
+      for (const [l, r] of rows) {
+        doc.rect(margin, fy, contentW, 8);
+        doc.text(l, margin + 2, fy + 5);
+        if (r) doc.text(r, margin + contentW / 2 + 10, fy + 5);
+        fy += 8;
+      }
+
+      // Nº de copia
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(7);
+      doc.setTextColor(120);
+      doc.text(`Copia ${c + 1} de ${copies}`, pageW - margin, pageH - 5, { align: "right" });
+      doc.setTextColor(0);
+    }
+    return doc;
+  }
+
+  function handlePrintVale() {
+    if (!stageId || filteredReqs.length === 0) {
+      toast.error("Selecciona una etapa con materiales.");
+      return;
+    }
+    const n = Math.max(1, Math.min(20, Number(printCopies) || 1));
+    const doc = buildValePdf(n);
+    const filename = `Vale_${houseType}_${selectedVT?.code ?? ""}_Etapa${selectedStage?.stage_number ?? ""}.pdf`;
+    if (printMode === "download") {
+      doc.save(filename);
+      toast.success(`PDF generado (${n} copia${n === 1 ? "" : "s"})`);
+    } else {
+      doc.autoPrint();
+      const url = doc.output("bloburl");
+      const w = window.open(url, "_blank");
+      if (!w) toast.error("Permite ventanas emergentes para imprimir.");
+    }
+    setPrintOpen(false);
+  }
+
   return (
     <div className="space-y-6">
       <SectionHeader
