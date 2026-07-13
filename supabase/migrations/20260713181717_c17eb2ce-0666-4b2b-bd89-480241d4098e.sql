@@ -1,0 +1,1 @@
+DELETE FROM public.vale_types_v2 WHERE id='b69a1f04-6f6c-4bac-af31-d0962cf8e6bf';
