@@ -48,6 +48,9 @@ export function MaterialsSection() {
     unit: "un",
     tracks_handedness: false,
   });
+  const [addPass, setAddPass] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
+
   const [saving, setSaving] = useState(false);
   // Filtro/orden/paginación gestionados por useTableControls (más abajo)
 
@@ -78,26 +81,41 @@ export function MaterialsSection() {
       toast.error("La descripción es requerida");
       return;
     }
+    if (!addPass) {
+      toast.error("Contraseña requerida");
+      return;
+    }
     setSaving(true);
     const all = materials.data ?? [];
     const code = nextCode(all);
     const next_sort = (all.reduce((a, b) => Math.max(a, b.sort_order), 0) ?? 0) + 1;
-    const { error } = await supabase.from("materials_v2" as never).insert({
-      code,
-      description: form.description.trim(),
-      unit: form.unit.trim() || "un",
-      tracks_handedness: form.tracks_handedness,
-      sort_order: next_sort,
-    } as never);
-    setSaving(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      await adminMutate({
+        data: {
+          passphrase: addPass,
+          table: "materials_v2",
+          action: "insert",
+          values: {
+            code,
+            description: form.description.trim(),
+            unit: form.unit.trim() || "un",
+            tracks_handedness: form.tracks_handedness,
+            sort_order: next_sort,
+          },
+        },
+      });
+      toast.success(`Material agregado (${code})`);
+      setForm({ description: "", unit: "un", tracks_handedness: false });
+      setAddPass("");
+      setAddOpen(false);
+      invalidate();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Error");
+    } finally {
+      setSaving(false);
     }
-    toast.success(`Material agregado (${code})`);
-    setForm({ description: "", unit: "un", tracks_handedness: false });
-    invalidate();
   }
+
 
   function openEdit(m: MaterialV2) {
     setEditing(m);
@@ -175,9 +193,19 @@ export function MaterialsSection() {
           <p className="text-xs text-muted-foreground">
             El código se inventará automático (próximo: <b>{nextCode(materials.data ?? [])}</b>).
           </p>
-          <Button onClick={add} disabled={saving}>
+          <Button
+            onClick={() => {
+              if (!form.description.trim()) {
+                toast.error("La descripción es requerida");
+                return;
+              }
+              setAddOpen(true);
+            }}
+            disabled={saving}
+          >
             {saving ? "Guardando…" : "Agregar material"}
           </Button>
+
         </div>
       </div>
 
@@ -310,6 +338,38 @@ export function MaterialsSection() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add material password dialog */}
+      <AlertDialog open={addOpen} onOpenChange={(o) => { if (!o) { setAddOpen(false); setAddPass(""); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar creación de material</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Se creará el material <b>{form.description}</b> con código automático.
+            </p>
+            <Label>Contraseña de obra</Label>
+            <Input
+              type="password"
+              value={addPass}
+              onChange={(e) => setAddPass(e.target.value)}
+              placeholder="••••••••"
+              autoFocus
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!addPass || saving}
+              onClick={(e) => { e.preventDefault(); add(); }}
+            >
+              {saving ? "Guardando…" : "Crear"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
