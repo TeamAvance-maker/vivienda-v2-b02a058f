@@ -1176,15 +1176,30 @@ export function ValeTipoSection() {
                 disabled={createValeMut.isPending}
               />
             </div>
-            <div>
-              <Label>Sección (opcional)</Label>
-              <Input
-                value={newValeSection}
-                onChange={(e) => setNewValeSection(e.target.value)}
-                placeholder="Agrupador opcional (ej: PINTURAS)"
-                disabled={createValeMut.isPending}
-              />
+            <div className="grid grid-cols-[110px_1fr] gap-2">
+              <div>
+                <Label>Etapa Nº *</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={newValeStageNumber}
+                  onChange={(e) => setNewValeStageNumber(Number(e.target.value))}
+                  disabled={createValeMut.isPending}
+                />
+              </div>
+              <div>
+                <Label>Nombre de la etapa (opcional)</Label>
+                <Input
+                  value={newValeStageName}
+                  onChange={(e) => setNewValeStageName(e.target.value)}
+                  placeholder={`Ej: Etapa ${newValeStageNumber || 1}`}
+                  disabled={createValeMut.isPending}
+                />
+              </div>
             </div>
+            <p className="-mt-2 text-xs text-muted-foreground">
+              Se creará esta primera etapa junto con el vale. Después puedes agregar más etapas normalmente.
+            </p>
             <div>
               <Label>Contraseña de obra</Label>
               <Input
