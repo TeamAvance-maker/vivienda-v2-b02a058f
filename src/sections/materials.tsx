@@ -338,6 +338,38 @@ export function MaterialsSection() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add material password dialog */}
+      <AlertDialog open={addOpen} onOpenChange={(o) => { if (!o) { setAddOpen(false); setAddPass(""); } }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar creación de material</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Se creará el material <b>{form.description}</b> con código automático.
+            </p>
+            <Label>Contraseña de obra</Label>
+            <Input
+              type="password"
+              value={addPass}
+              onChange={(e) => setAddPass(e.target.value)}
+              placeholder="••••••••"
+              autoFocus
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={!addPass || saving}
+              onClick={(e) => { e.preventDefault(); add(); }}
+            >
+              {saving ? "Guardando…" : "Crear"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
