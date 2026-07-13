@@ -557,9 +557,14 @@ export function ValeTipoSection() {
             (próximo: <span className="font-mono font-semibold text-foreground">{nextValeCode}</span>).
           </div>
         </div>
-        <Button onClick={() => setNewValeOpen(true)} className="shrink-0">
-          <Plus className="mr-2 h-4 w-4" /> Nuevo vale tipo
-        </Button>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <Button variant="outline" onClick={() => setManageOpen(true)}>
+            <Pencil className="mr-2 h-4 w-4" /> Administrar vales tipo
+          </Button>
+          <Button onClick={() => setNewValeOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Nuevo vale tipo
+          </Button>
+        </div>
       </div>
 
 
