@@ -516,6 +516,22 @@ export function ValeTipoSection() {
 
       <MaterialSearchPanel onGo={goToReq} />
 
+      {/* Crear nuevo vale tipo */}
+      <div className="surface-card flex flex-wrap items-center justify-between gap-3 p-4">
+        <div className="min-w-0">
+          <div className="text-sm font-semibold">Vales tipo disponibles: {sortedValeTypes.length}</div>
+          <div className="text-xs text-muted-foreground">
+            Puedes crear un vale tipo nuevo. El código se genera automáticamente
+            (próximo: <span className="font-mono font-semibold text-foreground">{nextValeCode}</span>).
+          </div>
+        </div>
+        <Button onClick={() => setNewValeOpen(true)} className="shrink-0">
+          <Plus className="mr-2 h-4 w-4" /> Nuevo vale tipo
+        </Button>
+      </div>
+
+
+
 
       {/* Selectores */}
       <div ref={selectorsRef} className="surface-card grid grid-cols-1 gap-3 p-5 md:grid-cols-3">
