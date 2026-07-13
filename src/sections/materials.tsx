@@ -81,26 +81,41 @@ export function MaterialsSection() {
       toast.error("La descripción es requerida");
       return;
     }
+    if (!addPass) {
+      toast.error("Contraseña requerida");
+      return;
+    }
     setSaving(true);
     const all = materials.data ?? [];
     const code = nextCode(all);
     const next_sort = (all.reduce((a, b) => Math.max(a, b.sort_order), 0) ?? 0) + 1;
-    const { error } = await supabase.from("materials_v2" as never).insert({
-      code,
-      description: form.description.trim(),
-      unit: form.unit.trim() || "un",
-      tracks_handedness: form.tracks_handedness,
-      sort_order: next_sort,
-    } as never);
-    setSaving(false);
-    if (error) {
-      toast.error(error.message);
-      return;
+    try {
+      await adminMutate({
+        data: {
+          passphrase: addPass,
+          table: "materials_v2",
+          action: "insert",
+          values: {
+            code,
+            description: form.description.trim(),
+            unit: form.unit.trim() || "un",
+            tracks_handedness: form.tracks_handedness,
+            sort_order: next_sort,
+          },
+        },
+      });
+      toast.success(`Material agregado (${code})`);
+      setForm({ description: "", unit: "un", tracks_handedness: false });
+      setAddPass("");
+      setAddOpen(false);
+      invalidate();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Error");
+    } finally {
+      setSaving(false);
     }
-    toast.success(`Material agregado (${code})`);
-    setForm({ description: "", unit: "un", tracks_handedness: false });
-    invalidate();
   }
+
 
   function openEdit(m: MaterialV2) {
     setEditing(m);
