@@ -1,6 +1,9 @@
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowRight, Check, ChevronsUpDown, Pencil, Plus, Repeat2, Search, Trash2 } from "lucide-react";
+import { ArrowRight, Check, ChevronsUpDown, Pencil, Plus, Printer, Repeat2, Search, Trash2 } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import { useConfig } from "@/lib/queries";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   SortableTh,
@@ -76,7 +79,13 @@ export function ValeTipoSection() {
   const materials = useMaterialsV2();
   const reqs = useValeReqs();
   const invalidate = useInvalidateSitesV2();
+  const cfg = useConfig();
   const adminMutate = useServerFn(adminMutateFn);
+
+  // Print vale dialog
+  const [printOpen, setPrintOpen] = useState(false);
+  const [printCopies, setPrintCopies] = useState<number>(1);
+  const [printMode, setPrintMode] = useState<"print" | "download">("print");
 
   const [houseType, setHouseType] = useState<HouseTypeV2>("A1");
   const [valeTypeId, setValeTypeId] = useState<string>("");
@@ -285,6 +294,150 @@ export function ValeTipoSection() {
     }, 50);
   }
 
+  function buildValePdf(copies: number): jsPDF {
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 12;
+    const contentW = pageW - margin * 2;
+    const projectName = (cfg.data?.name ?? "").toUpperCase();
+    const today = new Date();
+    const fecha = `${today.getDate()}-${today.getMonth() + 1}-${today.getFullYear()}`;
+    const houseTitle = `CASA TIPO "${houseType}- ETAPA ${selectedStage?.stage_number ?? ""}"`;
+    const valeName = (selectedVT?.name ?? "").toUpperCase();
+    const items = filteredReqs.map((r) => {
+      const m = materialsById.get(r.material_id);
+      return { qty: r.qty, unit: m?.unit ?? "", desc: m?.description ?? "?" };
+    });
+
+    for (let c = 0; c < copies; c++) {
+      if (c > 0) doc.addPage();
+      let y = margin;
+
+      // Título casa
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.3);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.rect(margin, y, contentW, 8);
+      doc.text(houseTitle, pageW / 2, y + 5.5, { align: "center" });
+      y += 8;
+
+      // Nombre vale
+      doc.setFillColor(230, 230, 230);
+      doc.rect(margin, y, contentW, 6, "FD");
+      doc.setFontSize(10);
+      doc.text(valeName, pageW / 2, y + 4.2, { align: "center" });
+      y += 6;
+
+      // Fecha
+      doc.rect(margin, y, contentW, 6);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.text("FECHA", margin + 2, y + 4);
+      doc.setFont("helvetica", "normal");
+      doc.text(fecha, margin + 20, y + 4);
+      y += 6;
+
+      // Proyecto
+      doc.rect(margin, y, contentW, 8);
+      doc.setFont("helvetica", "bold");
+      doc.text("PROYE", margin + 2, y + 5);
+      doc.setFontSize(11);
+      doc.text(projectName, pageW / 2, y + 5.2, { align: "center" });
+      y += 8;
+
+      // Fecha solicitud / Solicitado por
+      doc.rect(margin, y, contentW, 7);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.text("FECHA SOLICITUD:", margin + 2, y + 4.5);
+      doc.text("SOLICITADO POR:", margin + contentW / 2, y + 4.5);
+      y += 7;
+
+      // Cant / Sitio / Manzana
+      doc.rect(margin, y, contentW, 7);
+      doc.text("CANT.", margin + 2, y + 4.5);
+      doc.setFont("helvetica", "normal");
+      doc.text("1", margin + 20, y + 4.5);
+      doc.setFont("helvetica", "bold");
+      doc.text("SITIO:", margin + 55, y + 4.5);
+      doc.text("MANZANA:", margin + contentW / 2 + 10, y + 4.5);
+      y += 7;
+
+      // Tabla materiales
+      autoTable(doc, {
+        startY: y,
+        margin: { left: margin, right: margin },
+        head: [["CANT.", "UNI.", "DESCRIPCIÓN"]],
+        body: [
+          ...items.map((it) => [String(it.qty), it.unit, it.desc]),
+          ...Array.from({ length: Math.max(0, 18 - items.length) }, () => ["", "", ""]),
+        ],
+        theme: "grid",
+        styles: { fontSize: 9, cellPadding: 1.5, lineColor: [0, 0, 0], lineWidth: 0.2, textColor: 0 },
+        headStyles: { fillColor: [230, 230, 230], textColor: 0, fontStyle: "bold", halign: "center" },
+        columnStyles: {
+          0: { cellWidth: 18, halign: "center" },
+          1: { cellWidth: 18, halign: "center" },
+          2: { cellWidth: contentW - 36 },
+        },
+      });
+
+      const afterY = (doc as any).lastAutoTable.finalY as number;
+      let fy = Math.min(afterY + 2, pageH - 50);
+
+      // Partida / Cod.
+      doc.rect(margin, fy, contentW, 7);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.text("PARTIDA", margin + 2, fy + 4.5);
+      doc.text("COD.", margin + contentW / 2 + 10, fy + 4.5);
+      fy += 7;
+
+      const rows = [
+        ["RECIBIDO POR", "FECHA"],
+        ["DESPACHADO POR", "FECHA"],
+        ["INGRESADO AL SISTEMA POR", "FECHA"],
+        ["OBSERVACIONES", ""],
+      ];
+      for (const [l, r] of rows) {
+        doc.rect(margin, fy, contentW, 8);
+        doc.text(l, margin + 2, fy + 5);
+        if (r) doc.text(r, margin + contentW / 2 + 10, fy + 5);
+        fy += 8;
+      }
+
+      // Nº de copia
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(7);
+      doc.setTextColor(120);
+      doc.text(`Copia ${c + 1} de ${copies}`, pageW - margin, pageH - 5, { align: "right" });
+      doc.setTextColor(0);
+    }
+    return doc;
+  }
+
+  function handlePrintVale() {
+    if (!stageId || filteredReqs.length === 0) {
+      toast.error("Selecciona una etapa con materiales.");
+      return;
+    }
+    const n = Math.max(1, Math.min(20, Number(printCopies) || 1));
+    const doc = buildValePdf(n);
+    const filename = `Vale_${houseType}_${selectedVT?.code ?? ""}_Etapa${selectedStage?.stage_number ?? ""}.pdf`;
+    if (printMode === "download") {
+      doc.save(filename);
+      toast.success(`PDF generado (${n} copia${n === 1 ? "" : "s"})`);
+    } else {
+      doc.autoPrint();
+      const url = doc.output("bloburl");
+      const w = window.open(url, "_blank");
+      if (!w) toast.error("Permite ventanas emergentes para imprimir.");
+    }
+    setPrintOpen(false);
+  }
+
   return (
     <div className="space-y-6">
       <SectionHeader
@@ -391,21 +544,37 @@ export function ValeTipoSection() {
               <h3 className="font-display text-base font-semibold">
                 Agregar material a {houseType} · {selectedVT?.code} · Etapa {selectedStage?.stage_number}
               </h3>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={filteredReqs.length === 0}
-                onClick={() => {
-                  setCopyTargets([]);
-                  setCopyOverwrite(false);
-                  setCopyPass("");
-                  setCopyOpen(true);
-                }}
-              >
-                <Repeat2 className="mr-1 h-4 w-4" />
-                Copiar a otro tipo de casa
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  disabled={filteredReqs.length === 0}
+                  onClick={() => {
+                    setPrintCopies(1);
+                    setPrintMode("print");
+                    setPrintOpen(true);
+                  }}
+                >
+                  <Printer className="mr-1 h-4 w-4" />
+                  Imprimir vale
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={filteredReqs.length === 0}
+                  onClick={() => {
+                    setCopyTargets([]);
+                    setCopyOverwrite(false);
+                    setCopyPass("");
+                    setCopyOpen(true);
+                  }}
+                >
+                  <Repeat2 className="mr-1 h-4 w-4" />
+                  Copiar a otro tipo de casa
+                </Button>
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
               <div className="md:col-span-2">
@@ -770,6 +939,64 @@ export function ValeTipoSection() {
               }}
             >
               {copyTypeMut.isPending ? "Copiando…" : "Copiar vale completo"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Imprimir / Exportar vale a PDF */}
+      <AlertDialog open={printOpen} onOpenChange={setPrintOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Imprimir vale</AlertDialogTitle>
+          </AlertDialogHeader>
+          <div className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              <strong className="text-foreground">CASA TIPO "{houseType} - ETAPA {selectedStage?.stage_number}"</strong>
+              <br />
+              {selectedVT?.name} · {filteredReqs.length} material{filteredReqs.length === 1 ? "" : "es"}
+            </div>
+            <div>
+              <Label>Número de copias</Label>
+              <Input
+                type="number"
+                min={1}
+                max={20}
+                value={printCopies}
+                onChange={(e) => setPrintCopies(Number(e.target.value))}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Se genera una hoja idéntica por cada copia (máx. 20).
+              </p>
+            </div>
+            <div>
+              <Label>¿Qué quieres hacer?</Label>
+              <RadioGroup
+                value={printMode}
+                onValueChange={(v) => setPrintMode(v as "print" | "download")}
+                className="mt-2 space-y-2"
+              >
+                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                  <RadioGroupItem value="print" />
+                  <span><strong>Imprimir ahora</strong> — abre el cuadro de imprimir de tu navegador.</span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+                  <RadioGroupItem value="download" />
+                  <span><strong>Descargar PDF</strong> — guarda el archivo en tu computador.</span>
+                </label>
+              </RadioGroup>
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handlePrintVale();
+              }}
+            >
+              <Printer className="mr-1 h-4 w-4" />
+              {printMode === "print" ? "Imprimir" : "Descargar"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
