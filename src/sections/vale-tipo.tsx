@@ -188,6 +188,8 @@ export function ValeTipoSection() {
   const [newValeSection, setNewValeSection] = useState("");
   const [newValePass, setNewValePass] = useState("");
   const [newValeHouseType, setNewValeHouseType] = useState<HouseTypeV2>("A1");
+  const [newValeStageNumber, setNewValeStageNumber] = useState<number>(1);
+  const [newValeStageName, setNewValeStageName] = useState<string>("");
 
   // Próximo código: V## siguiente al máximo actual (crece a 3+ si hace falta).
   const nextValeCode = useMemo(() => {
