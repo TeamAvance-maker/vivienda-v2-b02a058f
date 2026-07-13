@@ -1471,6 +1471,7 @@ function MaterialSearchPanel({ onGo }: { onGo: (r: ValeReq) => void }) {
           invalidate();
         }}
       />
+    </div>
   );
 }
 
