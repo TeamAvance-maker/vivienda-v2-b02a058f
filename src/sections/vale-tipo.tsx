@@ -443,9 +443,9 @@ export function ValeTipoSection() {
       // Proyecto
       doc.rect(margin, y, contentW, 8);
       doc.setFont("helvetica", "bold");
-      doc.text("PROYE", margin + 2, y + 5);
+      doc.text("PROYECTO:", margin + 2, y + 5);
       doc.setFontSize(11);
-      doc.text(projectName, pageW / 2, y + 5.2, { align: "center" });
+
       y += 8;
 
       // Fecha solicitud / Solicitado por
