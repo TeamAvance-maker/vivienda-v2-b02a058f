@@ -191,6 +191,76 @@ export function ValeTipoSection() {
   const [newValeStageNumber, setNewValeStageNumber] = useState<number>(1);
   const [newValeStageName, setNewValeStageName] = useState<string>("");
 
+  // ------------- CRUD panel (Administrar vales tipo) -------------
+  const [manageOpen, setManageOpen] = useState(false);
+  const [manageSearch, setManageSearch] = useState("");
+  const [managePage, setManagePage] = useState(1);
+  const managePageSize = 10;
+
+  // ------------- Editar vale tipo -------------
+  const [editVale, setEditVale] = useState<ValeTypeV2 | null>(null);
+  const [editValeName, setEditValeName] = useState("");
+  const [editValeSection, setEditValeSection] = useState("");
+  const [editValePass, setEditValePass] = useState("");
+
+  const editValeMut = useMutation({
+    mutationFn: async () => {
+      if (!editVale) throw new Error("Sin vale seleccionado");
+      const name = editValeName.trim();
+      if (!name) throw new Error("Nombre requerido");
+      if (!editValePass) throw new Error("Contraseña requerida");
+      await adminMutate({
+        data: {
+          passphrase: editValePass,
+          table: "vale_types_v2",
+          action: "update",
+          match: { id: editVale.id },
+          values: {
+            name: name.toUpperCase(),
+            section: editValeSection.trim() || null,
+          },
+        },
+      });
+    },
+    onSuccess: async () => {
+      toast.success("Vale tipo actualizado");
+      setEditVale(null);
+      setEditValePass("");
+      await valeTypes.refetch();
+      invalidate();
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Error"),
+  });
+
+  // Conteo de etapas por vale (para columna en el panel)
+  const stagesCountByVale = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const s of valeStages.data ?? []) {
+      m.set(s.vale_type_id, (m.get(s.vale_type_id) ?? 0) + 1);
+    }
+    return m;
+  }, [valeStages.data]);
+
+  const manageFiltered = useMemo(() => {
+    const tokens = manageSearch.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return sortedValeTypes.filter((vt) => {
+      if (tokens.length === 0) return true;
+      const hay = `${vt.code} ${vt.name} ${vt.section ?? ""}`.toLowerCase();
+      return tokens.every((t) => hay.includes(t));
+    });
+  }, [sortedValeTypes, manageSearch]);
+
+  const manageTotalPages = Math.max(1, Math.ceil(manageFiltered.length / managePageSize));
+  const managePageSafe = Math.min(managePage, manageTotalPages);
+  const manageRows = manageFiltered.slice(
+    (managePageSafe - 1) * managePageSize,
+    managePageSafe * managePageSize,
+  );
+
+  useEffect(() => {
+    setManagePage(1);
+  }, [manageSearch]);
+
   // Próximo código: V## siguiente al máximo actual (crece a 3+ si hace falta).
   const nextValeCode = useMemo(() => {
     let maxNum = 0;
