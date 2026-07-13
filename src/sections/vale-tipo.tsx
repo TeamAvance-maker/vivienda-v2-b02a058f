@@ -544,21 +544,37 @@ export function ValeTipoSection() {
               <h3 className="font-display text-base font-semibold">
                 Agregar material a {houseType} · {selectedVT?.code} · Etapa {selectedStage?.stage_number}
               </h3>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={filteredReqs.length === 0}
-                onClick={() => {
-                  setCopyTargets([]);
-                  setCopyOverwrite(false);
-                  setCopyPass("");
-                  setCopyOpen(true);
-                }}
-              >
-                <Repeat2 className="mr-1 h-4 w-4" />
-                Copiar a otro tipo de casa
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="default"
+                  size="sm"
+                  disabled={filteredReqs.length === 0}
+                  onClick={() => {
+                    setPrintCopies(1);
+                    setPrintMode("print");
+                    setPrintOpen(true);
+                  }}
+                >
+                  <Printer className="mr-1 h-4 w-4" />
+                  Imprimir vale
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={filteredReqs.length === 0}
+                  onClick={() => {
+                    setCopyTargets([]);
+                    setCopyOverwrite(false);
+                    setCopyPass("");
+                    setCopyOpen(true);
+                  }}
+                >
+                  <Repeat2 className="mr-1 h-4 w-4" />
+                  Copiar a otro tipo de casa
+                </Button>
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
               <div className="md:col-span-2">
