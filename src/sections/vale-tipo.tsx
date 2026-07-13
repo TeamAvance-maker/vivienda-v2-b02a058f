@@ -182,6 +182,75 @@ export function ValeTipoSection() {
     [valeTypes.data],
   );
 
+  // ------------- Nuevo vale tipo -------------
+  const [newValeOpen, setNewValeOpen] = useState(false);
+  const [newValeName, setNewValeName] = useState("");
+  const [newValeSection, setNewValeSection] = useState("");
+  const [newValePass, setNewValePass] = useState("");
+
+  // Próximo código: V## siguiente al máximo actual (crece a 3+ si hace falta).
+  const nextValeCode = useMemo(() => {
+    let maxNum = 0;
+    for (const vt of valeTypes.data ?? []) {
+      const m = /^V(\d+)$/i.exec(vt.code ?? "");
+      if (m) maxNum = Math.max(maxNum, parseInt(m[1], 10));
+    }
+    const n = maxNum + 1;
+    return `V${String(n).padStart(2, "0")}`;
+  }, [valeTypes.data]);
+
+  const nextValeSort = useMemo(
+    () =>
+      (valeTypes.data ?? []).reduce(
+        (a, b) => Math.max(a, b.sort_order ?? 0),
+        0,
+      ) + 1,
+    [valeTypes.data],
+  );
+
+  const createValeMut = useMutation({
+    mutationFn: async () => {
+      const name = newValeName.trim();
+      if (!name) throw new Error("Nombre requerido");
+      if (!newValePass) throw new Error("Contraseña requerida");
+      const dup = (valeTypes.data ?? []).find(
+        (v) => v.code.toLowerCase() === nextValeCode.toLowerCase(),
+      );
+      if (dup) throw new Error(`El código ${nextValeCode} ya existe. Recarga la página.`);
+      const values: Record<string, any> = {
+        code: nextValeCode,
+        name: name.toUpperCase(),
+        sort_order: nextValeSort,
+      };
+      const section = newValeSection.trim();
+      if (section) values.section = section;
+      await adminMutate({
+        data: {
+          passphrase: newValePass,
+          table: "vale_types_v2",
+          action: "insert",
+          values,
+        },
+      });
+      return { code: nextValeCode };
+    },
+    onSuccess: async (res) => {
+      toast.success(`Vale tipo ${res.code} creado`);
+      setNewValeOpen(false);
+      setNewValeName("");
+      setNewValeSection("");
+      setNewValePass("");
+      const { data: fresh } = await valeTypes.refetch();
+      invalidate();
+      const created = (fresh ?? []).find((v) => v.code === res.code);
+      if (created) {
+        setValeTypeId(created.id);
+        setStageId("");
+      }
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Error"),
+  });
+
   const stagesForType = useMemo(
     () =>
       (valeStages.data ?? [])
