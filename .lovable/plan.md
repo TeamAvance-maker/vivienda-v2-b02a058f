@@ -1,33 +1,56 @@
-## Problema
+## Qué hay hoy 🧒
 
-En la sección **Materiales**, al presionar "Agregar material" sale el error rojo:
-`new row violates row-level security policy for table "materials_v2"`
+En la sección **Vales tipo** hoy solo puedes:
+- ➕ Crear un vale tipo nuevo (con etapa inicial).
+- 📋 Elegir un vale del selector de arriba y cargarle materiales.
+- 🖨️ Imprimir / exportar a PDF.
 
-### Por qué pasa (explicado simple)
+Pero **no puedes** renombrar un vale, cambiar su sección, ni eliminarlo. Eso es lo que falta para tener un CRUD completo.
 
-Piensa en la base de datos como una caja fuerte 🔐. Cuando activamos la seguridad (RLS) hace unas semanas, le dijimos: *"solo deja **mirar** los materiales a usuarios aprobados"*. Pero **no le dimos permiso para meter materiales nuevos** desde el navegador.
+## Qué haré
 
-El formulario de "Agregar material" hoy escribe **directamente** desde el navegador (sin la contraseña de obra), y la caja fuerte lo rechaza. En cambio, el botón "Editar" sí funciona porque usa la ruta segura del servidor (`adminMutateFn`) con contraseña.
+Convertir el botón único **"Nuevo vale tipo"** en un **panel de gestión de vales tipo** con las 4 acciones clásicas (Crear, Leer, Actualizar, Eliminar), sin tocar la parte de materiales/etapas que ya funciona.
 
-## Solución propuesta
+### 1. Nuevo botón "Administrar vales tipo"
+Al lado del actual "Nuevo vale tipo", abre un diálogo grande con la **lista de todos los vales tipo** (código, nombre, sección, fecha de creación, nº de etapas). Con:
+- 🔎 Buscador por tokens (misma regla global).
+- 📄 Paginación de 10 (regla global).
+- Botones por fila: **Editar ✏️** y **Eliminar 🗑️**.
+- Botón arriba: **➕ Nuevo** (reutiliza el diálogo existente).
 
-Cambiar el botón "Agregar material" para que use la **misma ruta segura** que ya usa "Editar":
+### 2. Editar vale tipo (Update) ✏️
+Diálogo con:
+- **Nombre** (obligatorio).
+- **Sección** (opcional).
+- **Contraseña de obra**.
 
-1. En `src/sections/materials.tsx`, reemplazar el `supabase.from(...).insert(...)` directo por una llamada a `adminMutateFn` (server function que ya existe y ya bypasea RLS de forma controlada).
-2. Pedir la **contraseña de obra** en un pequeño diálogo antes de crear el material (igual que hoy pide para editar/borrar), para no dejar la creación abierta a cualquiera.
-3. Al terminar, refrescar la lista automáticamente.
+El **código** (V01, V02…) NO se puede cambiar — es el ID único y hay muchos datos ligados a él. Se muestra como solo lectura.
 
-**No** vamos a abrir la política RLS de `materials_v2` a INSERT desde el navegador — sería un agujero de seguridad (cualquier usuario aprobado podría inyectar materiales sin control). La ruta con contraseña es coherente con el resto del sitio.
+Guarda con `adminMutateFn` → `update` sobre `vale_types_v2`. Queda en el historial automáticamente.
 
-## Alcance
+### 3. Eliminar vale tipo (Delete) 🗑️
+Usa el diálogo de **borrado en cascada** que ya existe (`requestCascadeDelete`) para avisar en rojo que se borrarán también:
+- Todas sus etapas (`vale_stages`).
+- Todos los materiales asignados en esas etapas (`vale_reqs`).
 
-- Un solo archivo tocado: `src/sections/materials.tsx`.
-- Sin cambios en la base de datos, sin nuevas migraciones, sin tocar otras secciones.
+Pide contraseña de obra y motivo. Queda en historial.
 
-## Detalles técnicos
+Si el vale seleccionado arriba era el que borraste, el selector se limpia solo.
 
-- Usar `useServerFn(adminMutateFn)` con `{ table: "materials_v2", action: "insert", values: {...} }`.
-- Añadir estado local `addPass` y un `AlertDialog` reutilizando el patrón del diálogo de edición ya existente en el mismo archivo.
-- `sort_order` y `code` (autogenerado con `nextCode`) se calculan igual que ahora.
+### 4. Crear (ya existe, sin cambios)
+Reutilizo el diálogo actual "Nuevo vale tipo" — solo lo abro también desde el panel.
+
+## Alcance técnico
+
+- **Un solo archivo tocado**: `src/sections/vale-tipo.tsx`.
+- **Sin migraciones** ni cambios en base de datos.
+- **Sin nuevas server functions**: uso `adminMutateFn` (update) y `requestCascadeDelete` (delete en cascada) que ya existen.
+- Refresco de datos con `invalidate()` de `useInvalidateSitesV2` (ya se usa).
+
+## Fuera de alcance
+
+- No cambio el CRUD de materiales dentro del vale (ya funciona).
+- No cambio el CRUD de etapas dentro del vale (ya funciona).
+- No cambio el código autogenerado ni el formato V##.
 
 ¿Le damos? 🚀
