@@ -79,7 +79,13 @@ export function ValeTipoSection() {
   const materials = useMaterialsV2();
   const reqs = useValeReqs();
   const invalidate = useInvalidateSitesV2();
+  const cfg = useConfig();
   const adminMutate = useServerFn(adminMutateFn);
+
+  // Print vale dialog
+  const [printOpen, setPrintOpen] = useState(false);
+  const [printCopies, setPrintCopies] = useState<number>(1);
+  const [printMode, setPrintMode] = useState<"print" | "download">("print");
 
   const [houseType, setHouseType] = useState<HouseTypeV2>("A1");
   const [valeTypeId, setValeTypeId] = useState<string>("");
