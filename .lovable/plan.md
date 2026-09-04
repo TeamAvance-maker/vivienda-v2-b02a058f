@@ -1,56 +1,47 @@
-## Qué hay hoy 🧒
+# Análisis de un vale (nueva pantalla)
 
-En la sección **Vales tipo** hoy solo puedes:
-- ➕ Crear un vale tipo nuevo (con etapa inicial).
-- 📋 Elegir un vale del selector de arriba y cargarle materiales.
-- 🖨️ Imprimir / exportar a PDF.
+Una pantalla nueva donde eliges **un vale tipo** (por ejemplo "PUERTAS") y ves todo sobre él: sus etapas separadas, cuánto material ya se entregó, cuánto falta, y qué sitios están incompletos.
 
-Pero **no puedes** renombrar un vale, cambiar su sección, ni eliminarlo. Eso es lo que falta para tener un CRUD completo.
+## Dónde vivirá
 
-## Qué haré
+Nueva opción en el menú lateral llamada **"Análisis de vale"**, justo después de "Reportes".
 
-Convertir el botón único **"Nuevo vale tipo"** en un **panel de gestión de vales tipo** con las 4 acciones clásicas (Crear, Leer, Actualizar, Eliminar), sin tocar la parte de materiales/etapas que ya funciona.
+## Qué se verá, de arriba hacia abajo
 
-### 1. Nuevo botón "Administrar vales tipo"
-Al lado del actual "Nuevo vale tipo", abre un diálogo grande con la **lista de todos los vales tipo** (código, nombre, sección, fecha de creación, nº de etapas). Con:
-- 🔎 Buscador por tokens (misma regla global).
-- 📄 Paginación de 10 (regla global).
-- Botones por fila: **Editar ✏️** y **Eliminar 🗑️**.
-- Botón arriba: **➕ Nuevo** (reutiliza el diálogo existente).
+1. **Elegir el vale**
+   - Un buscador para elegir el vale tipo (busca por código o nombre, escribiendo palabras sueltas).
 
-### 2. Editar vale tipo (Update) ✏️
-Diálogo con:
-- **Nombre** (obligatorio).
-- **Sección** (opcional).
-- **Contraseña de obra**.
+2. **Resumen rápido (tarjetas)**
+   - Sitios donde aplica este vale.
+   - Sitios completos / incompletos.
+   - Porcentaje de avance de la obra para ese vale.
 
-El **código** (V01, V02…) NO se puede cambiar — es el ID único y hay muchos datos ligados a él. Se muestra como solo lectura.
+3. **Por etapa**
+   - Una sección por cada etapa del vale (Etapa 1, Etapa 2, …).
+   - Dentro de cada etapa, una tabla de materiales con: código, descripción, unidad, **necesario**, **asignado (entregado)**, **falta**, y % de avance.
 
-Guarda con `adminMutateFn` → `update` sobre `vale_types_v2`. Queda en el historial automáticamente.
+4. **Por tipo de vivienda (A1, A2, B, C) por separado**
+   - Una tabla por tipo de casa con los mismos totales (necesario / asignado / falta) de ese vale.
+   - Sólo aparecen los tipos de casa a los que el vale realmente aplica.
 
-### 3. Eliminar vale tipo (Delete) 🗑️
-Usa el diálogo de **borrado en cascada** que ya existe (`requestCascadeDelete`) para avisar en rojo que se borrarán también:
-- Todas sus etapas (`vale_stages`).
-- Todos los materiales asignados en esas etapas (`vale_reqs`).
+5. **Por manzana**
+   - Tabla con: manzana, sitios que aplican, completos, incompletos, y el total de material que falta en esa manzana.
 
-Pide contraseña de obra y motivo. Queda en historial.
+6. **General de la obra**
+   - Tabla consolidada de todos los materiales del vale: necesario total, asignado total, falta total.
 
-Si el vale seleccionado arriba era el que borraste, el selector se limpia solo.
+7. **Sitios incompletos**
+   - Lista con manzana, sitio, tipo de casa, etapa pendiente y **qué material y cuánto le falta** a cada uno.
+   - Con buscador y paginación de 10 filas.
 
-### 4. Crear (ya existe, sin cambios)
-Reutilizo el diálogo actual "Nuevo vale tipo" — solo lo abro también desde el panel.
+8. **Exportar**
+   - Botones para **Excel** (una hoja por bloque: etapas, tipos de vivienda, manzanas, general, sitios incompletos) y **PDF** para imprimir, con el mismo estilo café que ya usan los otros informes.
 
-## Alcance técnico
+## Detalles técnicos
 
-- **Un solo archivo tocado**: `src/sections/vale-tipo.tsx`.
-- **Sin migraciones** ni cambios en base de datos.
-- **Sin nuevas server functions**: uso `adminMutateFn` (update) y `requestCascadeDelete` (delete en cascada) que ya existen.
-- Refresco de datos con `invalidate()` de `useInvalidateSitesV2` (ya se usa).
-
-## Fuera de alcance
-
-- No cambio el CRUD de materiales dentro del vale (ya funciona).
-- No cambio el CRUD de etapas dentro del vale (ya funciona).
-- No cambio el código autogenerado ni el formato V##.
-
-¿Le damos? 🚀
+- Archivo nuevo `src/sections/vale-analysis.tsx`; se registra el tab `analisis-vale` en `src/components/app-shell.tsx` y en `src/routes/_authenticated/index.tsx`.
+- Los cálculos se hacen en el navegador con los datos que ya se cargan: `useSites`, `useValeTypes`, `useValeStages`, `useValeReqs`, `useMaterialsV2`, `useSiteDeliveries`, `useSiteDeliveryItems` (de `src/lib/sites-queries.ts`).
+- Se reutiliza `buildMaps` de `src/lib/sites-compute.ts`; se agregan funciones puras nuevas en un archivo `src/lib/vale-analysis.ts` para los cortes por etapa, tipo de casa, manzana y sitio (necesario = suma de `vale_reqs` por sitio aplicable; asignado = suma de `site_delivery_items`; falta = máximo entre 0 y necesario − asignado, calculado por sitio y luego sumado).
+- Todo con `useMemo`, buscador por tokens y paginación de 10, siguiendo las reglas globales del proyecto.
+- Exportaciones con `xlsx` y `jspdf`/`jspdf-autotable`, ya instalados.
+- Sólo lectura: no se toca la base de datos ni se crean tablas.
