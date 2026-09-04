@@ -11,6 +11,7 @@ import {
   Map as MapIcon,
   Menu as MenuIcon,
   PackagePlus,
+  ScanSearch,
   Settings2,
   Truck,
   UserCog,
@@ -33,6 +34,7 @@ export type TabKey =
   | "materiales"
   | "inventario"
   | "reportes"
+  | "analisis-vale"
   | "simulador"
   | "config"
   | "usuarios";
@@ -46,6 +48,7 @@ export const TABS: { key: TabKey; label: string; icon: typeof Home }[] = [
   { key: "casas", label: "Casas", icon: HousePlus },
   { key: "inventario", label: "Inventario", icon: ClipboardCheck },
   { key: "reportes", label: "Reportes", icon: FileSpreadsheet },
+  { key: "analisis-vale", label: "Análisis de vale", icon: ScanSearch },
   { key: "simulador", label: "Simulador", icon: Calculator },
 ];
 
