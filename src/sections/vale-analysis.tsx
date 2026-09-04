@@ -259,9 +259,17 @@ export function ValeAnalysisSection() {
     );
 
     const style = {
-      styles: { font: "helvetica", fontSize: 8, cellPadding: 4, textColor: [60, 40, 25] },
-      headStyles: { fillColor: [70, 45, 30], textColor: [250, 244, 230] },
-      alternateRowStyles: { fillColor: [250, 244, 230] },
+      styles: {
+        font: "helvetica",
+        fontSize: 8,
+        cellPadding: 4,
+        textColor: [60, 40, 25] as [number, number, number],
+      },
+      headStyles: {
+        fillColor: [70, 45, 30] as [number, number, number],
+        textColor: [250, 244, 230] as [number, number, number],
+      },
+      alternateRowStyles: { fillColor: [250, 244, 230] as [number, number, number] },
       theme: "grid" as const,
     };
 
